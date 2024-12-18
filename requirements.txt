@@ -1,0 +1,10 @@
+setuptools
+wheel
+requests
+mqtt-spb-wrapper==2.0.1
+ping3
+pyyaml
+cmake
+omegaconf
+xmltodict
+pandas

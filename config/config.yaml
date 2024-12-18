@@ -1,0 +1,12 @@
+experiment_class: 'node_online'
+stream_rate: 10
+
+mqtt:
+  broker_address: 128.237.92.30
+  broker_port: 1883 
+  username: admin
+  password: password
+  group_name: Mill-19
+  node_name: test-node
+  tls_enabled: False
+  debug: True
