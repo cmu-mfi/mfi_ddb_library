@@ -11,6 +11,18 @@ import xmltodict
 from mqtt_spb_wrapper import MqttSpbEntityDevice
 
 class PushStreamToMqttSpb:
+    """
+    A class to push stream data to MQTT broker using Sparkplug B protocol.
+    Attributes:
+        cfg (OmegaConf): Configuration object loaded from the provided YAML file.
+        data_obj (object): Data object containing component IDs, attributes, and data.
+        components (dict): Dictionary to store MqttSpbEntityDevice instances for each component.
+    Methods:
+        __init__(cfg_file, data_obj): Initializes the PushStreamToMqttSpb instance with configuration and data object.
+        connect(): Connects to the MQTT broker and initializes MqttSpbEntityDevice instances for each component.
+        publish_birth(): Publishes birth certificates for all components to the MQTT broker.
+        streamdata(): Streams data for all components to the MQTT broker.
+    """
     def __init__(self, cfg_file, data_obj) -> None:      
         with open(cfg_file, 'r') as file:
             config = yaml.load(file, Loader=yaml.FullLoader) 
