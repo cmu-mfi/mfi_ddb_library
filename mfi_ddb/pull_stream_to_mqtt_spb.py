@@ -15,12 +15,14 @@ from mfi_ddb import PushStreamToMqttSpb
 class PullStreamToMqttSpb:
     """
     A class to pull data from a data source and stream it to an MQTT broker.
+    
     Attributes:
     -----------
-    data_obj : object
-        An object that provides methods to get and update data.
-    push_stream : PushStreamToMqttSpb
-        An instance of the PushStreamToMqttSpb class to handle streaming data to MQTT.
+    data_obj (object): An object that provides methods to get and update data.
+    push_stream (PushStreamToMqttSpb): An instance of the PushStreamToMqttSpb class to handle streaming data to MQTT.
+    components (list): A list of components to be streamed.
+    cfg (OmegaConf): Configuration object for the streaming process.
+    
     Methods:
     --------
     __init__(cfg_file, data_obj): Initializes the PullStreamToMqttSpb class with a configuration file and a data object.
@@ -28,9 +30,12 @@ class PullStreamToMqttSpb:
     """
     def __init__(self, cfg_file, data_obj) -> None:      
         
+        self.data_obj = data_obj
         self.data_obj.get_data()
         
         self.push_stream = PushStreamToMqttSpb(cfg_file, data_obj)
+        self.components = self.push_stream.components
+        self.cfg = self.push_stream.cfg
     
         try:
             while True:
@@ -41,7 +46,7 @@ class PullStreamToMqttSpb:
     def streamdata(self):  
               
         self.data_obj.update_data()
-        self.push_stream.stream_data()
+        self.push_stream.streamdata()
     
         component_count = len(self.components)
         sleep_time = 1/(self.cfg.stream_rate * component_count)
