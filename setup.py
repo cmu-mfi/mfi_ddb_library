@@ -7,4 +7,7 @@ setup(
     install_requires=[         # Add dependencies from requirements.txt
         line.strip() for line in open('requirements.txt').readlines()
     ],
+    author='Shobhit Aggarwal',
+    author_email='shobhit@cmu.edu',
+    url='https://github.com/cmu-mfi/mfi_ddb_library'
 )
