@@ -9,7 +9,7 @@ import yaml
 from mqtt_spb_wrapper import MqttSpbEntityDevice
 from omegaconf import OmegaConf
 
-from mfi_ddb import PushStreamToMqttSpb
+from mfi_ddb import DataObject, PushStreamToMqttSpb
 
 
 class PullStreamToMqttSpb:
@@ -18,7 +18,7 @@ class PullStreamToMqttSpb:
     
     Attributes:
     -----------
-    data_obj (object): An object that provides methods to get and update data.
+    data_obj (DataObject): An object that provides methods to get and update data.
     push_stream (PushStreamToMqttSpb): An instance of the PushStreamToMqttSpb class to handle streaming data to MQTT.
     components (list): A list of components to be streamed.
     cfg (OmegaConf): Configuration object for the streaming process.
@@ -28,7 +28,7 @@ class PullStreamToMqttSpb:
     __init__(cfg_file, data_obj): Initializes the PullStreamToMqttSpb class with a configuration file and a data object.
     streamdata(): Updates the data and streams it to the MQTT broker.
     """
-    def __init__(self, cfg_file, data_obj) -> None:      
+    def __init__(self, cfg_file, data_obj: DataObject) -> None:      
         
         self.data_obj = data_obj
         self.data_obj.get_data()

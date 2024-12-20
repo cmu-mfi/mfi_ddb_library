@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 
 import os
+import random
 import time
 
-import random
-import yaml
-from omegaconf import OmegaConf
 import xmltodict
-
+import yaml
 from mqtt_spb_wrapper import MqttSpbEntityDevice
+from omegaconf import OmegaConf
+
+from mfi_ddb import DataObject
+
 
 class PushStreamToMqttSpb:
     """
@@ -23,7 +25,7 @@ class PushStreamToMqttSpb:
         publish_birth(): Publishes birth certificates for all components to the MQTT broker.
         streamdata(): Streams data for all components to the MQTT broker.
     """
-    def __init__(self, cfg_file, data_obj) -> None:      
+    def __init__(self, cfg_file, data_obj: DataObject) -> None:      
         with open(cfg_file, 'r') as file:
             config = yaml.load(file, Loader=yaml.FullLoader) 
         

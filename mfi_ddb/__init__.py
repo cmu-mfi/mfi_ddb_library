@@ -1,3 +1,4 @@
+from .data_object import DataObject
 from .push_stream_to_mqtt import PushStreamToMqtt
 from .push_stream_to_mqtt_spb import PushStreamToMqttSpb
 from .pull_stream_to_mqtt import PullStreamToMqtt

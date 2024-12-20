@@ -9,7 +9,7 @@ import yaml
 from mqtt_spb_wrapper import MqttSpbEntityDevice
 from omegaconf import OmegaConf
 
-from mfi_ddb import PushStreamToMqtt
+from mfi_ddb import DataObject, PushStreamToMqtt
 
 
 class PullStreamToMqtt:
