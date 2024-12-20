@@ -1,4 +1,4 @@
-class DataObject:
+class BaseDataObject:
     def __init__(self) -> None:
         self.component_ids = []
         self.data = {}
