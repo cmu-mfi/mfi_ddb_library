@@ -57,8 +57,8 @@ class RosDataObject(BaseDataObject):
             
             self.attributes[namespace] = cfg["attributes"]
             if 'experiment_class' not in cfg["attributes"].keys():
-                if 'experiment_class' in cfg.keys():
-                    self.attributes[namespace]['experiment_class'] = cfg['experiment_class']
+                if 'experiment_class' in config.keys():
+                    self.attributes[namespace]['experiment_class'] = config['experiment_class']
             
             self.data[namespace] = {}
             self.raw_data[namespace] = {}
