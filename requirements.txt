@@ -1,10 +1,10 @@
-setuptools
-wheel
-requests
+cmake
 mqtt-spb-wrapper==2.0.1
+omegaconf
+pandas
 ping3
 pyyaml
-cmake
-omegaconf
+requests
+setuptools
+wheel
 xmltodict
-pandas
