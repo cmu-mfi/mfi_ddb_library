@@ -82,10 +82,11 @@ class MTConnectDataObject(BaseDataObject):
             def extract_key_value(data_item, data_item_key):
                 if isinstance(data_item, omegaconf.dictconfig.DictConfig):
                     for key in data_item.keys():
-                        extract_key_value(data_item[key], f'{data_item_key}/{key}')
+                        substitute_key = key
+                        if key == '#text':
+                            substitute_key = 'value'
+                        extract_key_value(data_item[key], f'{data_item_key}/{substitute_key}')
                 else:
-                    if data_item_key == "#text":
-                        data_item_key = "value"
                     self.data[component_id][data_item_key] = self.__autotype(data_item)           
             
             for key in component_data.keys():
