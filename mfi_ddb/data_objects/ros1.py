@@ -54,7 +54,12 @@ class RosDataObject(BaseDataObject):
             cfg = config["devices"][device]
             namespace = cfg["namespace"]
             self.component_ids.append(namespace)
+            
             self.attributes[namespace] = cfg["attributes"]
+            if 'experiment_class' not in cfg["attributes"].keys():
+                if 'experiment_class' in cfg.keys():
+                    self.attributes[namespace]['experiment_class'] = cfg['experiment_class']
+            
             self.data[namespace] = {}
             self.raw_data[namespace] = {}
             for topic in cfg["rostopics"]:

@@ -72,12 +72,20 @@ class PushStreamToMqttSpb:
         components = self.components.copy()
         for component_id in components.keys():
             # set attributes value
-            experiment_class = self.cfg['experiment_class']
-            self.components[component_id].attributes.set_value('experiment_class', experiment_class)
-            
             attributes = self.data_obj.attributes[component_id]
             input_values = self.data_obj.data[component_id]
 
+            if 'experiment_class' not in attributes.keys():
+                if 'experiment_class' not in self.cfg.keys():
+                    print(f"Experiment class not found for component {component_id}")
+                    self.components.pop(component_id)
+                    self.data_obj.component_ids.remove(component_id)
+                    self.data_obj.attributes.pop(component_id)
+                    self.data_obj.data.pop(component_id)
+                    continue
+                else:
+                    attributes['experiment_class'] = self.cfg['experiment_class']           
+            
             if not bool(input_values):
                 print(f"Data not found for component {component_id}")
                 self.components.pop(component_id)
