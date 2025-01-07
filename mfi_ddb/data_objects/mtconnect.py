@@ -84,7 +84,9 @@ class MTConnectDataObject(BaseDataObject):
                     for key in data_item.keys():
                         extract_key_value(data_item[key], f'{data_item_key}/{key}')
                 else:
-                    self.data[component_id][data_item_key] = data_item           
+                    if data_item_key == "#text":
+                        data_item_key = "value"
+                    self.data[component_id][data_item_key] = self.__autotype(data_item)           
             
             for key in component_data.keys():
                 if key in ['Events', 'Samples']:
@@ -101,3 +103,12 @@ class MTConnectDataObject(BaseDataObject):
         val = xmltodict.parse(response.text, encoding='utf-8')
         val = OmegaConf.create(val)        
         return val
+    
+    def __autotype(self, value):
+        try:
+            return int(value)
+        except:
+            try:
+                return float(value)
+            except:
+                return value
