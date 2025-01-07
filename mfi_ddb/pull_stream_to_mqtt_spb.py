@@ -33,10 +33,12 @@ class PullStreamToMqttSpb:
         self.components = self.push_stream.components
         self.cfg = self.push_stream.cfg
         
-        if 'stream_rate' not in self.cfg:
+        if 'stream_rate' not in self.data_obj.cfg:
             print("Stream rate not specified. Defaulting to 1 Hz.")
             self.cfg.stream_rate = 1        
-        
+        else:
+            self.cfg.stream_rate = self.data_obj.cfg.stream_rate
+            
         try:
             while True:
                 self.streamdata()

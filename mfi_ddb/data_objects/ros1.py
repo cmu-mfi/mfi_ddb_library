@@ -48,17 +48,18 @@ class RosDataObject(BaseDataObject):
             )
 
         # INIT DATA MEMBERS FROM CONFIG
+        self.config = config
         self.raw_data = {}
-        for device in config["devices"]:
+        for device in self.config["devices"]:
             print(f"Device: {device}")
-            cfg = config["devices"][device]
+            cfg = self.config["devices"][device]
             namespace = cfg["namespace"]
             self.component_ids.append(namespace)
             
             self.attributes[namespace] = cfg["attributes"]
             if 'experiment_class' not in cfg["attributes"].keys():
-                if 'experiment_class' in config.keys():
-                    self.attributes[namespace]['experiment_class'] = config['experiment_class']
+                if 'experiment_class' in self.config.keys():
+                    self.attributes[namespace]['experiment_class'] = self.config['experiment_class']
             
             self.data[namespace] = {}
             self.raw_data[namespace] = {}
@@ -102,13 +103,13 @@ class RosDataObject(BaseDataObject):
 
         self._enable_topic_polling = enable_topic_polling
         stream_rate = None
-        if "stream_rate" not in config.keys():
+        if "stream_rate" not in self.config.keys():
             print(
                 "Warning: stream_rate not found in config file. Setting stream_rate to 1 Hz."
             )
             stream_rate = 1
         else:
-            stream_rate = config["stream_rate"]
+            stream_rate = self.config["stream_rate"]
 
         self._wait_per_topic = 1 / stream_rate
         
