@@ -58,7 +58,10 @@ class RosDataObject(BaseDataObject):
             self.data[namespace] = {}
             self.raw_data[namespace] = {}
             for topic in cfg["rostopics"]:
-                topic = f"/{namespace}/{topic}"
+                if len(namespace) > 0:
+                    topic = f"/{namespace}/{topic}"
+                else:
+                    topic = f"/{topic}"
                 self.raw_data[namespace][topic] = None
 
         # CHECK IF ROS MASTER IS RUNNING
