@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
 
-import os
-import random
 import time
 
-import xmltodict
-import yaml
 from mqtt_spb_wrapper import MqttSpbEntityDevice
 from omegaconf import OmegaConf
 
@@ -36,7 +32,11 @@ class PullStreamToMqttSpb:
         self.push_stream = PushStreamToMqttSpb(cfg_file, data_obj)
         self.components = self.push_stream.components
         self.cfg = self.push_stream.cfg
-    
+        
+        if 'stream_rate' not in self.cfg:
+            print("Stream rate not specified. Defaulting to 1 Hz.")
+            self.cfg.stream_rate = 1        
+        
         try:
             while True:
                 self.streamdata()
@@ -49,5 +49,8 @@ class PullStreamToMqttSpb:
         self.push_stream.streamdata()
     
         component_count = len(self.components)
-        sleep_time = 1/(self.cfg.stream_rate * component_count)
+        try:
+            sleep_time = 1/(self.cfg.stream_rate * component_count)
+        except ZeroDivisionError:
+            raise ZeroDivisionError("Zero active components.")
         time.sleep(sleep_time)

@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 
-import os
-import random
 import time
 
-import xmltodict
 import yaml
 from mqtt_spb_wrapper import MqttSpbEntityDevice
 from omegaconf import OmegaConf
@@ -72,13 +69,22 @@ class PushStreamToMqttSpb:
 
     def publish_birth(self):
         
-        for component_id in self.components.keys():
+        components = self.components.copy()
+        for component_id in components.keys():
             # set attributes value
             experiment_class = self.cfg['experiment_class']
             self.components[component_id].attributes.set_value('experiment_class', experiment_class)
             
             attributes = self.data_obj.attributes[component_id]
             input_values = self.data_obj.data[component_id]
+
+            if not bool(input_values):
+                print(f"Data not found for component {component_id}")
+                self.components.pop(component_id)
+                self.data_obj.component_ids.remove(component_id)
+                self.data_obj.attributes.pop(component_id)
+                self.data_obj.data.pop(component_id)
+                continue
 
             for key in attributes.keys():
                 self.components[component_id].attributes.set_value(key, attributes[key])
