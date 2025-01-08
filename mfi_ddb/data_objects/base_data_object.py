@@ -1,8 +1,22 @@
 class BaseDataObject:
+    """
+    Base class for data objects. Use as a super class for the data objects that will be used in the PullStreamToMqtt(Spb) and PushStreamToMqtt(Spb) classes.
+    """
+
     def __init__(self) -> None:
         self.component_ids = []
+        # component_ids is a list of identifiers for the components that are part of the data object.
+        # e.g.: self.component_ids = ["robot-arm-1", "machine-a"]
+
         self.data = {}
+        # data is a dictionary that contains the data of the components.
+        # e.g.: self.data = {"robot-arm-1": {"estop": 0, "joint-1": 0.52},
+        #                    "machine-a": {"temperature": 30, "pressure": 100}}
+
         self.attributes = {}
+        # attributes is a dictionary that contains the attributes of the components.
+        # e.g.: self.attributes = {"robot-arm-1": {"manufacturer": "ABB", "model": "IRB 120", "experiment_class": "orange-test-1"},
+        #                          "machine-a": {"manufacturer": "Siemens", "model": "S7-1500", "experiment_class": "orange-test-1"}},
 
     def get_data(self):
         """
@@ -15,14 +29,14 @@ class BaseDataObject:
             NotImplementedError: If the method is not implemented.
         """
         NotImplementedError("DataObject.get_data() not implemented yet!")
-    
+
     def update_data(self):
         """
         Update data from the data source.
-        
+
         This method should be implemented in the inherited class.
         It is required for the PullStreamToMqttSpb and PullStreamToMqtt classes.
-        
+
         Raises:
             NotImplementedError: If the method is not implemented.
         """

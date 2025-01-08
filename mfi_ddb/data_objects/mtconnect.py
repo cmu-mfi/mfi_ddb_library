@@ -21,18 +21,6 @@ class MTConnectDataObject(BaseDataObject):
               
         # CHECK IF MTCONNECT AGENT IS ACTIVE
         self.__connect()
-        
-    def __connect(self):
-        # Ping to see if MTConnect agent is active -----------------------------------
-        print("Checking if MTConnect agent is active ...")
-        pinged = False
-        ip = self.cfg['mtconnect']['agent_ip']
-        while not pinged:
-            response = ping(ip)
-            if response is not None:
-                pinged = True
-        
-        print(f"MTConnect agent at {ip} is active")
     
     def get_data(self):
         raw_data = self.__request_agent('current')
@@ -73,6 +61,18 @@ class MTConnectDataObject(BaseDataObject):
                 return
         
         self.__populate_data(component_stream)
+
+    def __connect(self):
+        # Ping to see if MTConnect agent is active -----------------------------------
+        print("Checking if MTConnect agent is active ...")
+        pinged = False
+        ip = self.cfg['mtconnect']['agent_ip']
+        while not pinged:
+            response = ping(ip)
+            if response is not None:
+                pinged = True
+        
+        print(f"MTConnect agent at {ip} is active")
 
     def __populate_data(self, component_stream):
         
