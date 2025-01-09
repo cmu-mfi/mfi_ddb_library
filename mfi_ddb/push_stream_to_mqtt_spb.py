@@ -109,6 +109,10 @@ class PushStreamToMqttSpb:
             
             input_values = self.data_obj.data[component_id]
 
+            if not bool(input_values):
+                print(f"Data not found for component {component_id}")
+                continue
+            
             for key in input_values.keys():
                 data_item_prefix = 'DATA/'+key
                 self.components[component_id].data.set_value(data_item_prefix, input_values[key])            
