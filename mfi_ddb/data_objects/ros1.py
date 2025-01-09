@@ -64,7 +64,7 @@ class RosDataObject(BaseDataObject):
             self.data[namespace] = {}
             self.raw_data[namespace] = {}
             for topic in cfg["rostopics"]:
-                if len(namespace) > 0:
+                if namespace != "/":
                     topic = f"/{namespace}/{topic}"
                 else:
                     topic = f"/{topic}"
