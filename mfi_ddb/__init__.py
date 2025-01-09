@@ -7,3 +7,4 @@ from .pull_stream_to_mqtt_spb import PullStreamToMqttSpb
 from .data_objects.mtconnect import MTConnectDataObject
 from .data_objects.ros1 import RosDataObject
 from .data_objects.ros1 import RosCallback
+from .data_objects.local_files import LocalFilesDataObject

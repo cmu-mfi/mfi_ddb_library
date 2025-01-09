@@ -1,0 +1,13 @@
+experiment_class: 'receptacle_image'
+
+watch_dir: 
+  - '/home/mfi/repos/dbb_interfaces/data'
+
+system:
+  name: 'keyence'
+  description: '...'
+  type: '...'
+
+wait_before_read: 1 # seconds
+buffer_size: 10
+stream_rate: 1
