@@ -95,11 +95,14 @@ class PushStreamToMqttSpb:
                 continue
 
             for key in attributes.keys():
+                if type(attributes[key]) not in [int, float, str, list]:
+                    continue                 
                 self.components[component_id].attributes.set_value(key, attributes[key])
                 
-            for key in input_values.keys():                
+            for key in input_values.keys():
+                if type(input_values[key]) not in [int, float, str, list]:
+                    continue                 
                 self.components[component_id].data.set_value(key, input_values[key])
-
             self.components[component_id].publish_birth()
             print(f"Birth published for component {component_id}")
     
@@ -114,9 +117,10 @@ class PushStreamToMqttSpb:
                 continue
             
             for key in input_values.keys():
+                if type(input_values[key]) not in [int, float, str, list]:
+                    continue 
                 data_item_prefix = 'DATA/'+key
                 self.components[component_id].data.set_value(data_item_prefix, input_values[key])            
                 
             self.components[component_id].publish_data()
-
             print(f"Data published for component {component_id}")
