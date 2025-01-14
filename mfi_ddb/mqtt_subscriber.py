@@ -7,7 +7,7 @@ import time
 import numpy as np
 import paho.mqtt.client as mqtt
 
-class MQTTSubscriber:
+class MqttSubscriber:
     """
     A class to handle MQTT subscriptions and message processing.
     Attributes:
@@ -40,6 +40,7 @@ class MQTTSubscriber:
         
         for topic in config['topics']:
             self.client.subscribe(topic)
+        # self.client.subscribe("lfs/keyence")
 
     def __on_connect(self, client, userdata, flags, rc):
         print(f"Connected with result code {rc}")
@@ -47,8 +48,8 @@ class MQTTSubscriber:
     def __on_message(self, client, userdata, message):
         print(f"Received message on topic '{message.topic}'")       
         
-        data = base64.b64decode(message.payload)
-        data_dict = pickle.loads(data)
+        # data = base64.b64decode(message.payload)
+        data_dict = pickle.loads(message.payload)
         
         path = self.config['output_path']
         folder = message.topic.replace('/', '.')
@@ -56,20 +57,42 @@ class MQTTSubscriber:
         if not os.path.exists(path):
             os.makedirs(path)
             
-        msg_type = message.topic.split('/')[0]
-        if msg_type == 'lfs':
-            self.__lfs_handler(message, data_dict, path)
+        topic_type = message.topic.split('/')[0]
+        if topic_type == 'lfs':
+            self.__lfs_handler(data_dict, path)
         else:
-            print(f"Message '{msg_type}' not supported")
+            print(f"Topic '{topic_type}' not supported")
         
     def __lfs_handler(self, data: dict, output_path):
+
+        # Get current time
+        time_val = time.strftime("%Y-%m-%d_%H-%M")
+        timestamp = f"{time_val}"
+        
+        # Check msg type, attributes or data
+        if len(data) != 1:
+            print(f'Uknown keys available in the message: {data.keys()}')
+        else:
+            msg_type = list(data.keys())[0]
+            data = data[msg_type]
+            if msg_type == 'data':
+                # check if it has the required keys
+                required_keys = ['file', 'name']
+                if not all(key in data for key in required_keys):
+                    print(f"Missing keys in the message: {required_keys}")
+                    return
+            elif msg_type == 'attributes':
+                filename = f'{timestamp}.json'
+                with open(os.path.join(output_path, filename), 'w') as file:
+                    file.write(json.dumps(data, indent=4))
+                return
+            else:
+                print(f'Uknown message type: {msg_type}')            
+                return
+
         filename = "untitled"
         ext = ""
         experiment_class = ''.join(np.random.choice(list('0123456789abcdefghijklmnopqrstuvwxyz'), 4))
-        time_val = time.strftime("%Y-%m-%d_%H-%M")
-        timestamp = f"{time_val}"
-
-        print(f'Keys available in the message: {data.keys()}')
         
         # Appending the filename with the name, experiment_class and timestamp
         if 'name' in data:
@@ -93,8 +116,8 @@ class MQTTSubscriber:
         # Saving metadata as a json file
         metadata = data
         metadata.pop('file')
-        metadata = json.dumps(metadata)
-        with open(os.path.join(output_path, f"{filename}_meta.json"), 'w') as file:
-            file.write(metadata)        
+        filename = filename.split('.')[0]
+        with open(os.path.join(output_path, f".{filename}_meta.json"), 'w') as file:
+            file.write(json.dumps(metadata, indent=4))
         
         print(f"File {filename} saved to {output_path}")  
