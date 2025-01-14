@@ -9,7 +9,33 @@ from watchdog.observers import Observer
 from mfi_ddb import BaseDataObject
 
 
-class LocalFilesDataObject(BaseDataObject, FileSystemEventHandler):        
+class LocalFilesDataObject(BaseDataObject, FileSystemEventHandler):   
+    """     
+    LocalFilesDataObject is responsible for monitoring local directories for file creation events
+    and managing data associated with these events. It extends BaseDataObject and FileSystemEventHandler
+    to provide functionality for handling file system events and managing data objects.
+    Attributes:
+    -----------
+    cfg(dict): Configuration dictionary containing system and directory watch settings.
+        Expected keys:
+            - system: Dictionary containing system name and experiment class.
+            - watch_dir: List of directories to watch for file creation events.
+            - buffer_size: Maximum number of data entries to store in the buffer.
+            - wait_before_read: Time to wait before reading the file content.
+    system_name(str): Name of the system, prefixed with 'lfs/'.
+    buffer_data(list): List of data dictionaries that have not been staged for publishing to MQTT yet.
+    component_ids(list): List of component IDs initialized from BaseDataObject.
+    data(dict): Dictionary to store data associated with the system.
+    attributes(dict): Dictionary to store attributes associated with the system.
+    
+    Methods:
+    --------
+    __init__(config, create_observers=True): Initializes the LocalFilesDataObject with the given configuration and sets up directory observers.
+    get_data(): Retrieves data from the buffer and updates the data dictionary.
+    update_data(): Calls get_data() to update the data dictionary.
+    on_created(event)
+    __get_event_data(event, key)
+    """
     def __init__(self, config, create_observers=True) -> None:
         super().__init__()
         
@@ -76,6 +102,8 @@ class LocalFilesDataObject(BaseDataObject, FileSystemEventHandler):
         data = {}
         data["name"] = self.__get_event_data(event, 'name')
         data["timestamp"] = self.__get_event_data(event, 'timestamp')
+        data["system"] = self.cfg["system"]
+        data["experiment_class"] = self.cfg["system"]["experiment_class"]
         data["file"] = self.__get_event_data(event, 'file')
         
         if len(self.buffer_data) < self.cfg["buffer_size"]:
