@@ -3,7 +3,7 @@ import os
 
 import yaml
 
-from mfi_ddb import LocalFilesDataObject, PullStreamToMqttSpb
+from mfi_ddb import LocalFilesDataObject, PullStreamToMqtt
 
 if __name__ == "__main__": 
     
@@ -15,4 +15,4 @@ if __name__ == "__main__":
         localfiles_cfg = yaml.load(file, Loader=yaml.FullLoader)
     
     data_obj = LocalFilesDataObject(localfiles_cfg)
-    PullStreamToMqttSpb(mqtt_cfg, data_obj)
+    PullStreamToMqtt(mqtt_cfg, data_obj)
