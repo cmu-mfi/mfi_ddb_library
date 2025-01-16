@@ -77,7 +77,6 @@ class PushStreamToMqtt:
     def __publish(self, topic, payload: dict):
         print(f"Publishing to topic {topic}")
         # encoded_data = base64.b64encode(payload)
-        breakpoint()
         self.client.publish(topic, pickle.dumps(payload))
     
     def streamdata(self):  
