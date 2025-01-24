@@ -23,7 +23,7 @@ MFI DDB Library gives tools to write
 * "MQTT Client" which streams data from a "Data Source" to a "MQTT broker". The data source may not be generating MQTT messages directly. The library provides a way to convert the data to MQTT messages and stream them to the broker.
 * "MQTT Subscriber" which subscribes to the MQTT broker and receives the data. The data can be stored in a database or used for other purposes.
 
-To be able to do the above two types of classes are provided:
+To be able to do the above four types of classes are provided:
 
 * **Data Objects**: These are the objects that represent the data that needs to be streamed. These objects are responsible for converting the data to MQTT messages.
 * **Streaming Objects**: These are the objects that are responsible for publishing MQTT messages to the broker. They use the data from data objects to stream the data. Streaming can be event driven (push) or time driven (pull).
