@@ -1,3 +1,4 @@
+import os
 import platform
 import time
 
@@ -65,7 +66,8 @@ class LocalFilesDataObject(BaseDataObject, FileSystemEventHandler):
         time_now = time.strftime("%Y%m%d-%H%M%S")
         
         for each_dir in self.cfg['watch_dir']:
-            with open(f"{each_dir}/mfi_ddb_start_{time_now}.txt", "w") as file:
+            filename = os.path.join(each_dir, f"mfi_ddb_start_{time_now}.txt")
+            with open(filename, "w") as file:
                 file.write(yaml.dump(self.cfg))      
         
         print("Waiting for LocalFilesDataObject to initialize ...")
