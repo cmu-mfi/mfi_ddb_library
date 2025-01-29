@@ -10,4 +10,6 @@ setup(
     author='Shobhit Aggarwal',
     author_email='shobhit@cmu.edu',
     url='https://github.com/cmu-mfi/mfi_ddb_library'
+    python_requires='>=3.8,<=3.13',   
+    
 )
