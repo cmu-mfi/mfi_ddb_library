@@ -3,6 +3,7 @@
 import base64
 import os
 import pickle
+import time
 
 import paho.mqtt.client as mqtt
 import yaml
@@ -40,6 +41,11 @@ class PushStreamToMqtt:
         self.client.username_pw_set(mqtt_user, mqtt_pass)
         self.client.on_connect = self.__on_connect
         self.client.connect(mqtt_host, mqtt_port, 60)
+        
+        while not self.client.is_connected():
+            print("Connecting to MQTT broker...")
+            time.sleep(1)
+            self.client.loop()
     
     def __on_connect(self, client, userdata, flags, rc):
         print(f"Connected with result code {rc}")
