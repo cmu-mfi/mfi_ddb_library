@@ -21,7 +21,9 @@ class PullStreamToMqtt:
             self.cfg.stream_rate = 1        
         else:
             self.cfg.stream_rate = self.data_obj.cfg['stream_rate']
-            
+        
+        self.__last_update_time = None
+        
         try:
             while True:
                 self.streamdata()
@@ -38,4 +40,12 @@ class PullStreamToMqtt:
             sleep_time = 1/(self.cfg.stream_rate * component_count)
         except ZeroDivisionError:
             raise ZeroDivisionError("Zero active components.")
+
+        if self.__last_update_time is not None:
+            sleep_time -= time.time() - self.__last_update_time
+            if sleep_time < 0:
+                sleep_time = 0
+                print("WARNING: Stream rate is too high. Data update and stream took longer than the specified stream rate.")
+        
         time.sleep(sleep_time)
+        self.__last_update_time = time.time() 

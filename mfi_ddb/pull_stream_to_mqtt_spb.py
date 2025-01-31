@@ -38,7 +38,9 @@ class PullStreamToMqttSpb:
             self.cfg.stream_rate = 1        
         else:
             self.cfg.stream_rate = self.data_obj.cfg['stream_rate']
-            
+        
+        self.__last_update_time = None    
+        
         try:
             while True:
                 self.streamdata()
@@ -52,7 +54,18 @@ class PullStreamToMqttSpb:
     
         component_count = len(self.components)
         try:
-            sleep_time = 1/(self.cfg.stream_rate * component_count)
+            sleep_time = 1/(self.cfg.stream_rate * component_count) # seconds
         except ZeroDivisionError:
             raise ZeroDivisionError("Zero active components.")
+        
+        if self.__last_update_time is not None:
+            time_diff = time.time() - self.__last_update_time
+            sleep_time -= time_diff
+            if sleep_time < 0:
+                print(f"WARNING: Stream rate is too high. Data update and stream took longer ({time_diff:.3f}s vs {sleep_time+time_diff:.3f}s).")
+                sleep_time = 0
+                
+        print(f"Polling next after {sleep_time:.3f} seconds.")
         time.sleep(sleep_time)
+        self.__last_update_time = time.time()
+        
