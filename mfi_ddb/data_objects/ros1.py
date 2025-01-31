@@ -1,6 +1,8 @@
 import yaml
 from mfi_ddb import BaseDataObject, PushStreamToMqtt, PushStreamToMqttSpb
 
+MAX_ARRAY_SIZE = 16
+
 
 class RosDataObject(BaseDataObject):
     """
@@ -48,27 +50,35 @@ class RosDataObject(BaseDataObject):
             )
 
         # INIT DATA MEMBERS FROM CONFIG
-        self.config = config
+        self.cfg = config
         self.raw_data = {}
-        for device in self.config["devices"]:
+        self.raw_data_filter = {}
+        for device in self.cfg["devices"]:
             print(f"Device: {device}")
-            cfg = self.config["devices"][device]
+            cfg = self.cfg["devices"][device]
             namespace = cfg["namespace"]
             self.component_ids.append(namespace)
-            
+
             self.attributes[namespace] = cfg["attributes"]
-            if 'experiment_class' not in cfg["attributes"].keys():
-                if 'experiment_class' in self.config.keys():
-                    self.attributes[namespace]['experiment_class'] = self.config['experiment_class']
-            
+            if "experiment_class" not in cfg["attributes"].keys():
+                if "experiment_class" in self.cfg.keys():
+                    self.attributes[namespace]["experiment_class"] = self.cfg[
+                        "experiment_class"
+                    ]
+
             self.data[namespace] = {}
             self.raw_data[namespace] = {}
+            self.raw_data_filter[namespace] = {}
             for topic in cfg["rostopics"]:
                 if namespace != "/":
                     topic = f"/{namespace}/{topic}"
                 else:
                     topic = f"/{topic}"
                 self.raw_data[namespace][topic] = None
+
+                # Data filter for each topic to avoid uint8[] array data
+                # str for status of filter, list(str) for filter
+                self.raw_data_filter[namespace][topic] = "check_needed"
 
         # CHECK IF ROS MASTER IS RUNNING
         # REF: https://github.com/ros/ros_comm/blob/8250c7d434ea34d0589eb8b6eaab5df1b11fd325/tools/rostopic/src/rostopic/__init__.py#L84
@@ -78,7 +88,6 @@ class RosDataObject(BaseDataObject):
             raise Exception(
                 "ROS master is not running. Can't initialize RosDataObject."
             )
-
         # CHECK IF LISTED ROS TOPICS EXISTS
         for device in self.component_ids:
             for topic in self.raw_data[device]:
@@ -94,31 +103,33 @@ class RosDataObject(BaseDataObject):
 
                     del self.raw_data[device][topic]
                     continue
-        
+
         # Below data members used only if using pull streaming classes from mfi_ddb
         # Pull Based Streaming not recommended if
         # 1. High data publishing frequency
         # 2. High number of topics
         # 3. Not using threads to handle pull streaming objects
+        # 4. Large data size
 
         self._enable_topic_polling = enable_topic_polling
         stream_rate = None
-        if "stream_rate" not in self.config.keys():
+        if "stream_rate" not in self.cfg.keys():
             print(
                 "Warning: stream_rate not found in config file. Setting stream_rate to 1 Hz."
             )
             stream_rate = 1
         else:
-            stream_rate = self.config["stream_rate"]
+            stream_rate = self.cfg["stream_rate"]
 
         self._wait_per_topic = 1 / stream_rate
-        
+
         rospy.init_node("mfi_ddb_RosDataObject", anonymous=True)
-        
+
     def get_data(self):
         if len(self.component_ids) == 0:
-            raise Exception("No components found in the data object.")
-        
+            print("ERROR: No components found in the data object.")
+            exit(1)
+
         self.__poll_ros_topics()
 
         for device in self.component_ids:
@@ -130,6 +141,19 @@ class RosDataObject(BaseDataObject):
 
     def process_rawdata(self, device, topic):
         msg = self.raw_data[device][topic]
+        """
+        * get variable names using`__slots__` attribute of the message class
+        * get variable types using `_get_types` method or `_slot_types` of the message class
+        * filter out the variables that are not needed using .__slots__.remove(<variable_name>)
+        """
+        if msg is not None:
+            if self.raw_data_filter[device][topic] == "check_needed":
+                self.__check_data_filter(device, topic, msg)
+
+            for key in self.raw_data_filter[device][topic]:
+                if key in msg.__slots__:
+                    msg.__slots__.remove(key)
+
         msg_dict = yaml.safe_load(str(msg))
         topic_name = topic.replace(f"/{device}/", "")
         print(f"Msg: {msg_dict}")
@@ -138,17 +162,15 @@ class RosDataObject(BaseDataObject):
         )
 
     def __poll_ros_topics(self):
-        
+
         if self.rospy.is_shutdown():
             raise KeyboardInterrupt("ROS shutdown signal received.")
-        
+
         for device in self.component_ids:
             for topic in self.raw_data[device]:
                 try:
                     wait_time = self._wait_per_topic
-                    msg_type = self.get_message_class(
-                        self.rostopic.get_topic_type(topic)[0]
-                    )
+                    msg_type = self.rostopic.get_topic_class(topic)[0]
                     self.raw_data[device][topic] = self.rospy.wait_for_message(
                         topic, msg_type, wait_time
                     )
@@ -173,7 +195,7 @@ class RosDataObject(BaseDataObject):
             else:
                 if not isinstance(data_dict[key], list):
                     data[key_prefix + key] = data_dict[key]
-                elif len(data_dict[key]) < 16:
+                elif len(data_dict[key]) < MAX_ARRAY_SIZE:
                     for i, val in enumerate(data_dict[key]):
                         data[key_prefix + key + f"/{key}[{i}]"] = val
                 else:
@@ -182,6 +204,21 @@ class RosDataObject(BaseDataObject):
                     )
 
         return data
+
+    def __check_data_filter(self, device, topic, msg):
+        """
+        Check if the message contains uint8[] array data
+        """
+        self.raw_data_filter[device][topic] = []
+
+        if "uint8[]" in msg._get_types():
+            for key in msg.__slots__:
+                if (
+                    msg._slot_types[msg.__slots__.index(key)] == "uint8[]"
+                    and len(msg.__getattribute__(key)) > MAX_ARRAY_SIZE
+                ):
+                    self.raw_data_filter[device][topic].append(key)
+
 
 class RosCallback:
     """
@@ -265,6 +302,6 @@ class RosCallback:
         self.push_mqtt_stream.data_obj.process_rawdata(device, topic)
 
         self.push_mqtt_stream.streamdata()
-    
+
     def _ros_shutdown(self):
         raise KeyboardInterrupt("ROS shutdown signal received.")
