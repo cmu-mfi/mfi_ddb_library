@@ -41,3 +41,17 @@ class BaseDataObject:
             NotImplementedError: If the method is not implemented.
         """
         NotImplementedError("DataObject.update_data() not implemented yet!")
+
+    def clear_data_buffer(self):
+        """
+        Clear the data buffer of each component_id after the data has been streamed.
+
+        This method should be implemented in the inherited class.
+        It is required for the PullStreamToMqttSpb and PullStreamToMqtt classes.
+
+        Raises:
+            NotImplementedError: If the method is not implemented.
+        """
+        
+        for component_id in self.component_ids:
+            self.data[component_id] = {}
