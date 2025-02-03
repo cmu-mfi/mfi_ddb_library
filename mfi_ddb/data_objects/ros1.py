@@ -197,7 +197,7 @@ class RosDataObject(BaseDataObject):
                     data[key_prefix + key] = data_dict[key]
                 elif len(data_dict[key]) < MAX_ARRAY_SIZE:
                     for i, val in enumerate(data_dict[key]):
-                        data[key_prefix + key + f"/{key}[{i}]"] = val
+                        data[key_prefix + key + f"/{key}.{i}"] = val
                 else:
                     data[key_prefix + key] = "Array too big. Size: " + str(
                         len(data_dict[key])
