@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import time
+import threading
 
 from mfi_ddb import BaseDataObject, PushStreamToMqtt
 
@@ -33,7 +34,9 @@ class PullStreamToMqtt:
     def streamdata(self):  
               
         self.data_obj.update_data()
-        self.push_stream.streamdata()
+        
+        stream_thread = threading.Thread(target=self.push_stream.streamdata)
+        stream_thread.start()
     
         component_count = len(self.topics)
         try:

@@ -11,3 +11,4 @@ xmltodict
 paho-mqtt
 PyYAML==6.0.1
 watchdog
+threading

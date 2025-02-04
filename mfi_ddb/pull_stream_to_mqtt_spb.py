@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import threading
 import time
 
 from mqtt_spb_wrapper import MqttSpbEntityDevice
@@ -50,8 +51,10 @@ class PullStreamToMqttSpb:
     def streamdata(self):  
               
         self.data_obj.update_data()
-        self.push_stream.streamdata()
-    
+        
+        stream_thread = threading.Thread(target=self.push_stream.streamdata)
+        stream_thread.start()
+            
         component_count = len(self.components)
         try:
             sleep_time = 1/(self.cfg.stream_rate * component_count) # seconds
