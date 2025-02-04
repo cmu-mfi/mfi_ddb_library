@@ -95,3 +95,4 @@ class PushStreamToMqtt:
             
             self.__publish(topic, {'data': data})
             print(f"Data published for topic {topic}")
+            self.data_obj.clear_data_buffer()

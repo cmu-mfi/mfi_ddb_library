@@ -124,3 +124,4 @@ class PushStreamToMqttSpb:
                 
             self.components[component_id].publish_data()
             print(f"Data published for component {component_id}")
+            self.data_obj.clear_data_buffer()
