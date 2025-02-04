@@ -17,6 +17,9 @@ class BaseDataObject:
         # attributes is a dictionary that contains the attributes of the components.
         # e.g.: self.attributes = {"robot-arm-1": {"manufacturer": "ABB", "model": "IRB 120", "experiment_class": "orange-test-1"},
         #                          "machine-a": {"manufacturer": "Siemens", "model": "S7-1500", "experiment_class": "orange-test-1"}},
+        
+        self.cfg = {}
+        # cfg is a dictionary that contains the configuration of the data object.
 
     def get_data(self):
         """
@@ -55,3 +58,15 @@ class BaseDataObject:
         
         for component_id in self.component_ids:
             self.data[component_id] = {}
+            
+    def update_config(self, config: dict):
+        """
+        Update the configuration of the data object with the new configuration.
+        
+        Args:
+            config (dict): The new configuration of the data object.
+        """
+        if bool(config):
+            self.cfg = config
+        else:
+            raise ValueError("The configuration is empty!")
