@@ -8,8 +8,16 @@ import numpy as np
 import paho.mqtt.client as mqtt
 
 
-def lfs_handler(data: dict, output_path):
+def lfs_handler(msg_topic: str, data: dict, config: dict):
 
+    # Create the output folder if it doesn't exist
+    if not hasattr(lfs_handler, 'path'):
+        output_path = config['output_path']    
+        folder = msg_topic.replace('/', '.')
+        lfs_handler.path = os.path.join(output_path, folder)
+        if not os.path.exists(lfs_handler.path):
+            os.makedirs(lfs_handler.path)    
+            
     # Get current time
     time_val = time.strftime("%Y-%m-%d_%H-%M")
     timestamp = f"{time_val}"

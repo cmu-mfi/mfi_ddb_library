@@ -141,25 +141,43 @@ class RosDataObject(BaseDataObject):
 
     def process_rawdata(self, device, topic):
         msg = self.raw_data[device][topic]
+        if msg is None:
+            return
         """
         * get variable names using`__slots__` attribute of the message class
         * get variable types using `_get_types` method or `_slot_types` of the message class
         * filter out the variables that are not needed using .__slots__.remove(<variable_name>)
         """
-        if msg is not None:
-            if self.raw_data_filter[device][topic] == "check_needed":
-                self.__check_data_filter(device, topic, msg)
+        
+        # A. Process using topic-specific handler, if available
+        msg_class = msg.__class__
+        # special_handlers.get_data(self.data[device][topic], msg_class, msg)
+        # these special_handler maintain function_attributes as buffer
+        #   - in case of audio data, it keeps the audio data in buffer if the previous message was not streamed
+        #   - can check if previous message was streamed by checking none valof self.data[device]
+        #   - everytime keep adding new audio data to the buffer and format as .wav file in self.data[device]
+        # if topic in <list of topics with custom handlers>:
+        #     self.<custom_handler_method>(device, topic, msg)
+        #     return
+        
+        # B. Process using default method
+        # B.1. Check for uint8[] array data in the message
+        if self.raw_data_filter[device][topic] == "check_needed":
+            self.__check_data_filter(device, topic, msg)
 
-            for key in self.raw_data_filter[device][topic]:
-                if key in msg.__slots__:
-                    msg.__slots__.remove(key)
-
+        # B.2. Remove the uint8[] array data from the message
+        for key in self.raw_data_filter[device][topic]:
+            if key in msg.__slots__:
+                msg.__slots__.remove(key)         
+                    
+        # B.3. Populate "data" dictionary with key-value pairs from the message
         msg_dict = yaml.safe_load(str(msg))
         topic_name = topic.replace(f"/{device}/", "")
         print(f"Msg: {msg_dict}")
         self.data[device].update(
             self.__get_keyvalue_from_dict(msg_dict, f"{topic_name}/")
         )
+        breakpoint()
 
     def __poll_ros_topics(self):
 
