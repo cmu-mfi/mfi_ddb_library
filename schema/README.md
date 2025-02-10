@@ -19,7 +19,7 @@ flowchart LR;
     F --> G["site"];
     G --> H["area"];
     H --> I["device"];
-    I --> X["\#"];
+    I --> X["..."];
     F --> X;
     G --> X;
     H --> X;
@@ -27,7 +27,7 @@ flowchart LR;
     classDef highlight fill:#094d57
     class A,B,C,D,E highlight
 ```
-`enterprise`, `site`, `area`, and `device` are optional placeholders for the actual values of the enterprise, site, area, and device. The `#` represents a wildcard in the MQTT topic.
+`enterprise`, `site`, `area`, and `device` are optional placeholders for the actual values of the enterprise, site, area, and device.
 
 Examples: 
 * `mfi_ddb/v1.0/k-v/CMU/Mill19/Mezzanine-Lab/yk-destroyer/#`
