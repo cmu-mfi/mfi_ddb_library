@@ -1,8 +1,12 @@
-## Time Series Sparkplug Message Structure
+## Sparkplug Metric Naming Convention
 
-Sparkplug requires following topic structure: `namespace/group_id/message_type/node_id/[device_id]`
+* Sparkplug requires following topic structure: `namespace/group_id/message_type/node_id/[device_id]`
 
-Two `message_type` are expected in the time series data: DBIRTH and DDATA. DDEATH is optional.
+* Two `message_type` are expected in the time series data: DBIRTH and DDATA. DDEATH is optional.
+
+* Sparkplug messages are serialized using protobuf. The document below gives examples in JSON format for readability.
+
+* Sparkplug standard specific naming convention is defined in section 6.4.2 of the [Sparkplug specification](https://sparkplug.eclipse.org/specification/version/3.0/documents/sparkplug-specification-3.0.0.pdf). The naming convention below specifies additional requirements for the metrics.
 
 ### DBIRTH
 
