@@ -42,6 +42,7 @@ Since we are using Aveva PI for our time series data, the Sparkplug B schema for
 Key points to note:
 
 * Sparkplug requires following topic structure: `namespace/group_id/message_type/node_id/[device_id]`
+* Sparkplug messages are serialized using Google Protocol Buffers ([protobuf](https://protobuf.dev/)).
 * In reference to the above structure, 
     * `namespace` = `mfi_ddb/v1.0/spbv1.0`
     * `group_id` = `enterprise`
@@ -49,18 +50,22 @@ Key points to note:
     * `node_id` = `site`
     * `device_id` = `area` (optional)
 * mfi_ddb expects atleast DBIRTH, DDATA messages. DDEATH is optional.
-* Sparkplug messages are serialized using Google Protocol Buffers ([protobuf](https://protobuf.dev/)).
-* DBIRTH and DDATA messages before serialization are defined here: [spbv-req.md](./spbv-req.md).
+* Metric naming convention is defined in [spbv-metric-naming.md](./spbv-metric-naming.md)
 * `mfi_ddb` library uses [mqtt-spb-wrapper](https://pypi.org/project/mqtt-spb-wrapper/) to create sparkplug messages.
-
-### k-v [non-time-series]
-
-The messages in k-v topic tree can be used to send non-time series data. The schema is designed to be flexible and extensible to accommodate different types of data. The schema is defined in [k-v.json](./k-v.json).
+* The messages while not directly human-readable, can be decoded using the [protobuf schema](./spbv.proto). Some MQTT brokers, [like EMQX](https://www.emqx.com/en/blog/mqtt-sparkplug-in-action-a-step-by-step-tutorial), have built in capability to do so.
 
 ### blob [binary data]
 
 blob topic tree expects large binary files. 
 
 * The file data is sent as a binary payload of a json message.
-* The json message is serialized using xxx protocol.
-* The schema is defined in [blob.json](./blob.json).
+* The json message is serialized using [protobuf](https://protobuf.dev/) protocol.
+* The schema is defined in [blob.proto](./blob.proto).
+* The messages while not directly human-readable, can be decoded using the above protobuf schema. Some MQTT brokers, [like EMQX](https://www.emqx.com/en/blog/mqtt-sparkplug-in-action-a-step-by-step-tutorial), have built in capability to do so.
+
+### k-v [non-time-series]
+
+* The messages in k-v topic tree can be used to send non-time series data. 
+* The schema is designed to be flexible and extensible to accommodate different types of data. 
+* The schema is defined in [k-v.json](./k-v.json).
+* While [blob](#blob-binary-data) and [spbv1.0](#spbv1.0-time-series) are protobuf serialized, k-v messages are sent as json for ease of readability.
