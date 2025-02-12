@@ -1,0 +1,6 @@
+syntax = "proto3";
+
+message FileData {
+    string name = 1;
+    bytes file = 2;  // base64 encoded file data
+}
