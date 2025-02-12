@@ -50,9 +50,7 @@ Key points to note:
     * `device_id` = `area` (optional)
 * mfi_ddb expects atleast DBIRTH, DDATA messages. DDEATH is optional.
 * Sparkplug messages are serialized using Google Protocol Buffers ([protobuf](https://protobuf.dev/)).
-* DBIRTH and DDATA messages before serialization are defined in following json files:
-    * [spBv1.0_DBIRTH.json](./spBv1.0_DBIRTH.json)
-    * [spBv1.0_DDATA.json](./spBv1.0_DDATA.json)
+* DBIRTH and DDATA messages before serialization are defined here: [spbv-req.md](./spbv-req.md).
 * `mfi_ddb` library uses [mqtt-spb-wrapper](https://pypi.org/project/mqtt-spb-wrapper/) to create sparkplug messages.
 
 ### k-v [non-time-series]
