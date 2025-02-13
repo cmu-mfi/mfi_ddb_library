@@ -1,57 +1,84 @@
-syntax = "proto2";
+// * Copyright (c) 2015, 2018 Cirrus Link Solutions and others
+// *
+// * This program and the accompanying materials are made available under the
+// * terms of the Eclipse Public License 2.0 which is available at
+// * http://www.eclipse.org/legal/epl-2.0.
+// *
+// * SPDX-License-Identifier: EPL-2.0
+// *
+// * Contributors:
+// *   Cirrus Link Solutions - initial implementation
 
-//
+// Source: https://github.com/eclipse-tahu/tahu/blob/master/sparkplug_b/sparkplug_b.proto
+// 
 // To compile:
 // cd client_libraries/java
-// protoc --proto_path=../../ --java_out=src/main/java ../../sparkplug_b.proto 
+// protoc --proto_path=../../ --java_out=src/main/java ../../sparkplug_b.proto
 //
 // To generate the base protobuf Python library
 // protoc --python_out=<target path> <.proto file path>
 //
 
-package com.cirruslink.sparkplug.protobuf;
+syntax = "proto2";
 
-option java_package         = "com.cirruslink.sparkplug.protobuf";
+package org.eclipse.tahu.protobuf;
+
+option java_package         = "org.eclipse.tahu.protobuf";
 option java_outer_classname = "SparkplugBProto";
 
+enum DataType {
+    // Indexes of Data Types
+
+    // Unknown placeholder for future expansion.
+    Unknown         = 0;
+
+    // Basic Types
+    Int8            = 1;
+    Int16           = 2;
+    Int32           = 3;
+    Int64           = 4;
+    UInt8           = 5;
+    UInt16          = 6;
+    UInt32          = 7;
+    UInt64          = 8;
+    Float           = 9;
+    Double          = 10;
+    Boolean         = 11;
+    String          = 12;
+    DateTime        = 13;
+    Text            = 14;
+
+    // Additional Metric Types
+    UUID            = 15;
+    DataSet         = 16;
+    Bytes           = 17;
+    File            = 18;
+    Template        = 19;
+
+    // Additional PropertyValue Types
+    PropertySet     = 20;
+    PropertySetList = 21;
+
+    // Array Types
+    Int8Array = 22;
+    Int16Array = 23;
+    Int32Array = 24;
+    Int64Array = 25;
+    UInt8Array = 26;
+    UInt16Array = 27;
+    UInt32Array = 28;
+    UInt64Array = 29;
+    FloatArray = 30;
+    DoubleArray = 31;
+    BooleanArray = 32;
+    StringArray = 33;
+    DateTimeArray = 34;
+}
+
 message Payload {
-    /*
-        // Indexes of Data Types
-
-        // Unknown placeholder for future expansion.
-        Unknown         = 0;
-
-        // Basic Types
-        Int8            = 1;
-        Int16           = 2;
-        Int32           = 3;
-        Int64           = 4;
-        UInt8           = 5;
-        UInt16          = 6;
-        UInt32          = 7;
-        UInt64          = 8;
-        Float           = 9;
-        Double          = 10;
-        Boolean         = 11;
-        String          = 12;
-        DateTime        = 13;
-        Text            = 14;
-
-        // Additional Metric Types
-        UUID            = 15;
-        DataSet         = 16;
-        Bytes           = 17;
-        File            = 18;
-        Template        = 19;
-        
-        // Additional PropertyValue Types
-        PropertySet     = 20;
-        PropertySetList = 21;
-
-    */
 
     message Template {
-        
+
         message Parameter {
             optional string name        = 1;
             optional uint32 type        = 2;
@@ -72,9 +99,9 @@ message Payload {
         }
 
         optional string version         = 1;          // The version of the Template to prevent mismatches
-        repeated Metric metrics         = 2;          // Each metric is the name of the metric and the datatype of the member but does not contain a value
+        repeated Metric metrics         = 2;          // Each metric includes a name, datatype, and optionally a value
         repeated Parameter parameters   = 3;
-        optional string template_ref    = 4;          // Reference to a template if this is extending a Template or an instance - must exist if an instance
+        optional string template_ref    = 4;          // MUST be a reference to a template definition if this is an instance (i.e. the name of the template definition) - MUST be omitted for template definitions
         optional bool is_definition     = 5;
         extensions                      6 to max;
     }
@@ -113,7 +140,7 @@ message Payload {
     message PropertyValue {
 
         optional uint32     type                    = 1;
-        optional bool       is_null                 = 2; 
+        optional bool       is_null                 = 2;
 
         oneof value {
             uint32          int_value               = 3;
