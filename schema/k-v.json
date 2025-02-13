@@ -1,0 +1,12 @@
+{
+    "type": "object",
+    "properties": {
+        "experiment_class": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "experiment_class"
+    ],
+    "additionalProperties": true
+}
