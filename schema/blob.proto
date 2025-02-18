@@ -5,7 +5,7 @@ message Data {
   int64 timestamp = 2;  // Epoch time in seconds
   Metadata metadata = 3;
   string experiment_class = 4;
-  bytes file = 5;  // Base64 encoded file
+  bytes file = 5;
 
   // Nested message for 'system' (can be further defined as needed)
   message Metadata {

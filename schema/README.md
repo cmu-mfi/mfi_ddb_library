@@ -19,10 +19,13 @@ flowchart LR;
     F --> G["site"];
     G --> H["area"];
     H --> I["device"];
+    F --> I;
+    G --> I;    
     I --> X["..."];
     F --> X;
     G --> X;
     H --> X;
+
 
     classDef highlight fill:#094d57
     class A,B,C,D,E highlight
