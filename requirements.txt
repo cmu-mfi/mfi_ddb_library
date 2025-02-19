@@ -1,5 +1,5 @@
 cmake
-mqtt-spb-wrapper==2.0.1
+# mqtt-spb-wrapper==2.0.1
 omegaconf
 pandas
 ping3
@@ -9,6 +9,5 @@ setuptools
 wheel
 xmltodict
 paho-mqtt
-PyYAML==6.0.1
+# PyYAML==6.0.1
 watchdog
-threading
