@@ -98,3 +98,11 @@ class BaseDataAdapter:
         for observer in self._observers:
             # Run observer callback in a separate thread
             threading.Thread(target=observer.on_data_update, args=(new_value,), daemon=True).start()
+            
+    def clear_data_buffer(self, component_ids:list=[self.component_ids]):
+        """
+        Clear the data buffer of each component_id. Used by streamers to clear already streamed data
+        """
+        
+        for component_id in component_ids:
+            self.data[component_id] = {}
