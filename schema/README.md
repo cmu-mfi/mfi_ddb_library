@@ -2,7 +2,7 @@
 
 MFI DDB Schema V1.0 is a schema for the data that is streamed to the Digital Data Backbone (DDB) for the MFI project. The schema is designed to be flexible and extensible to accommodate different types of data.\
 
-The messages are sent and received using a pub-sub MQTT broker. The schema specifies which topics to use for different types of data. The schema also specifies the structure of the payload for each type of data.
+The messages are published to an MQTT broker, which uses the publish-subscribe model to route them to the appropriate subscribers. The schema defines the topics used for different types of data and specifies the structure of the payload for each data type.
 
 ## Topic Structure
 
@@ -40,7 +40,7 @@ Examples:
 
 ### spbv1.0 [time-series]
 
-Since we are using Aveva PI for our time series data, the Sparkplug B schema for our time series data is inspired from them. The general schema for Sparkplug B v1.0 is defined in the [Sparkplug specification](https://sparkplug.eclipse.org/specification/version/3.0/documents/sparkplug-specification-3.0.0.pdf).
+Since we are using Aveva PI to store our time series data, we have adopted the Sparkplug B schema as an initial model for inspiration. It's flexibility allows it to be applied to other data types. The general schema for Sparkplug B v1.0 is defined in the [Sparkplug specification](https://sparkplug.eclipse.org/specification/version/3.0/documents/sparkplug-specification-3.0.0.pdf).
 
 Key points to note:
 
@@ -52,7 +52,7 @@ Key points to note:
     * `message_type` = Sparkplug B message type, like DDATA, DBIRTH, etc.
     * `node_id` = `site`
     * `device_id` = `area` (optional)
-* mfi_ddb expects atleast DBIRTH, DDATA messages. DDEATH is optional.
+* mfi_ddb expects at least a DBIRTH message to establish identity and a DDATA message to send data.
 * Metric naming convention is defined in [spbv-metric-naming.md](./spbv-metric-naming.md)
 * `mfi_ddb` library uses [mqtt-spb-wrapper](https://pypi.org/project/mqtt-spb-wrapper/) to create sparkplug messages.
 * The messages while not directly human-readable, can be decoded using the [protobuf schema](./spbv.proto). Some MQTT brokers, [like EMQX](https://www.emqx.com/en/blog/mqtt-sparkplug-in-action-a-step-by-step-tutorial), have built in capability to do so.
