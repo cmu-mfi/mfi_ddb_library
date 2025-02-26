@@ -1,12 +1,12 @@
 {
     "type": "object",
     "properties": {
-        "experiment_class": {
+        "trial_id": {
             "type": "string"
         }
     },
     "required": [
-        "experiment_class"
+        "trial_id"
     ],
     "additionalProperties": true
 }
