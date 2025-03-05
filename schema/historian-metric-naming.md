@@ -1,4 +1,4 @@
-## Sparkplug Metric Naming Convention
+## Historian Metric Naming Convention
 
 * Sparkplug requires following topic structure: `namespace/group_id/message_type/node_id/[device_id]`
 

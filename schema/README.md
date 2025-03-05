@@ -6,15 +6,15 @@ The messages are published to an MQTT broker, which uses the publish-subscribe m
 
 ## Topic Structure
 
-* **spbv1.0** [time series data]: Sparkplug B
-* **k-v** [non-time series data]: Key-Value
+* **historian** [time series data]: Sparkplug B
+* **kv** [non-time series data]: Key-Value
 * **blob** [files]: Binary Large Object
 
 ```mermaid
 flowchart LR;
-    A[mfi_ddb]-->B[v1.0];
-    B --> C[spbv1.0] --> F["enterprise"];
-    B --> D[k-v] --> F;
+    B[mfi-v1.0];
+    B --> C[historian] --> F["enterprise"];
+    B --> D[kv] --> F;
     B --> E[blob] --> F;
     F --> G["site"];
     G --> H["area"];
@@ -33,12 +33,12 @@ flowchart LR;
 `enterprise`, `site`, `area`, and `device` are optional placeholders for the actual values of the enterprise, site, area, and device.
 
 Examples: 
-* `mfi_ddb/v1.0/k-v/CMU/Mill19/Mezzanine-Lab/yk-destroyer/#`
-* `mfi_ddb/v1.0/spbv1.0/CMU/Mill19/HAAS-UMC750/#`
+* `mfi-v1.0-kv/CMU/Mill19/Mezzanine-Lab/yk-destroyer/#`
+* `mfi-v1.0-historian/CMU/Mill19/HAAS-UMC750/#`
 
 ## Payload Schema
 
-### spbv1.0 [time-series]
+### historian [time-series]
 
 Since we are using Aveva PI to store our time series data, we have adopted the Sparkplug B schema as an initial model for inspiration. It's flexibility allows it to be applied to other data types. The general schema for Sparkplug B v1.0 is defined in the [Sparkplug specification](https://sparkplug.eclipse.org/specification/version/3.0/documents/sparkplug-specification-3.0.0.pdf).
 
@@ -47,13 +47,13 @@ Key points to note:
 * Sparkplug requires following topic structure: `namespace/group_id/message_type/node_id/[device_id]`
 * Sparkplug messages are serialized using Google Protocol Buffers ([protobuf](https://protobuf.dev/)).
 * In reference to the above structure, 
-    * `namespace` = `mfi_ddb/v1.0/spbv1.0`
+    * `namespace` = `mfi-v1.0-historian`
     * `group_id` = `enterprise`
     * `message_type` = Sparkplug B message type, like DDATA, DBIRTH, etc.
     * `node_id` = `site`
     * `device_id` = `area` (optional)
 * mfi_ddb expects at least a DBIRTH message to establish identity and a DDATA message to send data.
-* Metric naming convention is defined in [spbv-metric-naming.md](./spbv-metric-naming.md)
+* Metric naming convention is defined in [historian-metric-naming.md](./historian-metric-naming.md)
 * `mfi_ddb` library uses [mqtt-spb-wrapper](https://pypi.org/project/mqtt-spb-wrapper/) to create sparkplug messages.
 * The messages while not directly human-readable, can be decoded using the [protobuf schema](./spbv.proto). Some MQTT brokers, [like EMQX](https://www.emqx.com/en/blog/mqtt-sparkplug-in-action-a-step-by-step-tutorial), have built in capability to do so.
 
@@ -66,9 +66,9 @@ blob topic tree expects large binary files.
 * The schema is defined in [blob.proto](./blob.proto).
 * The messages while not directly human-readable, can be decoded using the above protobuf schema. Some MQTT brokers, [like EMQX](https://www.emqx.com/en/blog/mqtt-sparkplug-in-action-a-step-by-step-tutorial), have built in capability to do so.
 
-### k-v [non-time-series]
+### kv [non-time-series]
 
 * The messages in k-v topic tree can be used to send non-time series data. 
 * The schema is designed to be flexible and extensible to accommodate different types of data. 
-* The schema is defined in [k-v.json](./k-v.json).
-* While [blob](#blob-binary-data) and [spbv1.0](#spbv1.0-time-series) are protobuf serialized, k-v messages are sent as json for ease of readability.
+* The schema is defined in [kv.json](./kv.json).
+* While [blob](#blob-binary-data) and [historian](#historian-time-series) are protobuf serialized, k-v messages are sent as json for ease of readability.
