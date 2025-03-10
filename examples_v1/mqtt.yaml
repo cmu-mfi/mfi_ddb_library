@@ -1,9 +1,0 @@
-mqtt:
-  broker_address: 128.128.128.128
-  broker_port: 1883 
-  username: admin
-  password: password
-  group_name: Mill-19-test
-  node_name: HAAS-UMC750
-  tls_enabled: False
-  debug: True
