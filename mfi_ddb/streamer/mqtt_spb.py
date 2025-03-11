@@ -1,10 +1,12 @@
 import time
 
+from typing import Dict
+
 from mqtt_spb_wrapper import MqttSpbEntityDevice
 
 from mfi_ddb.data_adapters.base import BaseDataAdapter
 from mfi_ddb.topic_families.base import BaseTopicFamily
-
+from mfi_ddb.utils.exceptions import ConfigException
 
 class MqttSpb(BaseTopicFamily):
     def __init__(self, config: dict) -> None:
@@ -12,21 +14,18 @@ class MqttSpb(BaseTopicFamily):
 
         self.cfg = config
         
-        #TODO: type hint below to show that dict keys are string, and dict values are MqttSpbEntityDevice
-        self._components: dict = {}
+        self._components: Dict[str, MqttSpbEntityDevice] = {}
              
     def connect(self, component_ids:list):
         
         if 'mqtt' not in self.cfg.keys():
-            #TODO: Create config exceptions in mfi_ddb utils
-            raise Exception("\'mqtt\' config required in streamer config file")
+            raise ConfigException("\'mqtt\' config required in streamer config file")
         else:
             mqtt_keys = ['group_name', 
                         'node_name', 
                         'broker_address']
-            #TODO: fix lambda function below
-            if 'False' in [a: a in self.cfg['mqtt'].keys for a in mqtt_keys]:
-                raise Exception("Config incomplete for mqtt. Following keys needed:",mqtt_keys)
+            if 'False' in list(map(lambda a: a in self.cfg['mqtt'].keys, mqtt_keys)):
+                raise ConfigException("Config incomplete for mqtt. Following keys needed:",mqtt_keys)
         
         group_name = self.cfg['mqtt']['group_name']
         edge_node_name = self.cfg['mqtt']['node_name']
@@ -62,7 +61,7 @@ class MqttSpb(BaseTopicFamily):
     def publish_birth(self, attributes, data):
         if not bool(self._components):
             #TODO: get class name str and use for error messages
-            raise Exception("No SPB component connected for xxx")
+            raise Exception("No SPB component connected")
         
         for component_id in self._components.keys():
             
@@ -74,12 +73,12 @@ class MqttSpb(BaseTopicFamily):
                 continue
             
             # set attributes value
-            attributes = attributes[component_id]
-            attributes = self.process_attr(attributes)
-            if not self.__check_attributes():
+            component_attr = attributes[component_id]
+            component_attr = self.process_attr(component_attr)
+            if not self.__check_attributes(component_attr):
                 raise Exception(f"{self.topic_family_name} not compatible with MqttSpb")
-            for key in attributes.keys():
-                self._components[component_id].attributes.set_value(key, attributes[key])
+            for key in component_attr.keys():
+                self._components[component_id].attributes.set_value(key, component_attr[key])
                 
             # set data values
             input_values = data[component_id]
@@ -122,12 +121,14 @@ class MqttSpb(BaseTopicFamily):
     def disconnect(self):
         pass
     
-    def __check_attributes(self, attributes):
-        if type(attributes[key]) not in [int, float, str, list]:
-            continue                 
+    def __check_attributes(self, attributes: dict):
+        for key in attributes.keys():
+            if type(attributes[key]) not in [int, float, str, list]:
+                return False
         return True
     
-    def __check_data(self, data):
-        if type(input_values[key]) not in [int, float, str, list]:
-            continue         
+    def __check_data(self, data: dict):
+        for key in data.keys():
+            if type(data[key]) not in [int, float, str, list]:
+                return False         
         return True

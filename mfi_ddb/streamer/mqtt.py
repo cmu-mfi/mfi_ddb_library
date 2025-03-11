@@ -1,45 +1,42 @@
 import time
+import os
 
 import paho.mqtt.client as mqtt
 
 from mfi_ddb.data_adapters.base import BaseDataAdapter
 from mfi_ddb.topic_families.base import BaseTopicFamily
-
+from mfi_ddb.utils.exceptions import ConfigException
 
 class MqttJson(BaseTopicFamily):
     def __init__(self, config: dict) -> None:
         super().__init__()
 
         self.cfg = config
-        #TODO: check if correct type hinting
-        self.client:mqtt.Client = None
+        self.client : mqtt.Client = None
         self._components: list = []
         
         self.__topic_header = self.__get_topic_header(config['mqtt'])
-        
     
-    def __get_topic_header(config:dict):
-        ver = 'mfi_ddb/v1'
+    def __get_topic_header(self, config:dict):
+        ver = 'mfi-v1.0'
         topic_family = self.topic_family_name
+        topic_head = '-'.join([ver, topic_family])
         
-        #TODO: add a=True?10:20 like logic to assign "" if key doesn't exist
-        enterprise = config['enterprise']
-        site = config['site']
-        area = config['area']
+        enterprise = config['enterprise'] if 'enterprise' in config.keys() else ""
+        site = config['site'] if 'site' in config.keys() else ""
+        area = config['area'] if 'area' in config.keys() else ""
         
-        #TODO: merge using function like os.path.join to avoid "//" in case empty string
-        return f"{ver}/{topic_family}/{enterprise}/{site}/{area}/"
+        args = [topic_head, enterprise, site, area]
+        return '/'.join([arg for arg in args if arg])
 
     def connect(self, component_ids:list):
         
         if 'mqtt' not in self.cfg.keys():
-            #TODO: Create config exceptions in mfi_ddb utils
-            raise Exception("\'mqtt\' config required in streamer config file")
+            raise ConfigException("\'mqtt\' config required in streamer config file")
         else:
             mqtt_keys = ['enterprise', 
                         'broker_address']
-            #TODO: fix lambda function below
-            if 'False' in [a: a in self.cfg['mqtt'].keys for a in mqtt_keys]:
+            if 'False' in list(map(lambda a: a in self.cfg['mqtt'].keys, mqtt_keys)):
                 raise Exception("Config incomplete for mqtt. Following keys needed:",mqtt_keys)
         
         mqtt_host = self.cfg['mqtt']['broker_address']
@@ -69,7 +66,7 @@ class MqttJson(BaseTopicFamily):
     def publish_birth(self, attributes, data):
         if not bool(self._components):
             #TODO: get class name str and use for error messages
-            raise Exception("No JSON component connected for xxx")
+            raise Exception("No JSON component connected")
         
         self.stream_data(attributes)
         self.stream_data(data)
