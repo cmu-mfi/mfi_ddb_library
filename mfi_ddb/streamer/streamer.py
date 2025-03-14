@@ -3,11 +3,12 @@ import time
 import paho.mqtt.client as mqtt
 from observer import Observer
 
-from mfi_ddb.utils.exceptions import ConfigError
-from mfi_ddb.data_adapters.base import BaseDataAdapter
 # TODO: make __init__.py of data_adapters so that python file need not be referenced
 # For example `from mfi_ddb.data_adapters import BaseDataAdapter` becomes valid
 from mfi_ddb.data_adapters import *
+from mfi_ddb.data_adapters.base import BaseDataAdapter
+from mfi_ddb.utils.exceptions import ConfigError
+
 
 class Streamer(Observer):
     def __init__(self, config: dict, data_adp: BaseDataAdapter) -> None:

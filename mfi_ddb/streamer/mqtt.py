@@ -1,11 +1,12 @@
-import time
 import os
+import time
 
 import paho.mqtt.client as mqtt
 
 from mfi_ddb.data_adapters.base import BaseDataAdapter
 from mfi_ddb.topic_families.base import BaseTopicFamily
 from mfi_ddb.utils.exceptions import ConfigException
+
 
 class MqttJson(BaseTopicFamily):
     def __init__(self, config: dict) -> None:

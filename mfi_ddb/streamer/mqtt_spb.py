@@ -1,5 +1,4 @@
 import time
-
 from typing import Dict
 
 from mqtt_spb_wrapper import MqttSpbEntityDevice
@@ -7,6 +6,7 @@ from mqtt_spb_wrapper import MqttSpbEntityDevice
 from mfi_ddb.data_adapters.base import BaseDataAdapter
 from mfi_ddb.topic_families.base import BaseTopicFamily
 from mfi_ddb.utils.exceptions import ConfigException
+
 
 class MqttSpb(BaseTopicFamily):
     def __init__(self, config: dict) -> None:

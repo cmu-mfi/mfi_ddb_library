@@ -1,5 +1,7 @@
 import threading
+
 from mfi_ddb.streamer.observer import Observer
+
 
 class BaseDataAdapter:
     """
