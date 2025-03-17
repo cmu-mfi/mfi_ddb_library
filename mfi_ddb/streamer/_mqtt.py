@@ -77,7 +77,18 @@ class Mqtt:
         if set(attributes.keys()) != set(data.keys()):
             raise Exception("Attributes and data keys are not same. Birth publish failed")
         
-        self.stream_data(attributes)
+        for component_id in attributes.keys():
+            component_attr = attributes[component_id]
+            component_attr = self._topic_family.process_attr(component_attr)
+            if not bool(component_attr):
+                print(f"Attributes not found for device {component_id}")
+                continue
+            elif not self.__check_attributes(component_attr):
+                raise Exception(f"{self._topic_family.topic_family_name} not compatible with Mqtt")
+                      
+            self.__publish(component_id, component_attr)       
+
+
         self.stream_data(data)
         
         print(f"Birth published for devices: {attributes.keys()}")
@@ -101,6 +112,9 @@ class Mqtt:
         pass
     
     def __check_data(self, data):       
+        return True
+    
+    def __check_attributes(self, attributes):
         return True
     
     def __publish(self, device, payload: dict):
