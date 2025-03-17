@@ -1,5 +1,6 @@
 cmake
 # mqtt-spb-wrapper==2.0.1
+-e ./mfi_ddb/streamer/mqtt-spb-wrapper
 omegaconf
 pandas
 ping3

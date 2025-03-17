@@ -28,7 +28,7 @@ class Streamer(Observer):
         
         self.__data_adp = data_adp
         
-        self.__client.connect()
+        self.__client.connect(data_adp.component_ids)
         
         self.__data_adp.get_data()
         self.__client.publish_birth()

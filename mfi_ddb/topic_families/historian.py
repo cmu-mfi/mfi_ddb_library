@@ -1,10 +1,10 @@
 from base import BaseTopicFamily
 
-class SpbTopicFamily(BaseTopicFamily):
+class HistorianTopicFamily(BaseTopicFamily):
     def __init__(self):
         super().__init__()
 
-        self.topic_family_name = "spBv1.0"
+        self.topic_family_name = "historian"
         
     def process_data(self, data):
         ...

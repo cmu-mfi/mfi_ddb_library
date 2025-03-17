@@ -8,14 +8,23 @@ from mfi_ddb.topic_families.base import BaseTopicFamily
 from mfi_ddb.utils.exceptions import ConfigException
 
 
-class MqttJson(BaseTopicFamily):
-    def __init__(self, config: dict) -> None:
+class Mqtt:
+    def __init__(self, config: dict, topic_family: BaseTopicFamily) -> None:
         super().__init__()
 
         self.cfg = config
+        
+        if 'mqtt' not in self.cfg.keys():
+            raise ConfigException("\'mqtt\' config required in streamer config file")
+        else:
+            mqtt_keys = ['enterprise', 
+                        'broker_address']
+            if 'False' in list(map(lambda a: a in self.cfg['mqtt'].keys, mqtt_keys)):
+                raise Exception("Config incomplete for mqtt. Following keys needed:",mqtt_keys)        
+        
         self.client : mqtt.Client = None
         self._components: list = []
-        
+        self._topic_family = topic_family
         self.__topic_header = self.__get_topic_header(config['mqtt'])
     
     def __get_topic_header(self, config:dict):
@@ -31,23 +40,18 @@ class MqttJson(BaseTopicFamily):
         return '/'.join([arg for arg in args if arg])
 
     def connect(self, component_ids:list):
+
+        mqtt_cfg = self.cfg['mqtt']
         
-        if 'mqtt' not in self.cfg.keys():
-            raise ConfigException("\'mqtt\' config required in streamer config file")
-        else:
-            mqtt_keys = ['enterprise', 
-                        'broker_address']
-            if 'False' in list(map(lambda a: a in self.cfg['mqtt'].keys, mqtt_keys)):
-                raise Exception("Config incomplete for mqtt. Following keys needed:",mqtt_keys)
+        # REQUIRED KEYS        
+        mqtt_host = mqtt_cfg['broker_address']
         
-        mqtt_host = self.cfg['mqtt']['broker_address']
-        
-        #TODO: find a python equivalent of a=True?10:20 for below five
-        mqtt_port = int(self.cfg['mqtt']['broker_port'])
-        mqtt_user = self.cfg['mqtt']['username']
-        mqtt_pass = self.cfg['mqtt']['password']
-        mqtt_tls_enabled = self.cfg['mqtt']['tls_enabled']
-        debug = self.cfg['mqtt']['debug']
+        # OPTIONAL KEYS
+        mqtt_port = int(mqtt_cfg['broker_port']) if 'broker_port' in mqtt_cfg.keys() else 1883
+        mqtt_user = mqtt_cfg['username'] if 'username' in mqtt_cfg.keys() else None
+        mqtt_pass = mqtt_cfg['password'] if 'password' in mqtt_cfg.keys() else None
+        mqtt_tls_enabled = mqtt_cfg['tls_enabled'] if 'tls_enabled' in mqtt_cfg.keys() else False
+        debug = mqtt_cfg['debug'] if 'debug' in mqtt_cfg.keys() else False
         
         self.client = mqtt.Client()
         self.client.username_pw_set(mqtt_user, mqtt_pass)
@@ -62,36 +66,35 @@ class MqttJson(BaseTopicFamily):
         self._components = component_ids
         
     def __on_connect(self, client, userdata, flags, rc):
-        print(f"All JSON components connected to broker with result code {rc}")            
+        print(f"All components connected to broker with result code {rc}")            
         
     def publish_birth(self, attributes, data):
         if not bool(self._components):
             #TODO: get class name str and use for error messages
-            raise Exception("No JSON component connected")
+            raise Exception("No component connected")
+        
+        # check if attributes keys and data keys are same
+        if set(attributes.keys()) != set(data.keys()):
+            raise Exception("Attributes and data keys are not same. Birth publish failed")
         
         self.stream_data(attributes)
         self.stream_data(data)
-            
-        print(f"Birth published for device {component_id}")
+        
+        print(f"Birth published for devices: {attributes.keys()}")
    
     def stream_data(self, data):
-        for component_id in data.keys():   
-            # check if component_id exist in initialized components
-            if component_id not in self._components.keys():
-                print(f"{component_id} not initialized for MqttJson. Hence skipping...")
-                continue
+        for component_id in data.keys():
             
             input_values = data[component_id]
-            input_values = self.process_data(input_values)
+            input_values = self._topic_family.process_data(input_values)
             if not bool(input_values):
                 print(f"Data not found for device {component_id}")
                 continue
             elif not self.__check_data(input_values):
-                raise Exception(f"{self.topic_family_name} not compatible with MqttJson")
+                raise Exception(f"{self._topic_family.topic_family_name} not compatible with Mqtt")
                       
             self.__publish(component_id, input_values)       
                 
-            self._components[component_id].publish_data()
             print(f"Data published for device {component_id}")
     
     def disconnect(self):
@@ -100,6 +103,11 @@ class MqttJson(BaseTopicFamily):
     def __check_data(self, data):       
         return True
     
-    def __publish(self, device, payload):
-        self.client.publish(topic, payload)
+    def __publish(self, device, payload: dict):
+        topic_prefix = f"{self.__topic_header}/{device}"
+        print(f"Publishing to device: {device}")
         
+        for key in payload.keys():
+            self.client.publish(f"{topic_prefix}/{key}", payload[key])
+        
+        print(f"Published data to device: {device}")

@@ -7,36 +7,42 @@ from mfi_ddb.data_adapters.base import BaseDataAdapter
 from mfi_ddb.topic_families.base import BaseTopicFamily
 from mfi_ddb.utils.exceptions import ConfigException
 
+MAX_ARRAY_SIZE = 16
 
-class MqttSpb(BaseTopicFamily):
-    def __init__(self, config: dict) -> None:
+class MqttSpb:
+    def __init__(self, config: dict, topic_family: BaseTopicFamily) -> None:
         super().__init__()
 
         self.cfg = config
-        
-        self._components: Dict[str, MqttSpbEntityDevice] = {}
-             
-    def connect(self, component_ids:list):
-        
+
         if 'mqtt' not in self.cfg.keys():
             raise ConfigException("\'mqtt\' config required in streamer config file")
         else:
+        
             mqtt_keys = ['group_name', 
                         'node_name', 
                         'broker_address']
             if 'False' in list(map(lambda a: a in self.cfg['mqtt'].keys, mqtt_keys)):
                 raise ConfigException("Config incomplete for mqtt. Following keys needed:",mqtt_keys)
         
-        group_name = self.cfg['mqtt']['group_name']
-        edge_node_name = self.cfg['mqtt']['node_name']
-        mqtt_host = self.cfg['mqtt']['broker_address']
+        self._topic_family = topic_family
+        self._components: Dict[str, MqttSpbEntityDevice] = {}
+             
+    def connect(self, component_ids:list):
+              
+        mqtt_cfg = self.cfg['mqtt']
         
-        #TODO: find a python equivalent of a=True?10:20 for below five
-        mqtt_port = int(self.cfg['mqtt']['broker_port'])
-        mqtt_user = self.cfg['mqtt']['username']
-        mqtt_pass = self.cfg['mqtt']['password']
-        mqtt_tls_enabled = self.cfg['mqtt']['tls_enabled']
-        debug = self.cfg['mqtt']['debug']
+        # REQUIRED KEYS
+        group_name = mqtt_cfg['group_name']
+        edge_node_name = mqtt_cfg['node_name']
+        mqtt_host = mqtt_cfg['broker_address']
+        
+        # OPTIONAL KEYS
+        mqtt_port = int(mqtt_cfg['broker_port']) if 'broker_port' in mqtt_cfg.keys() else 1883
+        mqtt_user = mqtt_cfg['username'] if 'username' in mqtt_cfg.keys() else None
+        mqtt_pass = mqtt_cfg['password'] if 'password' in mqtt_cfg.keys() else None
+        mqtt_tls_enabled = mqtt_cfg['tls_enabled'] if 'tls_enabled' in mqtt_cfg.keys() else False
+        debug = mqtt_cfg['debug'] if 'debug' in mqtt_cfg.keys() else False
         
         for component_id in component_ids:
             spb_component = MqttSpbEntityDevice(group_name,
@@ -74,7 +80,7 @@ class MqttSpb(BaseTopicFamily):
             
             # set attributes value
             component_attr = attributes[component_id]
-            component_attr = self.process_attr(component_attr)
+            component_attr = self._topic_family.process_attr(component_attr)
             if not self.__check_attributes(component_attr):
                 raise Exception(f"{self.topic_family_name} not compatible with MqttSpb")
             for key in component_attr.keys():
@@ -82,9 +88,9 @@ class MqttSpb(BaseTopicFamily):
                 
             # set data values
             input_values = data[component_id]
-            input_values = self.process_data(input_values)
+            input_values = self._topic_family.process_data(input_values)
             if not self.__check_data(input_values):
-                raise Exception(f"{self.topic_family_name} not compatible with MqttSpb")
+                raise Exception(f"{self._topic_family.topic_family_name} not compatible with MqttSpb")
             for key in input_values.keys():                
                 self._components[component_id].data.set_value(key, input_values[key])
                 
@@ -103,7 +109,7 @@ class MqttSpb(BaseTopicFamily):
                 continue
             
             input_values = data[component_id]
-            input_values = self.process_data(input_values)
+            input_values = self._topic_family.process_data(input_values)
             if not bool(input_values):
                 print(f"Data not found for component {component_id}")
                 continue
@@ -122,13 +128,13 @@ class MqttSpb(BaseTopicFamily):
         pass
     
     def __check_attributes(self, attributes: dict):
-        for key in attributes.keys():
-            if type(attributes[key]) not in [int, float, str, list]:
-                return False
-        return True
+        return self.__check_data(attributes)
     
     def __check_data(self, data: dict):
         for key in data.keys():
             if type(data[key]) not in [int, float, str, list]:
                 return False         
+            if type(data[key]) == list:
+                if len(data[key]) > MAX_ARRAY_SIZE:
+                    return False
         return True
