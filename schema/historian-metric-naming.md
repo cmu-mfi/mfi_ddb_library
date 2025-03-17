@@ -14,7 +14,7 @@ Here are few requirements to follow:
 
 1. `ATTR` and `DATA`: Each metrics should be prefixed with `ATTR` or `DATA`. `ATTR` is used to define attributes of the data, while `DATA` is used to define the actual data.
 
-2. `ATTR/trial_id`: This is a **mandatory** attribute. It is used to define the experiment class of the data about to be sent on DDATA topic.
+2. `ATTR/trial_id`: This is a **mandatory** attribute. It is used to define the trial id of the data about to be sent on DDATA topic.
 
 3. `DATA/...`: Before streaming data on DDATA topic, each data point should have a `DATA/...` metric defined in DBIRTH message.
 
