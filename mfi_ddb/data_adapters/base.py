@@ -1,4 +1,5 @@
 import threading
+import time
 
 from mfi_ddb.streamer.observer import Observer
 
@@ -13,10 +14,14 @@ class BaseDataAdapter:
         # component_ids is a list of identifiers for the components that are part of the data object.
         # e.g.: self.component_ids = ["robot-arm-1", "machine-a"]
 
-        self.data = {}
+        self._data = {}
         # data is a dictionary that contains the data of the components.
         # e.g.: self.data = {"robot-arm-1": {"estop": 0, "joint-1": 0.52},
         #                    "machine-a": {"temperature": 30, "pressure": 100}}
+        # It keeps last updated data that has not been streamed yet for each component_id. 
+        # If all up-to-date data has been streamed, it will look like this:
+        # e.g.: self.data = {"robot-arm-1": {}, 
+        #                    "machine-a": {}}
 
         self._cb_data = {}
         # cb_data is a dictionary that contains the data of the components for the callback.
@@ -39,11 +44,18 @@ class BaseDataAdapter:
         self._observers: list[Observer] = []  # List of observers (listeners)
 
     @property
-    def cb_data(self):
+    def data(self):
         """
         Getter for data.
         """
         return self._data
+
+    @property
+    def cb_data(self):
+        """
+        Getter for data.
+        """
+        return self._cb_data
 
     @cb_data.setter
     def cb_data(self, new_data):
@@ -101,10 +113,11 @@ class BaseDataAdapter:
             # Run observer callback in a separate thread
             threading.Thread(target=observer.on_data_update, args=(new_value,), daemon=True).start()
             
-    def clear_data_buffer(self, component_ids:list=[self.component_ids]):
+    def clear_data_buffer(self, component_ids:list=None):
         """
         Clear the data buffer of each component_id. Used by streamers to clear already streamed data
         """
+        component_ids = self.component_ids if component_ids==None else component_ids
         
         for component_id in component_ids:
-            self.data[component_id] = {}
+            self.data[component_id] = {}            
