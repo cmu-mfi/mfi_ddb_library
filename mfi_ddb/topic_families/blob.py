@@ -13,6 +13,9 @@ class BlobTopicFamily(BaseTopicFamily):
     def process_attr(self, attributes):
         # Keeping last record of trial_id from processing attributes
         self.__trial_id = attributes.get("trial_id", None)
+        if self.__trial_id is None:
+            print("WARNING: trial_id is not provided in attributes")
+        
         payload = self.process_data(attributes)
         
         return {'attributes': payload['data']}
@@ -32,6 +35,9 @@ class BlobTopicFamily(BaseTopicFamily):
         metric.Metadata.size = data.get("size", 0)
         metric.timestamp = data.get("timestamp", payload.timestamp)
         metric.bytes_value = data.get("file", b'')
+        
+        if metric.bytes_value == b'':
+            print(f"WARNING: file is not provided in the blob data. Streaming empty file.")
         
         payload.metrics.append(metric)
         
