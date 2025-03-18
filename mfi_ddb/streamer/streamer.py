@@ -23,6 +23,9 @@ class Streamer(Observer):
         self.cfg = config
         topic_family_name = config['topic_family']
         
+        if topic_family_name not in TOPIC_CLIENTS:
+            raise ConfigError(f"Invalid topic family: {topic_family_name}")
+        
         topic_family = globals()[TOPIC_CLIENTS[topic_family_name][1]]
         self.__client = globals()[TOPIC_CLIENTS[topic_family_name][0]](config, topic_family)
         

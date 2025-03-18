@@ -19,8 +19,8 @@ class MqttSpb:
             raise ConfigException("\'mqtt\' config required in streamer config file")
         else:
         
-            mqtt_keys = ['group_name', 
-                        'node_name', 
+            mqtt_keys = ['enterprise', 
+                        'site', 
                         'broker_address']
             if 'False' in list(map(lambda a: a in self.cfg['mqtt'].keys, mqtt_keys)):
                 raise ConfigException("Config incomplete for mqtt. Following keys needed:",mqtt_keys)
@@ -33,8 +33,8 @@ class MqttSpb:
         mqtt_cfg = self.cfg['mqtt']
         
         # REQUIRED KEYS
-        group_name = mqtt_cfg['group_name']
-        edge_node_name = mqtt_cfg['node_name']
+        group_name = mqtt_cfg['enterprise']
+        edge_node_name = mqtt_cfg['site']
         mqtt_host = mqtt_cfg['broker_address']
         
         # OPTIONAL KEYS

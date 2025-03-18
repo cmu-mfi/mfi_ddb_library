@@ -9,7 +9,7 @@ class BaseDataAdapter:
     Base class for data adapters. Use as a super class for the data adapters that will be used in the PullStreamToMqtt(Spb) and PushStreamToMqtt(Spb) classes.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, config: dict) -> None:
         self.component_ids = []
         # component_ids is a list of identifiers for the components that are part of the data object.
         # e.g.: self.component_ids = ["robot-arm-1", "machine-a"]
@@ -38,7 +38,7 @@ class BaseDataAdapter:
         # e.g.: self.attributes = {"robot-arm-1": {"manufacturer": "ABB", "model": "IRB 120", "experiment_class": "orange-test-1"},
         #                          "machine-a": {"manufacturer": "Siemens", "model": "S7-1500", "experiment_class": "orange-test-1"}},
         
-        self.cfg = {}
+        self.cfg = config
         # cfg is a dictionary that contains the configuration of the data object.
 
         self._observers: list[Observer] = []  # List of observers (listeners)
