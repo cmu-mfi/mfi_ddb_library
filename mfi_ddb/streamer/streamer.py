@@ -1,7 +1,7 @@
 import time
 
 import paho.mqtt.client as paho_mqtt
-from observer import Observer
+from .observer import Observer
 
 from mfi_ddb.data_adapters import *
 from mfi_ddb.topic_families import *
@@ -26,7 +26,7 @@ class Streamer(Observer):
         if topic_family_name not in TOPIC_CLIENTS:
             raise ConfigError(f"Invalid topic family: {topic_family_name}")
         
-        topic_family = globals()[TOPIC_CLIENTS[topic_family_name][1]]
+        topic_family = globals()[TOPIC_CLIENTS[topic_family_name][1]]()
         self.__client = globals()[TOPIC_CLIENTS[topic_family_name][0]](config, topic_family)
         
         self.__data_adp = data_adp
@@ -34,7 +34,7 @@ class Streamer(Observer):
         self.__client.connect(data_adp.component_ids)
         
         self.__data_adp.get_data()
-        self.__client.publish_birth()
+        self.__client.publish_birth(self.__data_adp.attributes, self.__data_adp.data)
         
         self.__last_poll_update = 0
         

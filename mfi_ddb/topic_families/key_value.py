@@ -1,4 +1,4 @@
-from base import BaseTopicFamily
+from .base import BaseTopicFamily
 
 class KeyValueTopicFamily(BaseTopicFamily):
     def __init__(self):

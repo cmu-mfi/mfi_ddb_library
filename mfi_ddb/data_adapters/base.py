@@ -1,15 +1,12 @@
 import threading
 import time
 
-from mfi_ddb.streamer.observer import Observer
-
-
 class BaseDataAdapter:
     """
     Base class for data adapters. Use as a super class for the data adapters that will be used in the PullStreamToMqtt(Spb) and PushStreamToMqtt(Spb) classes.
     """
 
-    def __init__(self, config: dict) -> None:
+    def __init__(self, config: dict = None) -> None:
         self.component_ids = []
         # component_ids is a list of identifiers for the components that are part of the data object.
         # e.g.: self.component_ids = ["robot-arm-1", "machine-a"]

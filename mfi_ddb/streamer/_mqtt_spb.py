@@ -3,9 +3,8 @@ from typing import Dict
 
 from mqtt_spb_wrapper import MqttSpbEntityDevice
 
-from mfi_ddb.data_adapters.base import BaseDataAdapter
 from mfi_ddb.topic_families.base import BaseTopicFamily
-from mfi_ddb.utils.exceptions import ConfigException
+from mfi_ddb.utils.exceptions import ConfigError
 
 MAX_ARRAY_SIZE = 16
 
@@ -16,14 +15,14 @@ class MqttSpb:
         self.cfg = config
 
         if 'mqtt' not in self.cfg.keys():
-            raise ConfigException("\'mqtt\' config required in streamer config file")
+            raise ConfigError("\'mqtt\' config required in streamer config file")
         else:
         
             mqtt_keys = ['enterprise', 
                         'site', 
                         'broker_address']
-            if 'False' in list(map(lambda a: a in self.cfg['mqtt'].keys, mqtt_keys)):
-                raise ConfigException("Config incomplete for mqtt. Following keys needed:",mqtt_keys)
+            if 'False' in list(map(lambda a: a in list(self.cfg['mqtt'].keys()), mqtt_keys)):
+                raise ConfigError("Config incomplete for mqtt. Following keys needed:",mqtt_keys)
         
         self._topic_family = topic_family
         self._components: Dict[str, MqttSpbEntityDevice] = {}

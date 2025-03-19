@@ -1,4 +1,4 @@
-from base import BaseTopicFamily
+from .base import BaseTopicFamily
 
 MAX_ARRAY_SIZE = 16
 class HistorianTopicFamily(BaseTopicFamily):

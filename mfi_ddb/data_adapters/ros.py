@@ -70,6 +70,7 @@ class RosDataAdapter(BaseDataAdapter):
                 self.byte_data_filter[namespace][topic] = "check_needed"
 
         # CHECK IF ROS MASTER IS RUNNING
+        print("Checking if ROS master is running...")
         # REF: https://github.com/ros/ros_comm/blob/8250c7d434ea34d0589eb8b6eaab5df1b11fd325/tools/rostopic/src/rostopic/__init__.py#L84
         try:
             rosgraph.Master("/rostopic").getPid()
@@ -79,11 +80,13 @@ class RosDataAdapter(BaseDataAdapter):
             )
 
         # INIT ROS NODE IF NOT ALREADY INITIALIZED
+        print("Initializing ROS node...")
         if rospy.get_name() == "/unnamed":
             rospy.init_node("mfi_ddb_ros_adapter", anonymous=True)
-        rospy.on_shutdown(self.__ros_shutdown)
+        # rospy.on_shutdown(self.__ros_shutdown)
 
         # CHECK IF LISTED ROS TOPICS EXISTS
+        print("Checking if listed ROS topics exist...")
         for device in self.component_ids:
             for topic in self.raw_data[device]:
                 try:
@@ -99,6 +102,8 @@ class RosDataAdapter(BaseDataAdapter):
                     del self.raw_data[device][topic]
                     continue
 
+        print("RosDataAdapter initialized successfully.")
+        
         # SET ROS CALLBACK
         if self.cfg["set_ros_callback"]:
             self.__init_callback()

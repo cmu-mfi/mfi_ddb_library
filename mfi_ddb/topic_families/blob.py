@@ -1,7 +1,7 @@
 import time
 
-from base import BaseTopicFamily
-from schema import blob_pb2
+from .base import BaseTopicFamily
+from .schema import blob_pb2
 
 class BlobTopicFamily(BaseTopicFamily):
     def __init__(self):

@@ -3,9 +3,8 @@ import time
 
 import paho.mqtt.client as mqtt
 
-from mfi_ddb.data_adapters.base import BaseDataAdapter
 from mfi_ddb.topic_families.base import BaseTopicFamily
-from mfi_ddb.utils.exceptions import ConfigException
+from mfi_ddb.utils.exceptions import ConfigError
 
 
 class Mqtt:
@@ -15,7 +14,7 @@ class Mqtt:
         self.cfg = config
         
         if 'mqtt' not in self.cfg.keys():
-            raise ConfigException("\'mqtt\' config required in streamer config file")
+            raise ConfigError("\'mqtt\' config required in streamer config file")
         else:
             mqtt_keys = ['enterprise', 
                         'broker_address']
