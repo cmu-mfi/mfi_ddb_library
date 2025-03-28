@@ -14,9 +14,9 @@ pip install "mfi_ddb @ git+https://github.com/cmu-mfi/mfi_ddb_library.git"
 ```mermaid
 flowchart LR;
     A[Data Source] --> B[Data Adapter];
-    B --> M[MQTT Client];
-    C[Topic Family] --> M;
-    D[Streamer] --> M;
+    D[Streamer] --> M[MQTT Client];
+    B --> D;
+    C[Topic Family] --> D;
     M-->X[MQTT Broker];    
 
     classDef highlight fill:#094d57
@@ -30,13 +30,13 @@ To be able to do the above three major classes are provided:
 
 * **Data Adapter**: These are the objects that represent the data that needs to be streamed. These objects are responsible for converting the data to mfi_ddb ingestible structure.
 * **Streamer**: This is responsible for publishing MQTT messages to the broker. It uses the data from data adapters to stream the data. Streaming can be event driven using obeserver callback or polling based.
-* **Topic Family**: These classes allow streamer to convert data from adapters to MQTT payload as required by respective topic branch (`spBv`, `blob`, `kv`)
+* **Topic Family**: These classes allow streamer to convert data from adapters to MQTT payload as required by respective topic branch (`historian`, `blob`, `kv`)
 
 ## Usage
 
 * Review the [examples](examples) for usage.
 
-* [mqtt_client_tutorial.ipynb](examples/mqtt_client_tutorial.ipynb) gives a step by step tutorial to write your own MQTT client for mfi_ddb franework.
+* **[WIP]** [mqtt_client_tutorial.ipynb](examples/mqtt_client_tutorial.ipynb) gives a step by step tutorial to write your own MQTT client for mfi_ddb franework.
 
 ## Available Classes
 
