@@ -5,8 +5,7 @@ system:
   name: 'keyence'
   description: '...'
   type: '...'
-  experiment_class: 'testing_lfs'
+  trial_id: 'testing_lfs'
 
 wait_before_read: 1 # seconds
 buffer_size: 10
-stream_rate: 1

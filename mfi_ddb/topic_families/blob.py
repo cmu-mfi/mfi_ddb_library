@@ -35,6 +35,14 @@ class BlobTopicFamily(BaseTopicFamily):
         metric.Metadata.size = data.get("size", 0)
         metric.timestamp = data.get("timestamp", payload.timestamp)
         metric.bytes_value = data.get("file", b'')
+
+        # Put all other data in Metadata.description
+        other_metadata = {}
+        for key, value in data.items():
+            if key not in ["file_name", "file_type", "size", "timestamp", "file"]:
+                other_metadata[key] = value
+                
+        metric.Metadata.description = str(other_metadata)
         
         if metric.bytes_value == b'':
             print(f"WARNING: file is not provided in the blob data. Streaming empty file.")
