@@ -21,7 +21,7 @@ class LocalFilesDataAdapter(BaseDataAdapter):
         self.system_name = f'lfs/{self.system_name}'
         
         self.component_ids.append(self.system_name)
-        self.data[self.system_name] = {}
+        self._data[self.system_name] = {}
         self.attributes[self.system_name] = system_config
         
         self.buffer_data = []
@@ -44,7 +44,7 @@ class LocalFilesDataAdapter(BaseDataAdapter):
     def get_data(self): 
         if len(self.buffer_data) > 0:
             data = self.buffer_data.pop(0)
-            self.data[self.system_name] = data
+            self._data[self.system_name] = data
             return        
                     
     def on_created(self, event):
@@ -78,6 +78,7 @@ class LocalFilesDataAdapter(BaseDataAdapter):
             self.buffer_data.pop(0)
             
         self.buffer_data.append(data)
+        self._notify_observers({self.system_name: data})
 
     def update_config(self, config: dict):
         """

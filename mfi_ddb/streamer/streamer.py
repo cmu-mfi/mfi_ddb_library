@@ -17,7 +17,7 @@ TOPIC_CLIENTS = {
 }
 
 class Streamer(Observer):
-    def __init__(self, config: dict, data_adp: BaseDataAdapter) -> None:
+    def __init__(self, config: dict, data_adp: BaseDataAdapter, stream_on_update:bool = False) -> None:
         super().__init__()
         
         self.cfg = config
@@ -37,6 +37,9 @@ class Streamer(Observer):
         self.__client.publish_birth(self.__data_adp.attributes, self.__data_adp.data)
         
         self.__last_poll_update = 0
+        
+        if stream_on_update:
+            self.__data_adp.add_observer(self)
         
     def reconnect(self, config=None):
         config = self.cfg if config==None else config

@@ -117,7 +117,8 @@ class RosDataAdapter(BaseDataAdapter):
 
         for device in self.component_ids:
             for topic in self.raw_data[device]:
-                self.cb_data = self.__process_rawdata(device, topic)
+                # self.cb_data = self.__process_rawdata(device, topic)
+                self.__process_rawdata(device, topic)
 
     def __poll_ros_topics(self):
 
@@ -160,6 +161,7 @@ class RosDataAdapter(BaseDataAdapter):
 
         self._data[device].update(new_data)
         self.last_updated[device] = time.time()
+        self._notify_observers({device: new_data})
 
         return {device: new_data}
 
@@ -229,7 +231,8 @@ class RosDataAdapter(BaseDataAdapter):
 
         msg = msg_class().deserialize(anymsg._buff)
         self.raw_data[device][topic] = msg
-        self.cb_data = self.__process_rawdata(device, topic)
+        # self.cb_data = self.__process_rawdata(device, topic)
+        self.__process_rawdata(device, topic)
 
     def __ros_shutdown(self):
         raise KeyboardInterrupt("ROS shutdown signal received.")
