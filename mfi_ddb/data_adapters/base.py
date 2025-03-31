@@ -38,7 +38,7 @@ class BaseDataAdapter:
         self.cfg = config
         # cfg is a dictionary that contains the configuration of the data object.
 
-        self._observers: list[Observer] = []  # List of observers (listeners)
+        self._observers = []  # List of observers (listeners)
 
     @property
     def data(self):
