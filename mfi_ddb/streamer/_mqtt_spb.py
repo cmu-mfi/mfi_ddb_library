@@ -1,3 +1,4 @@
+import copy
 import time
 from typing import Dict
 
@@ -47,7 +48,7 @@ class MqttSpb:
             spb_component = MqttSpbEntityDevice(group_name,
                                                 edge_node_name,
                                                 component_id,
-                                                debug)
+                                                debug_enabled = debug)
 
             _connected = False
             while not _connected:
@@ -98,7 +99,7 @@ class MqttSpb:
             
             print(f"Birth published for component {component_id}")
             
-            return True
+        return True
    
     def stream_data(self, data):
         for component_id in data.keys():   
@@ -119,7 +120,7 @@ class MqttSpb:
                 # TODO: Add the fix below to the custom mqtt_spb_wrapper class
                 data_item_prefix = 'DATA/'+key
                 self._components[component_id].data.set_value(data_item_prefix, input_values[key])            
-                
+            
             self._components[component_id].publish_data()
             print(f"Data published for component {component_id}")
     
