@@ -35,6 +35,7 @@ class Streamer(Observer):
         
         self.__data_adp.get_data()
         self.__client.publish_birth(self.__data_adp.attributes, self.__data_adp.data)
+        self.__data_adp.clear_data_buffer()
         
         self.__last_poll_update = 0
         

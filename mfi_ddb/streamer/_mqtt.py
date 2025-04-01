@@ -18,7 +18,7 @@ class Mqtt:
         else:
             mqtt_keys = ['enterprise', 
                         'broker_address']
-            if 'False' in list(map(lambda a: a in self.cfg['mqtt'].keys, mqtt_keys)):
+            if 'False' in list(map(lambda a: a in list(self.cfg['mqtt'].keys()), mqtt_keys)):
                 raise Exception("Config incomplete for mqtt. Following keys needed:",mqtt_keys)        
         
         self.client : mqtt.Client = None
@@ -28,7 +28,7 @@ class Mqtt:
     
     def __get_topic_header(self, config:dict):
         ver = 'mfi-v1.0'
-        topic_family = self.topic_family_name
+        topic_family = self._topic_family.topic_family_name
         topic_head = '-'.join([ver, topic_family])
         
         enterprise = config['enterprise'] if 'enterprise' in config.keys() else ""
@@ -104,9 +104,7 @@ class Mqtt:
                 raise Exception(f"{self._topic_family.topic_family_name} not compatible with Mqtt")
                       
             self.__publish(component_id, input_values)       
-                
-            print(f"Data published for device {component_id}")
-    
+                    
     def disconnect(self):
         pass
     
@@ -123,4 +121,4 @@ class Mqtt:
         for key in payload.keys():
             self.client.publish(f"{topic_prefix}/{key}", payload[key])
         
-        print(f"Published data to device: {device}")
+        print(f"Published data on topic: {topic_prefix}/{key}")

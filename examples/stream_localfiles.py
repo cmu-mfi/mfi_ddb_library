@@ -1,8 +1,9 @@
 import os
+import time
 
 import yaml
 
-from mfi_ddb import Streamer, LocalFilesDataAdapter
+from mfi_ddb import LocalFilesDataAdapter, Streamer
 
 if __name__ == "__main__":
 
@@ -17,11 +18,11 @@ if __name__ == "__main__":
     with open(mqtt_config_file, "r") as file:
         mqtt_config = yaml.load(file, Loader=yaml.FullLoader)
 
-    lfs_adapter = LocalFilesDataAdapter(lfs_config)
-
     choice = input("Choose the streaming method:\n1. Polling\n2. Callback\n")
     while choice not in ["1", "2"]:
         choice = input("Invalid choice. Choose 1 or 2:\n1. Polling\n2. Callback\n")
+
+    lfs_adapter = LocalFilesDataAdapter(lfs_config)
     
     # 1. polling and streaming data
     if choice == "1":
@@ -36,4 +37,7 @@ if __name__ == "__main__":
         print("Callback method selected.")
             
         streamer = Streamer(mqtt_config, lfs_adapter, stream_on_update=True)
+        while True:
+            # Wait for data update
+            time.sleep(0.1)
     

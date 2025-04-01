@@ -22,6 +22,10 @@ class BlobTopicFamily(BaseTopicFamily):
     
     def process_data(self, data):
         # Using trial_id from data if available, otherwise using last record of trial_id
+        if not bool(data):
+            print("WARNING: blob data is empty")
+            return {}
+            
         self.__trial_id = data.get("trial_id", self.__trial_id)        
         
         payload = blob_pb2.Payload()
@@ -30,9 +34,9 @@ class BlobTopicFamily(BaseTopicFamily):
         
         metric = blob_pb2.Payload.Metric()
         
-        metric.Metadata.file_name = data.get("file_name", "")
-        metric.Metadata.file_type = data.get("file_type", "")
-        metric.Metadata.size = data.get("size", 0)
+        metric.metadata.file_name = data.get("file_name", "")
+        metric.metadata.file_type = data.get("file_type", "")
+        metric.metadata.size = data.get("size", 0)
         metric.timestamp = data.get("timestamp", payload.timestamp)
         metric.bytes_value = data.get("file", b'')
 
@@ -42,11 +46,11 @@ class BlobTopicFamily(BaseTopicFamily):
             if key not in ["file_name", "file_type", "size", "timestamp", "file"]:
                 other_metadata[key] = value
                 
-        metric.Metadata.description = str(other_metadata)
+        metric.metadata.description = str(other_metadata)
         
         if metric.bytes_value == b'':
             print(f"WARNING: file is not provided in the blob data. Streaming empty file.")
         
         payload.metrics.append(metric)
         
-        return({"data",payload.SerializeToString()})
+        return({"data": payload.SerializeToString()})
