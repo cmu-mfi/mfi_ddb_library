@@ -12,13 +12,12 @@ from watchdog.observers import Observer
 from mfi_ddb.data_adapters.base import BaseDataAdapter
 
 
-class LocalFilesDataAdapter(BaseDataAdapter):
+class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
     def __init__(self, config: dict = None) -> None:
         super().__init__(config)
         
         system_config = config['system']
         self.system_name = system_config['name']
-        self.system_name = f'lfs/{self.system_name}'
         
         self.component_ids.append(self.system_name)
         self._data[self.system_name] = {}
@@ -106,14 +105,11 @@ class LocalFilesDataAdapter(BaseDataAdapter):
         elif key == 'file_path':
             return event.src_path
         elif key == 'timestamp':
-            format = "%Y%m%d-%H%M%S"
-            event_time = os.path.getmtime(event.src_path)
-            return time.strftime(format, time.localtime(event_time))
+            return int(time.time())
         elif key == 'file':
             file_data = None
             with open(event.src_path, 'rb') as file:
                 file_data = file.read()
-            file_data = base64.b64encode(file_data).decode('utf-8')
             return file_data
         elif key == 'size':
             return os.path.getsize(event.src_path)
