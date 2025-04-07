@@ -50,7 +50,7 @@ class MTconnectDataAdapter(BaseDataAdapter):
         components_data = device_data
         component_data = self.__get_probe_components(components_data)
         for component in component_data:
-            component_id = f'{self.device_name}.{component["@id"]}'
+            component_id = f'{self.device_name}/{component["@id"]}'
             self.last_updated[component_id] = current_time
             self.component_ids.append(component_id)
             self.attributes[component_id] = device_attributes.copy()
@@ -122,7 +122,7 @@ class MTconnectDataAdapter(BaseDataAdapter):
         current_time = time.time()
         
         for component_data in raw_data:
-            component_id = f'{self.device_name}.{component_data["@componentId"]}'
+            component_id = f'{self.device_name}/{component_data["@componentId"]}'
             
             def extract_key_value(data_item, data_item_key):
                 if isinstance(data_item, omegaconf.dictconfig.DictConfig):
