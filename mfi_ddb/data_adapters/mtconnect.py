@@ -36,32 +36,31 @@ class MTconnectDataAdapter(BaseDataAdapter):
         current_time = time.time()
             
         # Populate device attributes
-        self.component_ids.append(self.device_name)
-        self.last_updated[self.device_name] = current_time
-        self.attributes[self.device_name] = {}
-        self.attributes[self.device_name]['trial_id'] = self.cfg['trial_id']
+        device_attributes = {}
+        device_attributes['trial_id'] = self.cfg['mtconnect']['trial_id']
         for key in device_data.keys():
             if not isinstance(device_data[key], omegaconf.dictconfig.DictConfig):
-                self.attributes[self.device_name][key] = device_data[key]
+                device_attributes[key] = device_data[key]
             elif key == 'Description':
                 for sub_key in device_data[key].keys():
                     if not isinstance(device_data[key][sub_key], omegaconf.dictconfig.DictConfig):
-                        self.attributes[self.device_name][sub_key] = device_data[key][sub_key]
+                        device_attributes[sub_key] = device_data[key][sub_key]
 
         # Populate component and data attributes
-        components_data = device_data.Components
+        components_data = device_data
         component_data = self.__get_probe_components(components_data)
         for component in component_data:
-            component_id = f'{self.device_name}.{component['@id']}'
+            component_id = f'{self.device_name}.{component["@id"]}'
             self.last_updated[component_id] = current_time
             self.component_ids.append(component_id)
-            self.attributes[component_id] = self.attributes[self.device_name].copy()
+            self.attributes[component_id] = device_attributes.copy()
             self._data[component_id] = {}
             data_list = component.DataItems.DataItem
+            if not isinstance(data_list, omegaconf.listconfig.ListConfig):
+                data_list = [data_list]
             for data_item in data_list:
-                self._data[component_id][data_item['@id']] = {}
                 for key in data_item.keys():
-                    self._data[component_id][data_item['@id']][key] = str(data_item[key])                
+                    self._data[component_id][f'{data_item["@id"]}/{key}'] = str(data_item[key])                
                     
     def get_data(self):
         raw_data = self.__request_agent('current')
@@ -123,7 +122,7 @@ class MTconnectDataAdapter(BaseDataAdapter):
         current_time = time.time()
         
         for component_data in raw_data:
-            component_id = f'{self.device_name}.{component_data['@componentId']}'
+            component_id = f'{self.device_name}.{component_data["@componentId"]}'
             
             def extract_key_value(data_item, data_item_key):
                 if isinstance(data_item, omegaconf.dictconfig.DictConfig):
@@ -133,7 +132,10 @@ class MTconnectDataAdapter(BaseDataAdapter):
                             substitute_key = 'value'
                         extract_key_value(data_item[key], f'{data_item_key}/{substitute_key}')
                 else:
-                    self._data[component_id][data_item_key] = self.__autotype(data_item)           
+                    try:
+                        self._data[component_id][data_item_key] = self.__autotype(data_item)           
+                    except KeyError:
+                        breakpoint()
                     self.last_updated[component_id] = current_time
             
             for key in component_data.keys():
