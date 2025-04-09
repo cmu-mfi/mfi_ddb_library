@@ -1,0 +1,349 @@
+/* Ensure the body and html take up the full height */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  font-family: 'Arial', sans-serif;
+  background-color: #f7f9fc; /* Light background color */
+}
+
+/* Ensure the root div takes up the full height */
+#root {
+  height: 100%;
+  width: 100%;
+  display: flex;
+}
+
+/* Style the container to take up the full space */
+.container {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #f7f9fc;
+}
+
+/* Style the card to take up the full space */
+.card {
+  height: 100%;
+  width: 100%;
+  max-width: 1200px; /* Optional: Limit the width for larger screens */
+  background-color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 24px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header styles */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.header-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.button:hover {
+  background-color: #0056b3;
+}
+
+/* Content styles */
+.card-content {
+  flex: 1;
+  background-color: #f8f9fa;
+  padding: 16px;
+  border-radius: 8px;
+  overflow-y: auto; /* Allow scrolling if content overflows */
+}
+
+.card-item {
+  padding: 8px 16px;
+  border-bottom: 1px solid #ddd;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.card-item.connected {
+  background-color: rgba(120, 199, 138, 0.6); /* Green with 80% opacity */
+  color: black; /* Ensure text is readable on green background */
+}
+
+.card-item.unknown {
+  background-color: rgb(224, 134, 143, 0.6); /* Green with 80% opacity */
+  color: black; /* Ensure text is readable on red background */
+}
+
+.card-item-expanded {
+  padding-left: 24px;
+}
+
+.status {
+  background-color: #28a745; /* Green for "Connected" */
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  margin-right: 8px;
+}
+
+.status:not(.connected) {
+  background-color: #dc3545; /* Red for other statuses */
+}
+
+.edit-icon {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  color: white; /* Match the text color */
+  cursor: pointer;
+}
+
+.edit-icon:hover {
+  color: #f8f9fa; /* Slightly lighter color on hover */
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ced4da;
+  border-radius: 8px;
+}
+
+.input[type="file"] {
+  margin-top: 8px;
+  margin-bottom: 16px;
+  padding: 4px;
+  font-size: 1rem;
+}
+
+.save-button {
+  width: 100%;
+  padding: 8px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.save-button:hover {
+  background-color: #0056b3;
+}
+
+.status-message {
+  text-align: center;
+  margin-top: 16px;
+  color: #dc3545;
+}
+
+.dialog-close-button {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #4a5568;
+}
+
+.dialog-close-button:hover {
+  color: #2d3748;
+}
+
+.App {
+  text-align: center;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.dialog-overlay.hidden {
+  display: none;
+}
+
+.dialog-overlay.visible {
+  display: flex; /* or block/grid, depending on your layout */
+}
+
+.config-box {
+  border: 1px dashed #ccc;
+  padding: 1rem;
+  margin-top: 0.5rem;
+  color: #999;
+  text-align: center;
+}
+
+.configure-button {
+  margin-top: 16px;
+  padding: 8px 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.configure-button:hover {
+  background-color: #0056b3;
+}
+
+.text-editor {
+  margin-top: 16px;
+}
+
+.text-editor label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.text-editor .input {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 16px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.text-editor .save-button {
+  padding: 8px 16px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.text-editor .save-button:hover {
+  background-color: #218838;
+}
+
+.main-connection {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background-color: transparent; /* Inherit the background color from the parent */
+  cursor: pointer;
+  transition: background-color 0.3s;
+  position: relative;
+}
+
+.main-connection:hover {
+  background-color: #e9ecef;
+}
+
+.connection-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* Add spacing between the status and the edit button */
+}
+
+.toggle-icon {
+  font-size: 1rem;
+  color: #333;
+}
+
+.sub-connections {
+  margin-left: 16px;
+  margin-top: 8px;
+}
+
+.sub-connection-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.sub-connection-name {
+  flex: 1;
+  color: black;
+  cursor: pointer;
+}
+
+.sub-connection-name:hover {
+  color: #0056b3;
+}
+
+.edit-button {
+  margin-top: 8px;
+  padding: 6px 12px;
+  background-color: #ffc107;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.edit-button:hover {
+  background-color: #e0a800;
+}
+
+.select-connection-type {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+
