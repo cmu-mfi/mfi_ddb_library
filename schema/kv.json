@@ -1,0 +1,12 @@
+{
+    "type": "object",
+    "properties": {
+        "trial_id": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "trial_id"
+    ],
+    "additionalProperties": true
+}
