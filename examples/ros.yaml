@@ -1,5 +1,5 @@
-experiment_class: 'untitled'
-stream_rate: 10
+trial_id: 'untitled'
+set_ros_callback: False
 
 devices:
   yk_architect:
@@ -9,7 +9,7 @@ devices:
       description: Architect - Yaskawa GP4 Robot System
       type: Robot
       version: 0.01
-      # experiment_class: 'wp-place-01'
+      # trial_id: 'wp-place-01'
 
   yk_builder:
     namespace: yk_builder
@@ -18,7 +18,7 @@ devices:
       description: Builder - Yaskawa GP4 Robot System
       type: Robot
       version: 0.01
-      # experiment_class: 'wp-place-01'
+      # trial_id: 'wp-place-01'
 
   yk_creator:
     namespace: yk_creator
@@ -27,7 +27,7 @@ devices:
       description: Creator - Yaskawa GP4 Robot System
       type: Robot
       version: 0.01
-      # experiment_class: 'wp-place-01'
+      # trial_id: 'wp-place-01'
 
   yk_destroyer:
     namespace: yk_destroyer
@@ -36,4 +36,4 @@ devices:
       description: Destroyer - Yaskawa GP4 Robot System
       type: Robot
       version: 0.01
-      # experiment_class: 'wp-place-01'
+      # trial_id: 'wp-place-01'

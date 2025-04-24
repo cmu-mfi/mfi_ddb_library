@@ -1,0 +1,3 @@
+[submodule "mfi_ddb/streamer/mqtt-spb-wrapper"]
+	path = mfi_ddb/streamer/mqtt-spb-wrapper
+	url = https://github.com/cmu-mfi/mqtt-spb-wrapper.git
