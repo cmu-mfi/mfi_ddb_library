@@ -16,11 +16,11 @@ class BlobTopicFamily(BaseTopicFamily):
         if self.__trial_id is None:
             print("WARNING: trial_id is not provided in attributes")
         
-        payload = self.process_data(attributes)
+        payload = self.process_data(attributes, is_attribute=True)
         
         return {'attributes': payload['data']}
     
-    def process_data(self, data):
+    def process_data(self, data, is_attribute=False):
         # Using trial_id from data if available, otherwise using last record of trial_id
         if not bool(data):
             print("WARNING: blob data is empty")
@@ -34,6 +34,7 @@ class BlobTopicFamily(BaseTopicFamily):
         
         metric = blob_pb2.Payload.Metric()
         
+        metric.name = "data" if not is_attribute else "attributes"
         metric.metadata.file_name = data.get("file_name", "")
         metric.metadata.file_type = data.get("file_type", "")
         metric.metadata.size = data.get("size", 0)
@@ -54,3 +55,31 @@ class BlobTopicFamily(BaseTopicFamily):
         payload.metrics.append(metric)
         
         return({"data": payload.SerializeToString()})
+    
+    @staticmethod
+    def process_message(message):        
+        payload = blob_pb2.Payload()
+        payload.ParseFromString(message)
+                
+        metric = payload.metrics[0]
+
+        payload_type = metric.name
+        
+        data = {}
+        data['file_name'] = metric.metadata.file_name
+        data['file_type'] = metric.metadata.file_type
+        data['size'] = metric.metadata.size
+        data['timestamp'] = metric.timestamp
+        data['file'] = metric.bytes_value
+        
+        trial_id = payload.trial_id
+        data['trial_id'] = trial_id
+        try:
+            data['description'] = eval(metric.metadata.description)
+        except:
+            data['description'] = metric.metadata.description            
+            
+        return payload_type, data
+        
+        
+            

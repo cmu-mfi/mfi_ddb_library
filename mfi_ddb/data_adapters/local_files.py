@@ -70,6 +70,7 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
         data["size"] = self.__get_event_data(event, 'size')
         
         data["trial_id"] = self.cfg["system"]["trial_id"]
+        data["system"] = self.cfg["system"]
         
         if len(self.buffer_data) >= self.cfg["buffer_size"]:
             print(f"WARNING: Buffer full. Ignoring file {self.buffer_data[-1]['file_name']}")

@@ -8,5 +8,7 @@ class BaseTopicFamily:
     
     def process_data(self, data):
         return data
-        
     
+    @staticmethod
+    def process_message(message):
+        NotImplementedError(f"process_message() not implemented.")
