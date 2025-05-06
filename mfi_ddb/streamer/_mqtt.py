@@ -8,7 +8,7 @@ from mfi_ddb.utils.exceptions import ConfigError
 
 
 class Mqtt:
-    def __init__(self, config: dict, topic_family: BaseTopicFamily) -> None:
+    def __init__(self, config: dict, topic_family: BaseTopicFamily = None) -> None:
         super().__init__()
 
         self.cfg = config
@@ -24,7 +24,10 @@ class Mqtt:
         self.client : mqtt.Client = None
         self._components: list = []
         self._topic_family = topic_family
-        self.__topic_header = self.__get_topic_header(config['mqtt'])
+        try:
+            self.__topic_header = self.__get_topic_header(config['mqtt'])
+        except:
+            self.__topic_header = None
     
     def __get_topic_header(self, config:dict):
         ver = 'mfi-v1.0'
@@ -38,7 +41,7 @@ class Mqtt:
         args = [topic_head, enterprise, site, area]
         return '/'.join([arg for arg in args if arg])
 
-    def connect(self, component_ids:list):
+    def connect(self, component_ids:list = []):
 
         mqtt_cfg = self.cfg['mqtt']
         
