@@ -81,14 +81,16 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
         # CREATE CALLBACKS FOR THE TOPICS
         for topic in self.cfg['mqtt']['topics']:
             component_id = topic['component_id']
-            topic = topic['topic']
+            topic_name = topic['topic']
+            if 'trial_id' in topic.keys():
+                topic['trial_id'] = self.cfg['trial_id']
                         
             self.buffer_data[component_id] = []
             self._data[component_id] = {}
             self.attributes[component_id] = topic
             self.component_ids.append(component_id)
             
-            self.create_message_callback(topic,
+            self.create_message_callback(topic_name,
                 lambda msg, c_id=component_id: self._topic_callback(msg, c_id))
             print(f"Subscribed to topic: {topic}")
         
