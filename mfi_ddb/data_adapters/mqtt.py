@@ -57,7 +57,7 @@ class _Mqtt:
         print(f"Subscribed to topic: {topic}")
         
     def start_listening(self):
-        self.client.loop_forever()
+        self.client.loop_start()
         print("Connected to MQTT broker")
 
     def __on_connect(self, client, userdata, flags, rc):
@@ -91,6 +91,7 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
                 lambda msg, c_id=component_id: self._topic_callback(msg, c_id))
             print(f"Subscribed to topic: {topic}")
         
+        self.start_listening()
         print("MqttDataAdapter initialized")
     
     def get_data(self):
