@@ -10,20 +10,17 @@ class _Mqtt:
     def __init__(self, config: dict) -> None:
         super().__init__()
 
-        self.cfg = config
-        
-        if 'mqtt' not in self.cfg.keys():
-            raise ConfigError("\'mqtt\' config required in streamer config file")
-        else:
-            mqtt_keys = ['broker_address']
-            if 'False' in list(map(lambda a: a in list(self.cfg['mqtt'].keys()), mqtt_keys)):
-                raise Exception("Config incomplete for mqtt. Following keys needed:",mqtt_keys)        
+        self.mqtt_cfg = config        
+
+        mqtt_keys = ['broker_address']
+        if 'False' in list(map(lambda a: a in list(self.mqtt_cfg.keys()), mqtt_keys)):
+            raise Exception("Config incomplete for mqtt. Following keys needed:",mqtt_keys)        
         
         self.client : mqtt.Client = None
     
     def connect(self):
 
-        mqtt_cfg = self.cfg
+        mqtt_cfg = self.mqtt_cfg
                 
         # REQUIRED KEYS        
         mqtt_host = mqtt_cfg['broker_address']
@@ -64,7 +61,7 @@ class _Mqtt:
         print("Connected to MQTT broker")
 
     def __on_connect(self, client, userdata, flags, rc):
-        print(f"Connected to broker {self.cfg['broker_address']} with result code {rc}")            
+        print(f"Connected to broker {self.mqtt_cfg['broker_address']} with result code {rc}")            
 
 
 class MqttDataAdapter(BaseDataAdapter, _Mqtt):
@@ -79,10 +76,10 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
         self.queue_size = self.cfg['queue_size'] if 'queue_size' in self.cfg.keys() else 10
         
         # CREATE CALLBACKS FOR THE TOPICS
-        for topic in self.cfg['mqtt']['topics']:
+        for topic in self.cfg['topics']:
             component_id = topic['component_id']
             topic_name = topic['topic']
-            if 'trial_id' in topic.keys():
+            if 'trial_id' not in topic.keys():
                 topic['trial_id'] = self.cfg['trial_id']
                         
             self.buffer_data[component_id] = []
@@ -94,7 +91,6 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
                 lambda msg, c_id=component_id: self._topic_callback(msg, c_id))
             print(f"Subscribed to topic: {topic}")
         
-        self.start_listening()
         print("MqttDataAdapter initialized")
     
     def get_data(self):

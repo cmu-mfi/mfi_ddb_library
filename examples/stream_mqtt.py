@@ -37,7 +37,5 @@ if __name__ == "__main__":
         print("Callback method selected.")
             
         streamer = Streamer(mqtt_config, mqtt_adp_adapter, stream_on_update=True)
-        while True:
-            # Wait for data update
-            time.sleep(0.1)
+        mqtt_adp_adapter.start_listening()
     
