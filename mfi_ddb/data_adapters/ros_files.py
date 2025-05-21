@@ -280,7 +280,6 @@ class ImageHandler:
 
         image = np.array(im[:,:,0:3])
         image = cv2.imencode(IMG_FILE_TYPE, image)[1]
-        image = np.array(image)
         image = image.tobytes()
         
         return image
