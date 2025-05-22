@@ -1,0 +1,22 @@
+{
+  "@context": {
+    "schema":   "http://schema.org/",
+    "core":     "https://example.org/semantic-schema/core#",
+    "@vocab":   "https://example.org/semantic-schema/core#",
+
+    "project_id": {
+      "@id":   "schema:identifier",
+      "@type": "@id",
+      "@comment": "A unique IRI assigned when the project is created"
+    },
+    "trial_id": {
+      "@id": "schema:identifier",
+      "@comment": "A user-supplied string for each trial (not required to be globally unique)"
+    },
+
+    "extension": {
+      "@id":   "core:extension",
+      "@type": "@id"
+    }
+  }
+}
