@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mfi_ddb"
+version = "0.2"
+dependencies = [
+    "cmake",
+    "omegaconf",
+    "pandas",
+    "ping3",
+    "pyyaml",
+    "requests",
+    "setuptools",
+    "wheel",
+    "xmltodict",
+    "paho-mqtt",
+    "watchdog",
+    "protobuf",
+    "numpy"
+]
+requires-python = ">=3.8,<3.14"
+authors = [
+    { name="Shobhit Aggarwal", email="shobhit@cmu.edu" }
+]

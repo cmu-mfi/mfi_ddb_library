@@ -5,8 +5,22 @@ Library to stream data to Digital Data Backend (DDB) for the MFI project.
 
 ## Installation
 
+**Linux**
 ```
-pip install "mfi_ddb @ git+https://github.com/cmu-mfi/mfi_ddb_library.git"
+git clone --recurse-submodules https://github.com/cmu-mfi/mfi_ddb_library.git
+cd mfi_ddb_library
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+**Windows CMD**
+```
+git clone --recurse-submodules https://github.com/cmu-mfi/mfi_ddb_library.git
+cd mfi_ddb_library
+python -m venv .venv
+venv\Scripts\activate.bat
+pip install -e .
 ```
 
 ## Concept

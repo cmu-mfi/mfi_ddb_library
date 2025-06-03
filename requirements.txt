@@ -1,6 +1,4 @@
 cmake
-# mqtt-spb-wrapper==2.0.1
--e ./mfi_ddb/streamer/mqtt-spb-wrapper
 omegaconf
 pandas
 ping3
@@ -13,3 +11,4 @@ paho-mqtt
 # PyYAML==6.0.1
 watchdog
 protobuf
+numpy
