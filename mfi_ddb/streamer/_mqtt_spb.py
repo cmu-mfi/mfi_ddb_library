@@ -2,7 +2,7 @@ import copy
 import time
 from typing import Dict
 
-from mqtt_spb_wrapper import MqttSpbEntityDevice
+from mfi_ddb.streamer.mqtt_spb_wrapper import MqttSpbEntityDevice
 
 from mfi_ddb.topic_families.base import BaseTopicFamily
 from mfi_ddb.utils.exceptions import ConfigError
