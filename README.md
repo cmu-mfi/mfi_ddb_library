@@ -9,6 +9,12 @@ Library to stream data to Digital Data Backend (DDB) for the MFI project.
 pip install "mfi_ddb @ git+https://github.com/cmu-mfi/mfi_ddb_library.git"
 ```
 
+## Clone the source code
+
+```
+git clone --recurse-submodules https://github.com/cmu-mfi/mfi_ddb_library.git
+```
+
 ## Concept
 
 ```mermaid
