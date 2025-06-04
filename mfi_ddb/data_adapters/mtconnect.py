@@ -131,11 +131,14 @@ class MTconnectDataAdapter(BaseDataAdapter):
                         if key == '#text':
                             substitute_key = 'value'
                         extract_key_value(data_item[key], f'{data_item_key}/{substitute_key}')
+                elif isinstance(data_item, omegaconf.listconfig.ListConfig):
+                        for i, item in enumerate(data_item):
+                            extract_key_value(item, f'{data_item_key}_{i}')
                 else:
                     try:
                         self._data[component_id][data_item_key] = self.__autotype(data_item)           
                     except KeyError:
-                        breakpoint()
+                        print("WARNING: KeyError: ", data_item_key, " not found in data buffer for component ", component_id)
                     self.last_updated[component_id] = current_time
             
             for key in component_data.keys():
