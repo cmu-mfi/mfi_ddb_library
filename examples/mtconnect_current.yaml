@@ -1,0 +1,1522 @@
+# Sample data from MTConnect "current" stream
+# HAAS UMC-750
+
+MTConnectStreams:
+  '@xmlns:m': urn:mtconnect.org:MTConnectStreams:1.2
+  '@xmlns': urn:mtconnect.org:MTConnectStreams:1.2
+  '@xmlns:xsi': http://www.w3.org/2001/XMLSchema-instance
+  '@xsi:schemaLocation': urn:mtconnect.org:MTConnectStreams:1.2 http://www.mtconnect.org/schemas/MTConnectStreams_1.2.xsd
+  Header:
+    '@creationTime': '2025-06-04T19:52:03.725Z'
+    '@sender': NGC
+    '@instanceId': '1748894880'
+    '@version': 1.2.0.1.2
+    '@bufferSize': '333'
+    '@firstSequence': '233651'
+    '@lastSequence': '233983'
+    '@nextSequence': '233984'
+  Streams:
+    DeviceStream:
+      '@name': UMC-750
+      '@uuid': '000'
+      ComponentStream:
+      - '@component': Spindles
+        '@componentId': spindles
+        '@name': Spindles
+        Events:
+          Message:
+          - '@dataItemId': sp1number
+            '@timestamp': '2025-06-02T20:08:47.768Z'
+            '@sequence': '155'
+            '@name': SpindleNumber
+            '#text': '4'
+          - '@dataItemId': sp2enabled
+            '@timestamp': '2025-06-02T20:08:47.775Z'
+            '@sequence': '186'
+            '@name': SubSpindleEnabled
+            '#text': 'false'
+          - '@dataItemId': sp2maxpwr
+            '@timestamp': '2025-06-02T20:08:47.843Z'
+            '@sequence': '237'
+            '@name': SubSpindleMaxPower
+            '#text': '0.0'
+          - '@dataItemId': sp3maxpwr
+            '@timestamp': '2025-06-02T20:08:47.807Z'
+            '@sequence': '209'
+            '@name': LiveToolMaxPower
+            '#text': '0.0'
+          - '@dataItemId': sp3enabled
+            '@timestamp': '2025-06-02T20:08:47.777Z'
+            '@sequence': '193'
+            '@name': LiveToolEnabled
+            '#text': 'false'
+          - '@dataItemId': sp1maxpwr
+            '@timestamp': '2025-06-02T20:08:47.772Z'
+            '@sequence': '171'
+            '@name': SpindleMaxPower
+            '#text': '15.0'
+          - '@dataItemId': sp2number
+            '@timestamp': '2025-06-02T20:08:47.741Z'
+            '@sequence': '90'
+            '@name': SubSpindleNumber
+            '#text': '12'
+          - '@dataItemId': sp3number
+            '@timestamp': '2025-06-02T20:08:47.761Z'
+            '@sequence': '141'
+            '@name': LiveToolNumber
+            '#text': '10'
+          - '@dataItemId': spindletime
+            '@timestamp': '2025-06-04T19:33:46.860Z'
+            '@sequence': '232862'
+            '@name': SpindleTime
+            '#text': '405851'
+          - '@dataItemId': sp1enabled
+            '@timestamp': '2025-06-02T20:08:47.727Z'
+            '@sequence': '71'
+            '@name': SpindleEnabled
+            '#text': 'true'
+      - '@component': Spindlecenterline
+        '@componentId': spindleCenterline
+        '@name': SpindleCenterline
+        Events:
+          Position:
+          - '@dataItemId': botx
+            '@timestamp': '2025-06-02T20:08:47.741Z'
+            '@sequence': '87'
+            '@name': Botx
+            '#text': '0.0'
+          - '@dataItemId': centerliney
+            '@timestamp': '2025-06-02T20:08:47.808Z'
+            '@sequence': '217'
+            '@name': CenterLineY
+            '#text': '0.0'
+          - '@dataItemId': vdix
+            '@timestamp': '2025-06-02T20:08:47.810Z'
+            '@sequence': '227'
+            '@name': VdiX
+            '#text': '0.0'
+      - '@component': Axis
+        '@componentId': y_axis
+        '@name': 'Y'
+        Samples:
+          PathPosition:
+            '@dataItemId': y_axis_actual_position
+            '@timestamp': '2025-06-04T19:33:53.866Z'
+            '@sequence': '232897'
+            '@name': Y_Axis_Actual_Position
+            '@subType': ACTUAL
+            '#text': '-203.20000476541276'
+        Events:
+          Message:
+          - '@dataItemId': y_axis_number
+            '@timestamp': '2025-06-02T20:08:47.740Z'
+            '@sequence': '83'
+            '@name': Y_Axis_Number
+            '#text': '2'
+          - '@dataItemId': y_axis_acceleration_time_constant
+            '@timestamp': '2025-06-02T20:08:47.742Z'
+            '@sequence': '91'
+            '@name': Y_Axis_Acceleration_Time_Constant
+            '#text': '0.05'
+          - '@dataItemId': y_axis_type
+            '@timestamp': '2025-06-02T20:08:47.740Z'
+            '@sequence': '85'
+            '@name': Y_Axis_Type
+            '#text': '0'
+          - '@dataItemId': y_axis_enabled
+            '@timestamp': '2025-06-02T20:08:47.776Z'
+            '@sequence': '191'
+            '@name': Y_Axis_Enabled
+            '#text': '1'
+          - '@dataItemId': y_axis_max_speed
+            '@timestamp': '2025-06-02T20:08:47.752Z'
+            '@sequence': '110'
+            '@name': Y_Axis_Maximum_Speed
+            '#text': '508.0'
+          - '@dataItemId': y_axis_max_acceleration
+            '@timestamp': '2025-06-02T20:08:47.776Z'
+            '@sequence': '192'
+            '@name': Y_Axis_Max_Acceleration
+            '#text': '2000.0'
+          - '@dataItemId': y_axis_name
+            '@timestamp': '2025-06-02T20:08:47.758Z'
+            '@sequence': '137'
+            '@name': Y_Axis_Name
+            '#text': Y_AXIS
+          - '@dataItemId': y_axis_linear_limit_positive
+            '@timestamp': '2025-06-02T20:08:47.811Z'
+            '@sequence': '228'
+            '@name': Y_Axis_Linear_Limit_Positive
+            '#text': '0.0'
+          - '@dataItemId': y_axis_linear_limit_negative
+            '@timestamp': '2025-06-02T20:08:47.772Z'
+            '@sequence': '173'
+            '@name': Y_Axis_Linear_Limit_Negative
+            '#text': '-508.0'
+      - '@component': Capability
+        '@componentId': capability
+        '@name': Capability
+        Events:
+          Message:
+          - '@dataItemId': caxiscapable
+            '@timestamp': '2025-06-02T20:08:47.741Z'
+            '@sequence': '88'
+            '@name': CAxisCapable
+            '#text': 'false'
+          - '@dataItemId': mainspthreadingcapable
+            '@timestamp': '2025-06-02T20:08:47.703Z'
+            '@sequence': '8'
+            '@name': MainSpThreadingCapable
+            '#text': 'true'
+          - '@dataItemId': ssspmaxopenloopspeed
+            '@timestamp': '2025-06-02T20:08:47.758Z'
+            '@sequence': '139'
+            '@name': SsSpMaxOpenLoopSpeed
+            '#text': '0'
+          - '@dataItemId': ssspthreadingcapable
+            '@timestamp': '2025-06-02T20:08:47.767Z'
+            '@sequence': '153'
+            '@name': SsSpThreadingCapable
+            '#text': 'true'
+          - '@dataItemId': ltspmaxopenloopacceleration
+            '@timestamp': '2025-06-02T20:08:47.754Z'
+            '@sequence': '122'
+            '@name': LtSpMaxOpenLoopAcceleration
+            '#text': '1464.842342'
+          - '@dataItemId': ssspmaxopenloopacceleration
+            '@timestamp': '2025-06-02T20:08:47.810Z'
+            '@sequence': '226'
+            '@name': SsSpMaxOpenLoopAcceleration
+            '#text': '0.0'
+          - '@dataItemId': mainspmaxopenloopacceleration
+            '@timestamp': '2025-06-02T20:08:47.741Z'
+            '@sequence': '89'
+            '@name': MainSpMaxOpenLoopAcceleration
+            '#text': '6.4E7'
+          - '@dataItemId': ltspmaxopenloopspeed
+            '@timestamp': '2025-06-02T20:08:47.719Z'
+            '@sequence': '55'
+            '@name': LtSpMaxOpenLoopSpeed
+            '#text': '0'
+          - '@dataItemId': mainspmaxopenloopspeed
+            '@timestamp': '2025-06-02T20:08:47.717Z'
+            '@sequence': '46'
+            '@name': MainSpMaxOpenLoopSpeed
+            '#text': '10000'
+          - '@dataItemId': ltspthreadingcapable
+            '@timestamp': '2025-06-02T20:08:47.776Z'
+            '@sequence': '189'
+            '@name': LtSpThreadingCapable
+            '#text': 'false'
+      - '@component': Gcodeoffset
+        '@componentId': gcodeoffset
+        '@name': GCodeOffset
+        Events:
+          WorkOffset:
+          - '@dataItemId': g92
+            '@timestamp': '2025-06-02T20:08:47.717Z'
+            '@sequence': '48'
+            '@name': G92
+            '#text': 0.0,0.0,0.0,0.0,0.0,0.0
+          - '@dataItemId': g154
+            '@timestamp': '2025-06-02T20:08:47.714Z'
+            '@sequence': '36'
+            '@name': G154
+            '#text': 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              -19.4224,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,-9.9446,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,-11.599,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              -19.4224,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,-9.9446,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,-11.599,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              -19.4224,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,-9.9446,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+              0.0,0.0,0.0,0.0,0.0,0.0 0.0,0.0,-11.599,0.0,0.0,0.0 0.0,0.0,0.0,0.0,0.0,0.0
+          - '@dataItemId': g57
+            '@timestamp': '2025-06-02T20:08:47.753Z'
+            '@sequence': '115'
+            '@name': G57
+            '#text': 0.0,0.0,0.0,0.0,0.0,0.0
+          - '@dataItemId': g58
+            '@timestamp': '2025-06-02T20:08:47.753Z'
+            '@sequence': '114'
+            '@name': G58
+            '#text': 0.0,0.0,0.0,0.0,0.0,0.0
+          - '@dataItemId': g55
+            '@timestamp': '2025-06-04T18:33:09.080Z'
+            '@sequence': '227912'
+            '@name': G55
+            '#text': -11.3017,-9.6075,-12.8606,0.0,0.0,0.0
+          - '@dataItemId': g50
+            '@timestamp': '2025-06-02T20:08:47.755Z'
+            '@sequence': '123'
+            '@name': G50
+            '#text': 0.0,0.0,0.0,0.0,0.0,0.0
+          - '@dataItemId': comm
+            '@timestamp': '2025-06-02T20:08:47.717Z'
+            '@sequence': '50'
+            '@name': Comm
+            '#text': 0.0,0.0,0.0,0.0,0.0,0.0
+          - '@dataItemId': g56
+            '@timestamp': '2025-06-02T20:08:47.753Z'
+            '@sequence': '116'
+            '@name': G56
+            '#text': -12.804,-12.2792,-19.7773,0.0,0.0,0.0
+          - '@dataItemId': g54
+            '@timestamp': '2025-06-04T19:23:18.582Z'
+            '@sequence': '231208'
+            '@name': G54
+            '#text': -12.4135,-7.6076,-12.8743,0.0,0.0,0.0
+          - '@dataItemId': g59
+            '@timestamp': '2025-06-02T20:08:47.752Z'
+            '@sequence': '113'
+            '@name': G59
+            '#text': 0.0,0.0,0.0,0.0,0.0,0.0
+          - '@dataItemId': g52
+            '@timestamp': '2025-06-02T20:08:47.754Z'
+            '@sequence': '119'
+            '@name': G52
+            '#text': 0.0,0.0,0.0,0.0,0.0,0.0
+          Material:
+            '@dataItemId': workmaterial
+            '@timestamp': '2025-06-02T20:08:47.809Z'
+            '@sequence': '220'
+            '@name': WorkMaterial
+            '#text': 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+      - '@component': Axis
+        '@componentId': c_axis
+        '@name': C
+        Samples:
+          PathPosition:
+            '@dataItemId': c_axis_actual_position
+            '@timestamp': '2025-06-04T19:30:45.772Z'
+            '@sequence': '231674'
+            '@name': C_Axis_Actual_Position
+            '@subType': ACTUAL
+            '#text': '-1.704686098946695E-6'
+        Events:
+          Message:
+          - '@dataItemId': c_axis_linear_limit_positive
+            '@timestamp': '2025-06-02T20:08:47.707Z'
+            '@sequence': '19'
+            '@name': C_Axis_Linear_Limit_Positive
+            '#text': '360000.0'
+          - '@dataItemId': c_axis_rotary_limit_negative
+            '@timestamp': '2025-06-02T20:08:47.757Z'
+            '@sequence': '136'
+            '@name': C_Axis_Rotary_Limit_Negative
+            '#text': 'NaN'
+          - '@dataItemId': c_axis_name
+            '@timestamp': '2025-06-02T20:08:47.780Z'
+            '@sequence': '207'
+            '@name': C_Axis_Name
+            '#text': C_AXIS
+          - '@dataItemId': c_axis_number
+            '@timestamp': '2025-06-02T20:08:47.844Z'
+            '@sequence': '238'
+            '@name': C_Axis_Number
+            '#text': '7'
+          - '@dataItemId': c_axis_of_rotation
+            '@timestamp': '2025-06-02T20:08:47.774Z'
+            '@sequence': '180'
+            '@name': C_Axis_Of_Rotation
+            '#text': Z_AXIS
+          - '@dataItemId': c_axis_rotary_limit_positive
+            '@timestamp': '2025-06-02T20:08:47.751Z'
+            '@sequence': '107'
+            '@name': C_Axis_Rotary_Limit_Positive
+            '#text': 'NaN'
+          - '@dataItemId': c_axis_type
+            '@timestamp': '2025-06-02T20:08:47.776Z'
+            '@sequence': '188'
+            '@name': C_Axis_Type
+            '#text': '0'
+          - '@dataItemId': c_axis_max_acceleration
+            '@timestamp': '2025-06-02T20:08:47.775Z'
+            '@sequence': '187'
+            '@name': C_Axis_Max_Acceleration
+            '#text': '437.266791044776'
+          - '@dataItemId': c_axis_acceleration_time_constant
+            '@timestamp': '2025-06-02T20:08:47.718Z'
+            '@sequence': '51'
+            '@name': C_Axis_Acceleration_Time_Constant
+            '#text': '0.0375'
+          - '@dataItemId': c_axis_max_speed
+            '@timestamp': '2025-06-02T20:08:47.714Z'
+            '@sequence': '37'
+            '@name': C_Axis_Maximum_Speed
+            '#text': '50.86263'
+          - '@dataItemId': c_axis_linear_limit_negative
+            '@timestamp': '2025-06-02T20:08:47.757Z'
+            '@sequence': '133'
+            '@name': C_Axis_Linear_Limit_Negative
+            '#text': '-360000.0'
+          - '@dataItemId': c_axis_enabled
+            '@timestamp': '2025-06-02T20:08:47.779Z'
+            '@sequence': '202'
+            '@name': C_Axis_Enabled
+            '#text': '1'
+      - '@component': Tailstock
+        '@componentId': tailstock
+        '@name': TailStock
+        Events:
+          Message:
+          - '@dataItemId': tailstockxclearance
+            '@timestamp': '2025-06-02T20:08:47.777Z'
+            '@sequence': '194'
+            '@name': TailstockXClearance
+            '#text': '0.0'
+          - '@dataItemId': tailstockzclearance
+            '@timestamp': '2025-06-02T20:08:47.742Z'
+            '@sequence': '94'
+            '@name': TailstockZClearance
+            '#text': '0.0'
+      - '@component': Rotarymodel
+        '@componentId': rotarymodel
+        '@name': RotaryModel
+        Events:
+          Message:
+          - '@dataItemId': rotarymodel4th
+            '@timestamp': '2025-06-02T20:08:47.716Z'
+            '@sequence': '44'
+            '@name': RotaryModel4th
+            '#text': ROT_B_UMC750-M20-B-P18-S.xml
+          - '@dataItemId': rotarymodel5th
+            '@timestamp': '2025-06-02T20:08:47.774Z'
+            '@sequence': '181'
+            '@name': RotaryModel5th
+            '#text': ROT_B_UMC750-M20-NRS-C-P18-S.xml
+      - '@component': Contourcontrol
+        '@componentId': cc
+        '@name': ContourControl
+        Events:
+          PathFeedrateOverride:
+          - '@dataItemId': contrtimecons
+            '@timestamp': '2025-06-02T20:08:47.712Z'
+            '@sequence': '25'
+            '@name': ContourTimeConstant
+            '#text': '3.0'
+          - '@dataItemId': contrmaxaccl
+            '@timestamp': '2025-06-02T20:08:47.768Z'
+            '@sequence': '156'
+            '@name': ContourMaxAccel
+            '#text': '600.0'
+          - '@dataItemId': smooth
+            '@timestamp': '2025-06-02T20:08:47.715Z'
+            '@sequence': '40'
+            '@name': Smoothness
+            '#text': '1'
+          - '@dataItemId': maxcrnrrnd
+            '@timestamp': '2025-06-02T20:08:47.779Z'
+            '@sequence': '205'
+            '@name': MaxCornerRound
+            '#text': '0.635'
+          - '@dataItemId': fdeltav
+            '@timestamp': '2025-06-02T20:08:47.718Z'
+            '@sequence': '54'
+            '@name': FeedDeltaV
+            '#text': '0.024414'
+          PathFeedrate:
+            '@dataItemId': mfdrate
+            '@timestamp': '2025-06-02T20:08:47.728Z'
+            '@sequence': '75'
+            '@name': MaximumFeedRate
+            '#text': '22860.0'
+      - '@component': Lengthandwear
+        '@componentId': lengthandwearmill
+        '@name': LengthAndWearMill
+        Events:
+          Message:
+          - '@dataItemId': lengthgeo
+            '@timestamp': '2025-06-04T16:08:45.349Z'
+            '@sequence': '204623'
+            '@name': LengthGeometry
+            '#text': 116.00687999999998,120.76176000000001,254.0,130.7592,134.74192,94.36607999999998,143.16964000000002,164.43197999999992,254.0,254.0,120.70842000000003,98.3869,254.0,139.26057999999998,144.53361999999996,158.18104,163.69284,135.15086,84.22894000000001,254.0,0.0,0.0,0.0,254.0,98.69424,75.28052000000002,254.0,93.98508000000001,101.78796000000001,138.08202000000003,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+          - '@dataItemId': toolclearance
+            '@timestamp': '2025-06-02T20:08:47.715Z'
+            '@sequence': '41'
+            '@name': ToolClearance
+            '#text': 0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+          - '@dataItemId': edgemeasure
+            '@timestamp': '2025-06-02T20:08:47.707Z'
+            '@sequence': '18'
+            '@name': EdgeMeasure
+            '#text': 0.0,0.0,0.0,0.0,5.08,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+          - '@dataItemId': approxdiam
+            '@timestamp': '2025-06-02T20:08:47.761Z'
+            '@sequence': '142'
+            '@name': ApproxDiameter
+            '#text': 1.5875,0.0,0.0,0.0,12.7,9.524999999999999,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,50.8,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+          - '@dataItemId': approxlength
+            '@timestamp': '2025-06-02T20:08:47.844Z'
+            '@sequence': '240'
+            '@name': ApproxLength
+            '#text': 120.64999999999999,0.0,0.0,0.0,101.6,96.52,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,76.19999999999999,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+          - '@dataItemId': cintpos
+            '@timestamp': '2025-06-02T20:08:47.750Z'
+            '@sequence': '102'
+            '@name': CoolantPosition
+            '#text': 2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+          - '@dataItemId': actualdiam
+            '@timestamp': '2025-06-02T20:08:47.808Z'
+            '@sequence': '214'
+            '@name': ActualDiameter
+            '#text': 0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,50.8,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+          - '@dataItemId': toolid
+            '@timestamp': '2025-06-02T20:08:47.742Z'
+            '@sequence': '93'
+            '@name': TOOL_ASSET_ID
+            '#text': 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159,160,161,162,163,164,165,166,167,168,169,170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200
+          - '@dataItemId': flutes
+            '@timestamp': '2025-06-02T20:08:47.809Z'
+            '@sequence': '219'
+            '@name': Flutes
+            '#text': 2,2,2,2,2,5,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,6,2,7,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2
+          - '@dataItemId': diamgeo
+            '@timestamp': '2025-06-02T20:08:47.743Z'
+            '@sequence': '97'
+            '@name': DiameterGeometry
+            '#text': 0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+          - '@dataItemId': probetype
+            '@timestamp': '2025-06-02T20:08:47.777Z'
+            '@sequence': '195'
+            '@name': ProbeType
+            '#text': 0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+          - '@dataItemId': diamwear
+            '@timestamp': '2025-06-02T20:08:47.719Z'
+            '@sequence': '57'
+            '@name': DiameterWear
+            '#text': 0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+          - '@dataItemId': toolmaterial
+            '@timestamp': '2025-06-02T20:08:47.728Z'
+            '@sequence': '73'
+            '@name': ToolMaterial
+            '#text': 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+          - '@dataItemId': tooltype
+            '@timestamp': '2025-06-02T20:08:47.773Z'
+            '@sequence': '176'
+            '@name': ToolType
+            '#text': END_MILL,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,END_MILL,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,SHELL_MILL,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,PROBE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE,NO_TOOL_TYPE
+          - '@dataItemId': pocket
+            '@timestamp': '2025-06-04T19:33:00.845Z'
+            '@sequence': '232539'
+            '@name': Pocket
+            '#text': 22,5,19,7,12,14,26,25,2,28,0,13,10,17,20,11,29,1,3,9,23,21,4,24,15,8,18,16,6,30,27,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101,-101
+          - '@dataItemId': lengthwear
+            '@timestamp': '2025-06-02T20:08:47.710Z'
+            '@sequence': '20'
+            '@name': LengthWear
+            '#text': 0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+      - '@component': Axis
+        '@componentId': z_axis
+        '@name': Z
+        Samples:
+          PathPosition:
+            '@dataItemId': z_axis_actual_position
+            '@timestamp': '2025-06-04T19:33:49.863Z'
+            '@sequence': '232876'
+            '@name': Z_Axis_Actual_Position
+            '@subType': ACTUAL
+            '#text': '63.499995280672934'
+        Events:
+          Message:
+          - '@dataItemId': z_axis_linear_limit_negative
+            '@timestamp': '2025-06-02T20:08:47.807Z'
+            '@sequence': '211'
+            '@name': Z_Axis_Linear_Limit_Negative
+            '#text': '-424.282'
+          - '@dataItemId': z_axis_enabled
+            '@timestamp': '2025-06-02T20:08:47.774Z'
+            '@sequence': '179'
+            '@name': Z_Axis_Enabled
+            '#text': '1'
+          - '@dataItemId': z_axis_type
+            '@timestamp': '2025-06-02T20:08:47.728Z'
+            '@sequence': '72'
+            '@name': Z_Axis_Type
+            '#text': '0'
+          - '@dataItemId': z_axis_number
+            '@timestamp': '2025-06-02T20:08:47.757Z'
+            '@sequence': '132'
+            '@name': Z_Axis_Number
+            '#text': '3'
+          - '@dataItemId': z_axis_acceleration_time_constant
+            '@timestamp': '2025-06-02T20:08:47.771Z'
+            '@sequence': '167'
+            '@name': Z_Axis_Acceleration_Time_Constant
+            '#text': '0.05'
+          - '@dataItemId': z_axis_max_acceleration
+            '@timestamp': '2025-06-02T20:08:47.750Z'
+            '@sequence': '103'
+            '@name': Z_Axis_Max_Acceleration
+            '#text': '2900.0'
+          - '@dataItemId': z_axis_linear_limit_positive
+            '@timestamp': '2025-06-02T20:08:47.779Z'
+            '@sequence': '204'
+            '@name': Z_Axis_Linear_Limit_Positive
+            '#text': '83.71838376380677'
+          - '@dataItemId': z_axis_max_speed
+            '@timestamp': '2025-06-02T20:08:47.707Z'
+            '@sequence': '17'
+            '@name': Z_Axis_Maximum_Speed
+            '#text': '508.0'
+          - '@dataItemId': z_axis_name
+            '@timestamp': '2025-06-02T20:08:47.718Z'
+            '@sequence': '52'
+            '@name': Z_Axis_Name
+            '#text': Z_AXIS
+      - '@component': Axes
+        '@componentId': axes
+        '@name': Axes
+        Events:
+          ActiveAxes:
+            '@dataItemId': xyzabc
+            '@timestamp': '2025-06-02T20:08:47.711Z'
+            '@sequence': '23'
+            '@name': Active_Axes
+            '#text': X_AXIS,Y_AXIS,Z_AXIS,B_AXIS,C_AXIS
+      - '@component': Controller
+        '@componentId': cont1
+        '@name': MachineController
+        Samples:
+          AxisFeedrate:
+            '@dataItemId': rovrd
+            '@timestamp': '2025-06-04T19:31:25.782Z'
+            '@sequence': '231917'
+            '@name': RapidOverride
+            '@subType': OVERRIDE
+            '#text': '100'
+          AccumulatedTime:
+          - '@dataItemId': lcycle
+            '@timestamp': '2025-06-04T19:33:55.868Z'
+            '@sequence': '232910'
+            '@name': LastCycle
+            '#text': '188'
+          - '@dataItemId': tcycle
+            '@timestamp': '2025-06-04T19:33:55.867Z'
+            '@sequence': '232906'
+            '@name': ThisCycle
+            '#text': '188'
+          - '@dataItemId': cyremtim
+            '@timestamp': '2025-06-04T19:30:50.774Z'
+            '@sequence': '231696'
+            '@name': CycleRemainingTime
+            '#text': '0'
+          PathFeedrate:
+            '@dataItemId': fdovrd
+            '@timestamp': '2025-06-04T16:52:02.425Z'
+            '@sequence': '214607'
+            '@name': FeedrateOverride
+            '@subType': OVERRIDE
+            '#text': '100'
+          SpindleSpeed:
+          - '@dataItemId': sspeed
+            '@timestamp': '2025-06-04T19:33:48.864Z'
+            '@sequence': '232871'
+            '@name': SpindleSpeed
+            '@subType': ACTUAL
+            '#text': '0.0'
+          - '@dataItemId': ssovrd
+            '@timestamp': '2025-06-03T22:47:17.197Z'
+            '@sequence': '136784'
+            '@name': SpindleSpeedOverride
+            '@subType': OVERRIDE
+            '#text': '100'
+        Events:
+          EmergencyStop:
+            '@dataItemId': estop
+            '@timestamp': '2025-06-02T21:31:50.949Z'
+            '@sequence': '18177'
+            '@name': EmergencyStop
+            '#text': ARMED
+          Message:
+          - '@dataItemId': machineruntime
+            '@timestamp': '2025-06-04T19:52:03.225Z'
+            '@sequence': '233983'
+            '@name': MachineRunTime
+            '#text': '6762594'
+          - '@dataItemId': elog
+            '@timestamp': '2025-06-04T19:33:55.433Z'
+            '@sequence': '232903'
+            '@name': EventLog
+            Haas:
+              EventLogEntries:
+                EventLogEntry:
+                - '@id': '2'
+                  '@timestamp': '2025-06-04T19:08:39.153Z'
+                  '#text': Program Stopped
+                - '@id': '1'
+                  '@timestamp': '2025-06-04T19:21:09.522Z'
+                  '#text': Program Started
+                - '@id': '2'
+                  '@timestamp': '2025-06-04T19:21:14.472Z'
+                  '#text': Program Stopped
+                - '@id': '1'
+                  '@timestamp': '2025-06-04T19:25:30.439Z'
+                  '#text': Program Started
+                - '@id': '2'
+                  '@timestamp': '2025-06-04T19:25:32.955Z'
+                  '#text': Program Stopped
+                - '@id': '1'
+                  '@timestamp': '2025-06-04T19:30:46.672Z'
+                  '#text': Program Started
+                - '@id': '5'
+                  '@timestamp': '2025-06-04T19:31:07.731Z'
+                  '#text': Rapid Override
+                - '@id': '5'
+                  '@timestamp': '2025-06-04T19:31:10.895Z'
+                  '#text': Rapid Override
+                - '@id': '5'
+                  '@timestamp': '2025-06-04T19:31:25.383Z'
+                  '#text': Rapid Override
+                - '@id': '2'
+                  '@timestamp': '2025-06-04T19:33:55.433Z'
+                  '#text': Program Stopped
+          - '@dataItemId': aalarms
+            '@timestamp': '2025-06-03T23:07:35.629Z'
+            '@sequence': '138905'
+            '@name': ActiveAlarms
+            '#text': NO ACTIVE ALARMS
+          - '@dataItemId': macdsp1
+            '@timestamp': '2025-06-02T20:08:47.715Z'
+            '@sequence': '38'
+            '@name': MacroDispl1
+            '#text': '10188'
+          - '@dataItemId': lpremain
+            '@timestamp': '2025-06-04T19:21:15.468Z'
+            '@sequence': '231077'
+            '@name': LoopsRemaining
+            '#text': '0'
+          - '@dataItemId': m30c2
+            '@timestamp': '2025-06-04T19:33:55.867Z'
+            '@sequence': '232905'
+            '@name': M30Counter2
+            '#text': '845'
+          - '@dataItemId': m30c1
+            '@timestamp': '2025-06-04T19:33:55.867Z'
+            '@sequence': '232904'
+            '@name': M30Counter1
+            '#text': '845'
+          - '@dataItemId': macdsp2
+            '@timestamp': '2025-06-02T20:08:47.702Z'
+            '@sequence': '5'
+            '@name': MacroDispl2
+            '#text': '1098'
+          ControllerMode:
+            '@dataItemId': mode
+            '@timestamp': '2025-06-04T19:25:11.661Z'
+            '@sequence': '231317'
+            '@name': Mode
+            '#text': AUTOMATIC
+          Execution:
+            '@dataItemId': rstat
+            '@timestamp': '2025-06-04T19:33:55.868Z'
+            '@sequence': '232911'
+            '@name': RunStatus
+            '#text': STOPPED
+          Program:
+            '@dataItemId': ncprog
+            '@timestamp': '2025-06-04T19:25:05.659Z'
+            '@sequence': '231311'
+            '@name': Program
+            '#text': Instinct_OP_2.nc
+        Condition:
+          Normal:
+            '@dataItemId': mcond
+            '@timestamp': '2025-06-03T23:07:35.628Z'
+            '@sequence': '138904'
+            '@type': SYSTEM
+            '@name': MachineCondition
+      - '@component': Program
+        '@componentId': program
+        '@name': Program
+        Events:
+          Message:
+          - '@dataItemId': mirrorimagec
+            '@timestamp': '2025-06-02T20:08:47.807Z'
+            '@sequence': '210'
+            '@name': MirrorImageC
+            '#text': 'false'
+          - '@dataItemId': defaultg51scaling
+            '@timestamp': '2025-06-02T20:08:47.752Z'
+            '@sequence': '112'
+            '@name': DefaultG51Scaling
+            '#text': '1.0'
+          - '@dataItemId': mirrorimagez
+            '@timestamp': '2025-06-02T20:08:47.809Z'
+            '@sequence': '221'
+            '@name': MirrorImageZ
+            '#text': 'false'
+          - '@dataItemId': diam5thaxis
+            '@timestamp': '2025-06-02T20:08:47.712Z'
+            '@sequence': '27'
+            '@name': 5thAxisDiameter
+            '#text': '254.0'
+          - '@dataItemId': mirrorimageb
+            '@timestamp': '2025-06-02T20:08:47.807Z'
+            '@sequence': '212'
+            '@name': MirrorImageB
+            '#text': 'false'
+          - '@dataItemId': cuttercomptype
+            '@timestamp': '2025-06-02T20:08:47.811Z'
+            '@sequence': '232'
+            '@name': CutterCompType
+            '#text': A
+          - '@dataItemId': cuttercomp
+            '@timestamp': '2025-06-02T20:08:47.765Z'
+            '@sequence': '151'
+            '@name': CutterComp
+            '#text': Fanuc
+          - '@dataItemId': mainspssvcycle
+            '@timestamp': '2025-06-02T20:08:47.749Z'
+            '@sequence': '99'
+            '@name': MainSpindleSSVcycle
+            '#text': '0.0'
+          - '@dataItemId': mirrorimagea
+            '@timestamp': '2025-06-02T20:08:47.808Z'
+            '@sequence': '213'
+            '@name': MirrorImageA
+            '#text': 'false'
+          - '@dataItemId': cancyclewoxy
+            '@timestamp': '2025-06-02T20:08:47.750Z'
+            '@sequence': '100'
+            '@name': CanCycle_w/o_XY
+            '#text': 'true'
+          - '@dataItemId': toffsetmeas
+            '@timestamp': '2025-06-02T20:08:47.716Z'
+            '@sequence': '45'
+            '@name': T_OffsetMeasUsesWork
+            '#text': 'true'
+          - '@dataItemId': threadchamfersize
+            '@timestamp': '2025-06-02T20:08:47.713Z'
+            '@sequence': '29'
+            '@name': ThreadChamferSize
+            '#text': '0.0'
+          - '@dataItemId': ltspspeedlimit
+            '@timestamp': '2025-06-02T20:08:47.779Z'
+            '@sequence': '206'
+            '@name': LTSpindleSpeedLimit
+            '#text': '0'
+          - '@dataItemId': exactstopcannedxy
+            '@timestamp': '2025-06-02T20:08:47.758Z'
+            '@sequence': '140'
+            '@name': ExactStopCannedXY
+            '#text': 'false'
+          - '@dataItemId': diam4thaxis
+            '@timestamp': '2025-06-02T20:08:47.808Z'
+            '@sequence': '216'
+            '@name': 4thAxisDiameter
+            '#text': '254.0'
+          - '@dataItemId': mainspssvvar
+            '@timestamp': '2025-06-02T20:08:47.752Z'
+            '@sequence': '109'
+            '@name': MainSpindleSSVvariation
+            '#text': '0'
+          - '@dataItemId': threadchamferangle
+            '@timestamp': '2025-06-02T20:08:47.715Z'
+            '@sequence': '39'
+            '@name': ThreadChamferAngle
+            '#text': '0.0'
+          - '@dataItemId': mainspspeedlimit
+            '@timestamp': '2025-06-02T20:08:47.756Z'
+            '@sequence': '131'
+            '@name': MainSpindleSpeedLimit
+            '#text': '0'
+          - '@dataItemId': pgmpointerresets
+            '@timestamp': '2025-06-02T20:08:47.751Z'
+            '@sequence': '108'
+            '@name': PgmPointerResets
+            '#text': 'true'
+          - '@dataItemId': minfeedradiuspct
+            '@timestamp': '2025-06-02T20:08:47.739Z'
+            '@sequence': '77'
+            '@name': MinF_RadiusCC_Percent
+            '#text': '50'
+          - '@dataItemId': minthreadcut
+            '@timestamp': '2025-06-02T20:08:47.758Z'
+            '@sequence': '138'
+            '@name': MinThreadCut
+            '#text': '0.0'
+          - '@dataItemId': ssspeedlimit
+            '@timestamp': '2025-06-02T20:08:47.845Z'
+            '@sequence': '244'
+            '@name': SSSpindleSpeedLimit
+            '#text': '0'
+          - '@dataItemId': defaultg68rotation
+            '@timestamp': '2025-06-02T20:08:47.811Z'
+            '@sequence': '230'
+            '@name': DefaultG68Rotation
+            '#text': '0.0'
+          - '@dataItemId': coolantoverride
+            '@timestamp': '2025-06-02T20:08:47.720Z'
+            '@sequence': '60'
+            '@name': CoolantOverride
+            '#text': COOLANT_OVERRIDE_NORMAL
+          - '@dataItemId': mirrorimagex
+            '@timestamp': '2025-06-02T20:08:47.809Z'
+            '@sequence': '222'
+            '@name': MirrorImageX
+            '#text': 'false'
+          - '@dataItemId': cancyclecutretract
+            '@timestamp': '2025-06-02T20:08:47.773Z'
+            '@sequence': '175'
+            '@name': CanCycleCutRetraction
+            '#text': '0.0'
+          - '@dataItemId': mirrorimagey
+            '@timestamp': '2025-06-02T20:08:47.810Z'
+            '@sequence': '223'
+            '@name': MirrorImageY
+            '#text': 'false'
+          - '@dataItemId': m30restoresgcodes
+            '@timestamp': '2025-06-02T20:08:47.844Z'
+            '@sequence': '241'
+            '@name': M30RestoresGCodes
+            '#text': 'false'
+      - '@component': Compensation
+        '@componentId': compensation
+        '@name': Compensation
+        Events:
+          Message:
+          - '@dataItemId': warmupzdistan
+            '@timestamp': '2025-06-02T20:08:47.756Z'
+            '@sequence': '128'
+            '@name': WarmupZDistance
+            '#text': '0.0'
+          - '@dataItemId': warmupydistan
+            '@timestamp': '2025-06-02T20:08:47.768Z'
+            '@sequence': '157'
+            '@name': WarmupYDistance
+            '#text': '0.0'
+          - '@dataItemId': warmuptimemin
+            '@timestamp': '2025-06-02T20:08:47.757Z'
+            '@sequence': '134'
+            '@name': WarmUpTimeMinutes
+            '#text': '0'
+          - '@dataItemId': warmupxdistan
+            '@timestamp': '2025-06-02T20:08:47.772Z'
+            '@sequence': '170'
+            '@name': WarmupXDistance
+            '#text': '0.0'
+      - '@component': Axis
+        '@componentId': x_axis
+        '@name': X
+        Samples:
+          PathPosition:
+            '@dataItemId': x_axis_actual_position
+            '@timestamp': '2025-06-04T19:33:53.866Z'
+            '@sequence': '232896'
+            '@name': X_Axis_Actual_Position
+            '@subType': ACTUAL
+            '#text': '-736.5999952437048'
+        Events:
+          Message:
+          - '@dataItemId': x_axis_acceleration_time_constant
+            '@timestamp': '2025-06-02T20:08:47.775Z'
+            '@sequence': '184'
+            '@name': X_Axis_Acceleration_Time_Constant
+            '#text': '0.05'
+          - '@dataItemId': x_axis_name
+            '@timestamp': '2025-06-02T20:08:47.778Z'
+            '@sequence': '197'
+            '@name': X_Axis_Name
+            '#text': X_AXIS
+          - '@dataItemId': x_axis_linear_limit_positive
+            '@timestamp': '2025-06-02T20:08:47.728Z'
+            '@sequence': '74'
+            '@name': X_Axis_Linear_Limit_Positive
+            '#text': '0.0'
+          - '@dataItemId': x_axis_type
+            '@timestamp': '2025-06-02T20:08:47.738Z'
+            '@sequence': '76'
+            '@name': X_Axis_Type
+            '#text': '0'
+          - '@dataItemId': x_axis_enabled
+            '@timestamp': '2025-06-02T20:08:47.703Z'
+            '@sequence': '7'
+            '@name': X_Axis_Enabled
+            '#text': '1'
+          - '@dataItemId': x_axis_linear_limit_negative
+            '@timestamp': '2025-06-02T20:08:47.770Z'
+            '@sequence': '162'
+            '@name': X_Axis_Linear_Limit_Negative
+            '#text': '-762.0'
+          - '@dataItemId': x_axis_max_acceleration
+            '@timestamp': '2025-06-02T20:08:47.769Z'
+            '@sequence': '159'
+            '@name': X_Axis_Max_Acceleration
+            '#text': '1800.0'
+          - '@dataItemId': x_axis_max_speed
+            '@timestamp': '2025-06-02T20:08:47.740Z'
+            '@sequence': '82'
+            '@name': X_Axis_Maximum_Speed
+            '#text': '508.0'
+          - '@dataItemId': x_axis_number
+            '@timestamp': '2025-06-02T20:08:47.755Z'
+            '@sequence': '124'
+            '@name': X_Axis_Number
+            '#text': '1'
+      - '@component': Activecodes
+        '@componentId': activecodes
+        '@name': ActiveCodes
+        Events:
+          Message:
+          - '@dataItemId': dhmtcodes
+            '@timestamp': '2025-06-04T19:33:55.867Z'
+            '@sequence': '232909'
+            '@name': DHMT_Codes
+            '#text': 00,11,30,04
+          - '@dataItemId': gcodes
+            '@timestamp': '2025-06-04T19:33:53.866Z'
+            '@sequence': '232898'
+            '@name': Gcodes
+            '#text': G00,G17,G90,G94,G20,G40,G43,G80,G98,G50,G54,G269,G64,G69,G170,G255
+          - '@dataItemId': addresscodes
+            '@timestamp': '2025-06-04T19:33:55.867Z'
+            '@sequence': '232908'
+            '@name': AddressCodes
+            '#text': 0.,0.,0.,0.,0.,0.,0.,0.4331,0.,0.,0.,0.,1.1811,1880,O01047,0,0.,0.,0.,0.1575,0.,0.,0.,0.,0.,0.
+      - '@component': Coolant
+        '@componentId': coolant
+        '@name': Coolant
+        Events:
+          Message:
+          - '@dataItemId': tsc
+            '@timestamp': '2025-06-02T20:08:47.716Z'
+            '@sequence': '42'
+            '@name': TscEnabled
+            '#text': 'true'
+          - '@dataItemId': clntspigot
+            '@timestamp': '2025-06-02T20:08:47.757Z'
+            '@sequence': '135'
+            '@name': CoolantSpigotEnabled
+            '#text': 'true'
+          - '@dataItemId': tab
+            '@timestamp': '2025-06-02T20:08:47.762Z'
+            '@sequence': '146'
+            '@name': TabEnabled
+            '#text': 'true'
+          - '@dataItemId': hpc
+            '@timestamp': '2025-06-02T20:08:47.713Z'
+            '@sequence': '30'
+            '@name': HpcEnabled
+            '#text': 'false'
+          - '@dataItemId': showerclnt
+            '@timestamp': '2025-06-02T20:08:47.723Z'
+            '@sequence': '63'
+            '@name': ShowerCoolantEnabled
+            '#text': 'false'
+          - '@dataItemId': mist
+            '@timestamp': '2025-06-02T20:08:47.845Z'
+            '@sequence': '245'
+            '@name': MistEnabled
+            '#text': 'false'
+          - '@dataItemId': pulsejet
+            '@timestamp': '2025-06-02T20:08:47.754Z'
+            '@sequence': '121'
+            '@name': PulseJet
+            '#text': 'false'
+      - '@component': Toolchangeposition
+        '@componentId': toolchangeposition
+        '@name': ToolChangePosition
+        Events:
+          Position:
+          - '@dataItemId': milltcxpos
+            '@timestamp': '2025-06-02T20:08:47.811Z'
+            '@sequence': '231'
+            '@name': MillTcXPos
+            '#text': '-758.6791458437601'
+          - '@dataItemId': milltczpos
+            '@timestamp': '2025-06-02T20:08:47.769Z'
+            '@sequence': '160'
+            '@name': MillTcZPos
+            '#text': '83.71838376380677'
+          - '@dataItemId': milltcypos
+            '@timestamp': '2025-06-02T20:08:47.808Z'
+            '@sequence': '215'
+            '@name': MillTcYPos
+            '#text': '-277.4335478288416'
+      - '@component': Axis
+        '@componentId': b_axis
+        '@name': B
+        Samples:
+          PathPosition:
+            '@dataItemId': b_axis_actual_position
+            '@timestamp': '2025-06-04T19:30:45.772Z'
+            '@sequence': '231673'
+            '@name': B_Axis_Actual_Position
+            '@subType': ACTUAL
+            '#text': '-2.481723924488456E-4'
+        Events:
+          Message:
+          - '@dataItemId': b_axis_rotary_limit_negative
+            '@timestamp': '2025-06-02T20:08:47.811Z'
+            '@sequence': '229'
+            '@name': B_Axis_Rotary_Limit_Negative
+            '#text': '-35.0'
+          - '@dataItemId': b_axis_linear_limit_positive
+            '@timestamp': '2025-06-02T20:08:47.777Z'
+            '@sequence': '196'
+            '@name': B_Axis_Linear_Limit_Positive
+            '#text': '120.0'
+          - '@dataItemId': b_axis_linear_limit_negative
+            '@timestamp': '2025-06-02T20:08:47.714Z'
+            '@sequence': '35'
+            '@name': B_Axis_Linear_Limit_Negative
+            '#text': '-35.0'
+          - '@dataItemId': b_axis_type
+            '@timestamp': '2025-06-02T20:08:47.810Z'
+            '@sequence': '224'
+            '@name': B_Axis_Type
+            '#text': '0'
+          - '@dataItemId': b_axis_rotary_limit_positive
+            '@timestamp': '2025-06-02T20:08:47.716Z'
+            '@sequence': '43'
+            '@name': B_Axis_Rotary_Limit_Positive
+            '#text': '120.0'
+          - '@dataItemId': b_axis_name
+            '@timestamp': '2025-06-02T20:08:47.771Z'
+            '@sequence': '168'
+            '@name': B_Axis_Name
+            '#text': B_AXIS
+          - '@dataItemId': b_axis_of_rotation
+            '@timestamp': '2025-06-02T20:08:47.706Z'
+            '@sequence': '14'
+            '@name': B_Axis_Of_Rotation
+            '#text': Y_AXIS
+          - '@dataItemId': b_axis_max_acceleration
+            '@timestamp': '2025-06-02T20:08:47.812Z'
+            '@sequence': '234'
+            '@name': B_Axis_Max_Acceleration
+            '#text': '415.244377775677'
+          - '@dataItemId': b_axis_enabled
+            '@timestamp': '2025-06-02T20:08:47.810Z'
+            '@sequence': '225'
+            '@name': B_Axis_Enabled
+            '#text': '1'
+          - '@dataItemId': b_axis_number
+            '@timestamp': '2025-06-02T20:08:47.755Z'
+            '@sequence': '125'
+            '@name': B_Axis_Number
+            '#text': '6'
+          - '@dataItemId': b_axis_max_speed
+            '@timestamp': '2025-06-02T20:08:47.711Z'
+            '@sequence': '22'
+            '@name': B_Axis_Maximum_Speed
+            '#text': '50.86263'
+          - '@dataItemId': b_axis_acceleration_time_constant
+            '@timestamp': '2025-06-02T20:08:47.779Z'
+            '@sequence': '203'
+            '@name': B_Axis_Acceleration_Time_Constant
+            '#text': '0.075'
+      - '@component': Controloptionsfeatures
+        '@componentId': cof
+        '@name': ControlOptionsFeatures
+        Events:
+          Message:
+          - '@dataItemId': comptable
+            '@timestamp': '2025-06-02T20:08:47.765Z'
+            '@sequence': '152'
+            '@name': CompTablesEnabled
+            '#text': 'true'
+          - '@dataItemId': m19sporient
+            '@timestamp': '2025-06-02T20:08:47.775Z'
+            '@sequence': '185'
+            '@name': M19SpindleOrientEnabled
+            '#text': 'true'
+          - '@dataItemId': tscpurchased
+            '@timestamp': '2025-06-02T20:08:47.704Z'
+            '@sequence': '13'
+            '@name': TSCPurchased
+            '#text': 'true'
+          - '@dataItemId': twp
+            '@timestamp': '2025-06-02T20:08:47.844Z'
+            '@sequence': '239'
+            '@name': TwpEnabled
+            '#text': 'false'
+          - '@dataItemId': fourthaxis
+            '@timestamp': '2025-06-02T20:08:47.762Z'
+            '@sequence': '144'
+            '@name': FourthAxisEnabled
+            '#text': 'true'
+          - '@dataItemId': macro
+            '@timestamp': '2025-06-02T20:08:47.765Z'
+            '@sequence': '150'
+            '@name': MacroEnabled
+            '#text': 'true'
+          - '@dataItemId': mediadisplay
+            '@timestamp': '2025-06-02T20:08:47.762Z'
+            '@sequence': '147'
+            '@name': MediaDisplayEnabled
+            '#text': 'true'
+          - '@dataItemId': maxpurchspindlesp
+            '@timestamp': '2025-06-02T20:08:47.713Z'
+            '@sequence': '31'
+            '@name': MaxPurchSpindleSpeed
+            '#text': '10000'
+          - '@dataItemId': rigidtapping
+            '@timestamp': '2025-06-02T20:08:47.742Z'
+            '@sequence': '92'
+            '@name': RigidTappingEnabled
+            '#text': 'true'
+          - '@dataItemId': wirelessnetwork
+            '@timestamp': '2025-06-02T20:08:47.750Z'
+            '@sequence': '101'
+            '@name': WirelessNetworkEnabled
+            '#text': 'true'
+          - '@dataItemId': rotateandscaling
+            '@timestamp': '2025-06-02T20:08:47.774Z'
+            '@sequence': '182'
+            '@name': RotateAndScalingEnabled
+            '#text': 'true'
+          - '@dataItemId': hispdmachine
+            '@timestamp': '2025-06-02T20:08:47.712Z'
+            '@sequence': '28'
+            '@name': HiSpeedMachiningEnabled
+            '#text': 'true'
+          - '@dataItemId': tcpcdwo
+            '@timestamp': '2025-06-02T20:08:47.727Z'
+            '@sequence': '69'
+            '@name': TcpcDwoEnabled
+            '#text': 'true'
+          - '@dataItemId': rtcp
+            '@timestamp': '2025-06-02T20:08:47.770Z'
+            '@sequence': '163'
+            '@name': RtcpEnabled
+            '#text': true,false,true
+          - '@dataItemId': customrot
+            '@timestamp': '2025-06-02T20:08:47.812Z'
+            '@sequence': '233'
+            '@name': CustomRotariesEnabled
+            '#text': 'false'
+          - '@dataItemId': fifthaxis
+            '@timestamp': '2025-06-02T20:08:47.769Z'
+            '@sequence': '158'
+            '@name': FifthAxisEnabled
+            '#text': 'true'
+          - '@dataItemId': polar
+            '@timestamp': '2025-06-02T20:08:47.773Z'
+            '@sequence': '174'
+            '@name': PolarEnabled
+            '#text': 'true'
+          - '@dataItemId': maxmempurchased
+            '@timestamp': '2025-06-02T20:08:47.778Z'
+            '@sequence': '201'
+            '@name': MaxMemPurchased
+            '#text': '1'
+          - '@dataItemId': vpsedit
+            '@timestamp': '2025-06-02T20:08:47.751Z'
+            '@sequence': '105'
+            '@name': VPSEditEnabled
+            '#text': 'true'
+      - '@component': Axis
+        '@componentId': a_axis
+        '@name': A
+        Samples:
+          PathPosition:
+            '@dataItemId': a_axis_actual_position
+            '@timestamp': '2025-06-02T20:08:47.751Z'
+            '@sequence': '104'
+            '@name': A_Axis_Actual_Position
+            '@subType': ACTUAL
+            '#text': '0.0'
+        Events:
+          Message:
+          - '@dataItemId': a_axis_name
+            '@timestamp': '2025-06-02T20:08:47.773Z'
+            '@sequence': '178'
+            '@name': A_Axis_Name
+            '#text': A_AXIS
+          - '@dataItemId': a_axis_rotary_limit_positive
+            '@timestamp': '2025-06-02T20:08:47.723Z'
+            '@sequence': '64'
+            '@name': A_Axis_Rotary_Limit_Positive
+            '#text': 'NaN'
+          - '@dataItemId': a_axis_max_speed
+            '@timestamp': '2025-06-02T20:08:47.770Z'
+            '@sequence': '165'
+            '@name': A_Axis_Maximum_Speed
+            '#text': '0.0'
+          - '@dataItemId': a_axis_linear_limit_positive
+            '@timestamp': '2025-06-02T20:08:47.806Z'
+            '@sequence': '208'
+            '@name': A_Axis_Linear_Limit_Positive
+            '#text': '0.0'
+          - '@dataItemId': a_axis_linear_limit_negative
+            '@timestamp': '2025-06-02T20:08:47.778Z'
+            '@sequence': '200'
+            '@name': A_Axis_Linear_Limit_Negative
+            '#text': '-0.0'
+          - '@dataItemId': a_axis_type
+            '@timestamp': '2025-06-02T20:08:47.726Z'
+            '@sequence': '68'
+            '@name': A_Axis_Type
+            '#text': '0'
+          - '@dataItemId': a_axis_rotary_limit_negative
+            '@timestamp': '2025-06-02T20:08:47.770Z'
+            '@sequence': '164'
+            '@name': A_Axis_Rotary_Limit_Negative
+            '#text': 'NaN'
+          - '@dataItemId': a_axis_of_rotation
+            '@timestamp': '2025-06-02T20:08:47.714Z'
+            '@sequence': '33'
+            '@name': A_Axis_Of_Rotation
+            '#text': X_AXIS
+          - '@dataItemId': a_axis_enabled
+            '@timestamp': '2025-06-02T20:08:47.778Z'
+            '@sequence': '199'
+            '@name': A_Axis_Enabled
+            '#text': '0'
+          - '@dataItemId': a_axis_acceleration_time_constant
+            '@timestamp': '2025-06-02T20:08:47.743Z'
+            '@sequence': '96'
+            '@name': A_Axis_Acceleration_Time_Constant
+            '#text': '0.0'
+          - '@dataItemId': a_axis_number
+            '@timestamp': '2025-06-02T20:08:47.754Z'
+            '@sequence': '120'
+            '@name': A_Axis_Number
+            '#text': '5'
+          - '@dataItemId': a_axis_max_acceleration
+            '@timestamp': '2025-06-02T20:08:47.725Z'
+            '@sequence': '67'
+            '@name': A_Axis_Max_Acceleration
+            '#text': '0.0'
+      - '@component': Miscellaneous
+        '@componentId': miscellaneous
+        '@name': Miscellaneous
+        Events:
+          Message:
+          - '@dataItemId': caxisdiam
+            '@timestamp': '2025-06-02T20:08:47.770Z'
+            '@sequence': '166'
+            '@name': CAxisDiameter
+            '#text': '0.0'
+          - '@dataItemId': negworkoffset
+            '@timestamp': '2025-06-02T20:08:47.707Z'
+            '@sequence': '16'
+            '@name': NegWorkOffsets
+            '#text': 'TRUE'
+      - '@component': Maxfeedacceleration
+        '@componentId': maxfeedacceleration
+        '@name': Maxfeedacceleration
+        Events:
+          Message:
+            '@dataItemId': maxfeedaccel
+            '@timestamp': '2025-06-04T19:33:44.861Z'
+            '@sequence': '232850'
+            '@name': MaxFeedAccel
+            '#text': '0.0'
+      - '@component': Maxfeedvelocity
+        '@componentId': maxfeedvelocity
+        '@name': Maxfeedvelocity
+        Events:
+          Message:
+            '@dataItemId': maxfeedvel
+            '@timestamp': '2025-06-02T20:08:47.762Z'
+            '@sequence': '145'
+            '@name': MaxFeedVel
+            '#text': '22860.0'
+      - '@component': Mrzp
+        '@componentId': mrzp
+        '@name': MRZP
+        Events:
+          AxisCoupling:
+          - '@dataItemId': amrzpz
+            '@timestamp': '2025-06-02T20:08:47.739Z'
+            '@sequence': '81'
+            '@name': A_MRZP_Z
+            '#text': '0.0'
+          - '@dataItemId': bmrzpx
+            '@timestamp': '2025-06-02T20:08:47.702Z'
+            '@sequence': '6'
+            '@name': B_MRZP_X
+            '#text': '0.0'
+          - '@dataItemId': bmrzpy
+            '@timestamp': '2025-06-02T20:08:47.706Z'
+            '@sequence': '15'
+            '@name': B_MRZP_Y
+            '#text': '0.0'
+          - '@dataItemId': amrzpx
+            '@timestamp': '2025-06-02T20:08:47.740Z'
+            '@sequence': '84'
+            '@name': A_MRZP_X
+            '#text': '0.0'
+          - '@dataItemId': bmrzpz
+            '@timestamp': '2025-06-02T20:08:47.704Z'
+            '@sequence': '12'
+            '@name': B_MRZP_Z
+            '#text': '0.0'
+          - '@dataItemId': amrzpy
+            '@timestamp': '2025-06-02T20:08:47.741Z'
+            '@sequence': '86'
+            '@name': A_MRZP_Y
+            '#text': '0.0'
+      - '@component': Auxiliaryequipment
+        '@componentId': aux
+        '@name': AuxiliaryEquipment
+        Events:
+          Message:
+          - '@dataItemId': palletsystem
+            '@timestamp': '2025-06-02T20:08:47.775Z'
+            '@sequence': '183'
+            '@name': PalletSystemEnabled
+            '#text': 'true'
+          - '@dataItemId': robot
+            '@timestamp': '2025-06-02T20:08:47.773Z'
+            '@sequence': '177'
+            '@name': RobotEnabled
+            '#text': 'false'
+          - '@dataItemId': conveyer
+            '@timestamp': '2025-06-02T20:08:47.845Z'
+            '@sequence': '243'
+            '@name': ConveyerEnabled
+            '#text': 'true'
+      - '@component': Macrovariablestart
+        '@componentId': macrovariablestart
+        '@name': MacroVariableStart
+        Events:
+          Message:
+          - '@dataItemId': macrorange5
+            '@timestamp': '2025-06-02T20:08:47.725Z'
+            '@sequence': '65'
+            '@name': MacroRange5
+            '#text': 0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+          - '@dataItemId': macrorange6
+            '@timestamp': '2025-06-02T20:08:47.722Z'
+            '@sequence': '62'
+            '@name': MacroRange6
+            '#text': 0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,500.0,0.0,0.0
+          - '@dataItemId': macrorange4
+            '@timestamp': '2025-06-04T19:21:15.468Z'
+            '@sequence': '231075'
+            '@name': MacroRange4
+            '#text': 0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,89.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.11735000000000007,0.11744999999999983,1.7763568394002505E-15,4.999999999988347E-5,30.0,5.436300000000001,0.2,0.2347999999999999,5.000000000165983E-5,0.0,0.1176076809705997,0.11758938522641771,0.11794919760554329,0.11783088645717904,0.11810409527355703,0.118122392602734,0.11776258653092808,0.11788089245770084,1.1785971171246594,0.0,0.0,0.0,0.0,0.0,0.0,0.0,-18.0487,-18.0487,0.49960000000000004,-27.2319,-17.953200000000002,2.952755905511811,0.39370078740157477,0.39370078740157477,5.905511811023622,13.0,-2.0,1.0,0.3,-58.83723070866144,0.0,0.0,NaN,0.0
+          - '@dataItemId': macrorange3
+            '@timestamp': '2025-06-02T20:08:47.721Z'
+            '@sequence': '61'
+            '@name': MacroRange3
+            '#text': 0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0
+          - '@dataItemId': macrorange2
+            '@timestamp': '2025-06-04T19:21:14.466Z'
+            '@sequence': '231065'
+            '@name': MacroRange2
+            '#text': 0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,90.0,270.0,0.0,0.0,-19.4224,-10.1274,-18.7213,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,-12.791825000000001,-10.0602375,-18.720500000000005,-12.7926,7.74999999999082E-4,-12.7918,-10.0603125,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,-12.7918,-10.0603125,-18.720500000000005,-12.7926,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,556.0,8.0,-18.0487,13.0,0.0,5.436300000000001,-27.2319,-17.953200000000002,200.0,19.0,2.952755905511811,0.39370078740157477,0.002,-0.81,1.7799,5.439,0.8881,-2.0012,0.03937007874015748,-12.752575,-12.819775,NaN,1.2652,NaN,-0.81,1.78,0.0026999999999990365,0.0026999999999990365,NaN,NaN,NaN,0.0026999999999990365,0.03200000000000039,NaN,0.03200000000000039,0.03200000000000039,1.0,NaN,0.0
+          - '@dataItemId': macrorange1
+            '@timestamp': '2025-06-04T19:21:14.466Z'
+            '@sequence': '231066'
+            '@name': MacroRange1
+            '#text': NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN,NaN
+      - '@component': Device
+        '@componentId': dev1
+        '@name': UMC-750
+        '@uuid': '000'
+        Events:
+          Availability:
+            '@dataItemId': avail
+            '@timestamp': '2025-06-02T20:08:04.619Z'
+            '@sequence': '1'
+            '@name': Availability
+            '#text': AVAILABLE
+      - '@component': Secondarysafetyposition
+        '@componentId': secondarysafetyposition
+        '@name': SecondarySafetyPosition
+        Events:
+          Position:
+          - '@dataItemId': tcmidposz
+            '@timestamp': '2025-06-02T20:08:47.755Z'
+            '@sequence': '127'
+            '@name': TcMidPositionZ
+            '#text': '0.0000'
+          - '@dataItemId': tcmidposy
+            '@timestamp': '2025-06-02T20:08:47.756Z'
+            '@sequence': '129'
+            '@name': TcMidPositionY
+            '#text': '0.0000'
+          - '@dataItemId': tcmidposx
+            '@timestamp': '2025-06-02T20:08:47.756Z'
+            '@sequence': '130'
+            '@name': TcMidPositionX
+            '#text': '0.0000'
+      - '@component': Axis_coupling
+        '@componentId': axis_coupling
+        '@name': Axis_Coupling
+        Events:
+          AxisCoupling:
+          - '@dataItemId': bcpln
+            '@timestamp': '2025-06-02T20:08:47.711Z'
+            '@sequence': '21'
+            '@name': B_Axis_Coupling
+            '#text': C_Axis
+          - '@dataItemId': acpln
+            '@timestamp': '2025-06-02T20:08:47.769Z'
+            '@sequence': '161'
+            '@name': A_Axis_Coupling
+            '#text': B_Axis
+      - '@component': Activeport
+        '@componentId': activeport
+        '@name': Activeport
+        Events:
+          Message:
+            '@dataItemId': dprint
+            '@timestamp': '2025-06-02T20:08:47.808Z'
+            '@sequence': '218'
+            '@name': DPRINT
+            '#text': DISABLED,,8080
+      - '@component': General
+        '@componentId': general
+        '@name': General
+        Events:
+          Message:
+          - '@dataItemId': rmovetype
+            '@timestamp': '2025-06-02T20:08:47.763Z'
+            '@sequence': '148'
+            '@name': RapidMoveType
+            '#text': ALL
+          - '@dataItemId': dimensioning
+            '@timestamp': '2025-06-02T20:08:47.739Z'
+            '@sequence': '79'
+            '@name': Dimensioning
+            '#text': '0'
+      - '@component': Numberofstationstools
+        '@componentId': numberofstationstools
+        '@name': Numberofstationstools
+        Events:
+          Message:
+            '@dataItemId': pockets
+            '@timestamp': '2025-06-02T20:08:47.772Z'
+            '@sequence': '172'
+            '@name': STATION
+            '#text': '30'
+      - '@component': Toolchangertype
+        '@componentId': toolchangertype
+        '@name': ToolChangerType
+        Events:
+          Message:
+            '@dataItemId': toolchangertype
+            '@timestamp': '2025-06-02T20:08:47.717Z'
+            '@sequence': '49'
+            '@name': ToolChangerType
+            '#text': '6'
