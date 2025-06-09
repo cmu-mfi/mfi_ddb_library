@@ -19,7 +19,7 @@ pip install -e .
 git clone --recurse-submodules https://github.com/cmu-mfi/mfi_ddb_library.git
 cd mfi_ddb_library
 python -m venv .venv
-venv\Scripts\activate.bat
+.venv\Scripts\activate.bat
 pip install -e .
 ```
 
