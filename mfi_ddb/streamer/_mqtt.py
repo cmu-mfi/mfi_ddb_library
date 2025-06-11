@@ -101,7 +101,7 @@ class Mqtt:
             input_values = data[component_id]
             input_values = self._topic_family.process_data(input_values)
             if not bool(input_values):
-                print(f"Data not found for device {component_id}")
+                print(f"WARNING: Data not found for device {component_id}")
                 continue
             elif not self.__check_data(input_values):
                 raise Exception(f"{self._topic_family.topic_family_name} not compatible with Mqtt")
@@ -123,5 +123,11 @@ class Mqtt:
         
         for key in payload.keys():
             self.client.publish(f"{topic_prefix}/{key}", payload[key])
-        
-        print(f"Published data on topic: {topic_prefix}/{key}")
+            print(f"Published data on topic: {topic_prefix}/{key}")
+            
+    def set_death_payload(self, topic: str, payload: str, qos: int = 0, retain: bool = False):
+        """
+        Set the last will message for the MQTT client.
+        """
+        self.client.will_set(topic, payload, qos=qos, retain=retain)
+        print(f"Last will set for topic: {topic} with payload: {payload}")

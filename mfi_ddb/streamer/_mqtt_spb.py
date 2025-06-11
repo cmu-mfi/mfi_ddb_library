@@ -138,3 +138,6 @@ class MqttSpb:
                 if len(data[key]) > MAX_ARRAY_SIZE:
                     return False
         return True
+    
+    def set_death_payload(self, topic: str, payload: str, qos: int = 0, retain: bool = False):
+        raise NotImplementedError("Death payload is not implemented for MqttSpb")
