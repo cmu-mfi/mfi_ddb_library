@@ -73,3 +73,121 @@ To be able to do the above three major classes are provided:
 * [BlobTopicFamily](mfi_ddb/topic_families/blob.py)
 * [KeyValueTopicFamily](mfi_ddb/topic_families/key_value.py)
 * [SpbTopicFamily](mfi_ddb/topic_families/time_series_spb.py)
+
+## Streaming Services
+
+### *MTConnect*
+
+*Folder Structure:*
+```
+C:\Users<you>\repos\mfi_ddb_library
+│
+├── .venv\ ← Python 3.12 virtual environment
+└── examples
+    ├── mtconnect.yaml ← MTConnect configuration
+    ├── mqtt.yaml ← MQTT configuratio
+    ├── run_stream_mtconnect.bat
+    └── stream_mtconnect.py
+```
+
+*Configure `mtconnect.yaml`*
+```
+In `examples/mtconnect.yaml`, set your MTConnect Agent details:
+
+mtconnect:
+  agent_ip:    {device_ip}
+  agent_url:   'http://{device_ip}/'
+  trial_id:    'haas_online'
+  stream_rate: 10
+  device_name: '{device_name}'
+
+```
+*Configure `MQTT.yaml`*
+```
+topic_family: historian
+
+mqtt:
+  broker_address: {mqtt_broker_addr}
+  broker_port: 1883 / 8883
+  enterprise: Mill-19-test
+  site: HAAS-UMC750
+  username: admin
+  password: {pwd}
+  tls_enabled: False
+  debug: True
+```
+
+*Create a Batch File:*
+
+e.g. create examples/run_stream_mtconnect.bat
+```
+@echo off
+
+echo --------------------------------------------------
+echo Starting MTConnect streamer as a service
+echo --------------------------------------------------
+
+REM 1) Where this batch file lives
+set scriptDir=%~dp0
+
+REM 2) Activate the venv (one level up)
+call "%scriptDir%..\.venv\Scripts\activate.bat"
+
+REM 3) cd into examples
+cd /d "%scriptDir%"
+
+REM 4) Run the MTConnect Python script
+python "%scriptDir%stream_mtconnect.py"
+
+REM 5) Pause for manual debugging
+pause
+```
+
+*3. Test it manually*
+```
+cd /d C:\Users\<you>\repos\mfi_ddb_library\examples
+run_stream_mtconnect.bat
+```
+You should see your script start polling the MTConnect agent.
+
+*Install as a Windows Service*
+
+    Open an Administrator Command Prompt and navigate to your NSSM folder:
+
+*Install the service (note the mfi_ prefix)*
+
+```
+nssm install mfi_Adapter_Stream_mtconnect "C:\Users\<you>\repos\mfi_ddb_library\examples\run_stream_mtconnect.bat"
+```
+*The NSSM GUI that opens*
+```
+Path: the full path to run_stream_mtconnect.bat
+
+Startup directory: C:\Users\<you>\repos\mfi_ddb_library\examples
+
+Click Install service.
+```
+
+*Start the service:*
+```
+nssm start mfi_Adapter_Stream_mtconnect
+```
+*Verify its status:*
+```
+nssm status mfi_Adapter_Stream_mtconnect
+```
+*Verify Streaming*
+```
+Open MQTTX (or another MQTT client).
+
+Connect to your MQTT broker.
+
+Subscribe to the MTConnect topic family (e.g. spBv1.0/# or your configured topics).
+
+Confirm you see live data from your MTConnect agent.
+```
+*(If required) Uninstalling the Service*
+```
+nssm stop   mfi_Adapter_Stream_mtconnect
+nssm remove mfi_Adapter_Stream_mtconnect confirm
+```
