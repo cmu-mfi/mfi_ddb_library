@@ -1,4 +1,5 @@
-
+import json
+import time
 
 def get_topic_from_config(cfg: dict) -> str:
     """
@@ -18,3 +19,29 @@ def get_topic_from_config(cfg: dict) -> str:
         NotImplementedError("Topic for historian is not implemented yet")
         
     return f"{topic}/#"
+
+def get_blob_json_payload_from_dict(data: dict, file_name: str, trial_id:str) -> dict:
+    """
+    Convert a dictionary to a JSON payload for blob data.
+    """
+    if not isinstance(data, dict):
+        raise TypeError("Data must be a dictionary")
+    
+    json_data = json.dumps(data, indent=4)
+    json_bytes = json_data.encode('utf-8')
+    
+    payload = {
+        "file_name": file_name,
+        "file_type": '.json',
+        "size": json_bytes.__sizeof__(),
+        "timestamp": int(time.time()),
+        "file": json_bytes,
+        "trial_id": trial_id if trial_id else "",
+    }
+    
+    # Add other metadata
+    for key, value in data.items():
+        if key not in ["file_name", "file_type", "size", "timestamp", "file"]:
+            payload[key] = value
+            
+    return payload

@@ -1,14 +1,18 @@
+import os
+import platform
+import socket
 import time
+from datetime import datetime
 
 import paho.mqtt.client as paho_mqtt
-from .observer import Observer
-
 from mfi_ddb.data_adapters import *
 from mfi_ddb.topic_families import *
 from mfi_ddb.utils.exceptions import ConfigError
+from mfi_ddb.utils.script_utils import *
 
 from ._mqtt import Mqtt
 from ._mqtt_spb import MqttSpb
+from .observer import Observer
 
 TOPIC_CLIENTS = {
     "historian": ("MqttSpb", "HistorianTopicFamily"),
@@ -20,6 +24,9 @@ class Streamer(Observer):
     def __init__(self, config: dict, data_adp: BaseDataAdapter, stream_on_update:bool = False) -> None:
         super().__init__()
         
+        
+        # 1. initialize the data adapter and respective topic family client
+        # `````````````````````````````````````````````````````````````````````````
         self.cfg = config
         topic_family_name = config['topic_family']
         
@@ -28,12 +35,37 @@ class Streamer(Observer):
         
         topic_family = globals()[TOPIC_CLIENTS[topic_family_name][1]]()
         self.__client = globals()[TOPIC_CLIENTS[topic_family_name][0]](config, topic_family)
-        
-        self.__data_adp = data_adp
-        
+        self.__data_adp = data_adp        
         self.__client.connect(data_adp.component_ids)
-        
         self.__data_adp.get_data()
+        
+        # 2. initialize the key-value metadata and respective topic family client
+        # `````````````````````````````````````````````````````````````````````````
+        trial_id = str(self.__data_adp.cfg.get('trial_id', None))
+        kv_topic_family = globals()[TOPIC_CLIENTS['kv'][1]]()
+        blob_topic_family = globals()[TOPIC_CLIENTS['blob'][1]]()
+        kv_client = globals()[TOPIC_CLIENTS['kv'][0]](config, kv_topic_family)
+        blob_client = globals()[TOPIC_CLIENTS['blob'][0]](config, blob_topic_family)
+        
+        kv_client.connect(['birth_metadata', 'death_metadata'])
+        blob_client.connect(['birth_metadata', 'death_metadata'])
+        kv_payload = self.__generate_birth_kv_payload(self.__data_adp)
+        blob_birth_payload = get_blob_json_payload_from_dict(data = kv_payload,
+                                                             file_name = f'{trial_id}_metadata_birth.json',
+                                                             trial_id = trial_id)
+        blob_death_payload = get_blob_json_payload_from_dict(data = kv_payload,
+                                                             file_name = f'{trial_id}_metadata_death.json',
+                                                             trial_id = trial_id)        
+        
+        # 3. publish the key-value metadata birth message with initial data
+        # `````````````````````````````````````````````````````````````````````````
+        kv_client.stream_data({"birth_metadata": kv_payload})
+        kv_client.set_death_payload("death_metadata", {"death_metadata": kv_payload})
+        blob_client.stream_data({"birth_metadata": blob_birth_payload})
+        blob_client.set_death_payload("death_metadata", {"death_metadata": blob_death_payload})
+        
+        # 4. publish the birth message of the data adapter        
+        # `````````````````````````````````````````````````````````````````````````
         self.__client.publish_birth(self.__data_adp.attributes, self.__data_adp.data)
         self.__data_adp.clear_data_buffer()
         
@@ -71,3 +103,25 @@ class Streamer(Observer):
     def stream_data(self):
         self.__client.stream_data(self.__data_adp.data)
         self.__data_adp.clear_data_buffer()
+        
+    def __generate_birth_kv_payload(self, data_adp: BaseDataAdapter) -> dict:
+        
+        payload = {
+            "time": {
+                "birth": datetime.now().isoformat()
+                },
+            "source": {
+                "os": platform.system(),
+                "hostname": socket.gethostname(),
+                "fqdn": socket.getfqdn(),
+            },
+            "adapter": {
+                "config": self.__data_adp.cfg,
+                "component_ids": self.__data_adp.component_ids,
+                "attributes": self.__data_adp.attributes,
+                "sample_data": self.__data_adp.data,
+            },
+            "broker": self.cfg            
+        }         
+        
+        return payload
