@@ -34,6 +34,13 @@ class Streamer(Observer):
         self.__client.connect(data_adp.component_ids)
         
         self.__data_adp.get_data()
+        print("WARNING: Waiting for birth data to be populated in the data adapter for all components...")
+        while any(not bool(value) for value in self.__data_adp.data.values()):
+            time.sleep(0.1)
+            self.__data_adp.get_data()
+        
+        print("Birth data populated in the data adapter for all components.")
+        
         self.__client.publish_birth(self.__data_adp.attributes, self.__data_adp.data)
         self.__data_adp.clear_data_buffer()
         
