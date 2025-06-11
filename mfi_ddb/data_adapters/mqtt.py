@@ -140,7 +140,6 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
                 else:
                     return cast(value)
             except:
-                print("WARNING: Could not cast value:", value, "to type", cast.__name__)
                 continue
 
         return value
