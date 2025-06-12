@@ -76,33 +76,33 @@ To be able to do the above three major classes are provided:
 
 ## Streaming Services
 
-### *MTConnect*
+### *1. MTConnect*
 
-*Folder Structure:*
+* *Folder Structure:*
 ```
 C:\Users<you>\repos\mfi_ddb_library
 │
 ├── .venv\ ← Python 3.12 virtual environment
 └── examples
     ├── mtconnect.yaml ← MTConnect configuration
-    ├── mqtt.yaml ← MQTT configuratio
+    ├── mqtt.yaml ← MQTT configuration
     ├── run_stream_mtconnect.bat
     └── stream_mtconnect.py
 ```
 
-*Configure `mtconnect.yaml`*
+* *Configure `mtconnect.yaml`*
 ```
 In `examples/mtconnect.yaml`, set your MTConnect Agent details:
 
 mtconnect:
-  agent_ip:    {device_ip}
-  agent_url:   'http://{device_ip}/'
-  trial_id:    'haas_online'
+  agent_ip: {device_ip}
+  agent_url: 'http://{device_ip}/'
+  trial_id: 'haas_online'
   stream_rate: 10
   device_name: '{device_name}'
 
 ```
-*Configure `MQTT.yaml`*
+* *Configure `MQTT.yaml`*
 ```
 topic_family: historian
 
@@ -117,9 +117,9 @@ mqtt:
   debug: True
 ```
 
-*Create a Batch File:*
+* *Create a Batch File:*
 
-e.g. create examples/run_stream_mtconnect.bat
+    e.g. create examples/run_stream_mtconnect.bat
 ```
 @echo off
 
@@ -143,40 +143,41 @@ REM 5) Pause for manual debugging
 pause
 ```
 
-*3. Test it manually*
+* *Test it manually*
 ```
 cd /d C:\Users\<you>\repos\mfi_ddb_library\examples
+
 run_stream_mtconnect.bat
 ```
 You should see your script start polling the MTConnect agent.
 
-*Install as a Windows Service*
+* *Install as a Windows Service*
 
-    Open an Administrator Command Prompt and navigate to your NSSM folder:
+        Open an Administrator Command Prompt and navigate to your NSSM folder.
 
-*Install the service (note the mfi_ prefix)*
+* *Install the service (note the mfi_ prefix)*
 
 ```
 nssm install mfi_Adapter_Stream_mtconnect "C:\Users\<you>\repos\mfi_ddb_library\examples\run_stream_mtconnect.bat"
 ```
-*The NSSM GUI that opens*
+* *The NSSM GUI that opens*
 ```
-Path: the full path to run_stream_mtconnect.bat
+Path: Full path to run_stream_mtconnect.bat
 
-Startup directory: C:\Users\<you>\repos\mfi_ddb_library\examples
+Startup directory: "C:\Users\<you>\repos\mfi_ddb_library\examples"
 
 Click Install service.
 ```
 
-*Start the service:*
+* *Start the service:*
 ```
 nssm start mfi_Adapter_Stream_mtconnect
 ```
-*Verify its status:*
+* *Verify its status:*
 ```
 nssm status mfi_Adapter_Stream_mtconnect
 ```
-*Verify Streaming*
+* *Verify Streaming*
 ```
 Open MQTTX (or another MQTT client).
 
@@ -186,7 +187,7 @@ Subscribe to the MTConnect topic family (e.g. spBv1.0/# or your configured topic
 
 Confirm you see live data from your MTConnect agent.
 ```
-*(If required) Uninstalling the Service*
+* *(If required) Uninstalling the Service*
 ```
 nssm stop   mfi_Adapter_Stream_mtconnect
 nssm remove mfi_Adapter_Stream_mtconnect confirm
