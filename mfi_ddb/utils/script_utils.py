@@ -38,10 +38,5 @@ def get_blob_json_payload_from_dict(data: dict, file_name: str, trial_id:str) ->
         "file": json_bytes,
         "trial_id": trial_id if trial_id else "",
     }
-    
-    # Add other metadata
-    for key, value in data.items():
-        if key not in ["file_name", "file_type", "size", "timestamp", "file"]:
-            payload[key] = value
-            
+                
     return payload
