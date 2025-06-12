@@ -179,13 +179,13 @@ nssm status mfi_Adapter_Stream_mtconnect
 ```
 * *Verify Streaming*
 ```
-Open MQTTX (or another MQTT client).
+1. Open MQTTX (or another MQTT client).
 
-Connect to your MQTT broker.
+2. Connect to your MQTT broker({mqtt_broker_addr} same as in mqtt.yaml file).
 
-Subscribe to the MTConnect topic family (e.g. spBv1.0/# or your configured topics).
+3. Subscribe to the MTConnect topic family (your configured topics).
 
-Confirm you see live data from your MTConnect agent.
+4. Confirm you see live data from your MTConnect agent.
 ```
 * *(If required) Uninstalling the Service*
 ```
