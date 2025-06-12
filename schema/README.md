@@ -70,3 +70,14 @@ blob topic tree expects large binary files.
 * The schema is designed to be flexible and extensible to accommodate different types of data. 
 * The schema is defined in [kv.json](./kv.json).
 * While [blob](#blob-binary-data) and [historian](#historian-time-series) are protobuf serialized, k-v messages are sent as json for ease of readability.
+
+## Streaming Metadata
+
+When streaming data to the broker, following metadata is recorded through the `mfi-ddb` stream:
+
+| Metadata | Description | Recorded as |
+|-------|-------------|-------------|
+| location context | The location context of the data being streamed, which includes the enterprise, site, area, and device. | [topic structure](#topic-structure) |
+| attributes | Key-value pairs that provide additional information about the data being streamed. These are defined in the adapter yaml configuration file. | streamed on the same topic before data using the same topic family encoding |
+| streaming configuration | The configuration of the data stream, which includes broker information, enterprise and site details. | streamed on the `kv` and `blob` at birth and death of data streaming  |
+| adapter configuration | The configuration of the adapter that is streaming the data, which includes all the components and their attributes | streamed on the `kv` and `blob` at birth and death of data streaming |  
