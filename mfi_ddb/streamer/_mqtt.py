@@ -1,3 +1,5 @@
+import copy
+import json
 import os
 import time
 
@@ -28,6 +30,9 @@ class Mqtt:
             self.__topic_header = self.__get_topic_header(config['mqtt'])
         except:
             self.__topic_header = None
+        
+        self.__last_will_set = False
+        self.__last_will = {}
     
     def __get_topic_header(self, config:dict):
         ver = 'mfi-v1.0'
@@ -58,6 +63,8 @@ class Mqtt:
         self.client = mqtt.Client()
         self.client.username_pw_set(mqtt_user, mqtt_pass)
         self.client.on_connect = self.__on_connect
+        self.client.on_disconnect = self.__publish_last_will()
+
         self.client.connect(mqtt_host, mqtt_port, 60)
         
         while not self.client.is_connected():
@@ -109,6 +116,10 @@ class Mqtt:
             self.__publish(component_id, input_values)       
                     
     def disconnect(self):
+        self.__publish_last_will()
+        self.client.loop_stop()
+        print("Disconnecting from MQTT broker...")
+        self.client.disconnect()
         pass
     
     def __check_data(self, data):       
@@ -120,14 +131,50 @@ class Mqtt:
     def __publish(self, device, payload: dict):
         topic_prefix = f"{self.__topic_header}/{device}"
         print(f"Publishing to device: {device}")
-        
         for key in payload.keys():
+            if isinstance(payload[key], dict):
+                payload[key] = json.dumps(payload[key])
             self.client.publish(f"{topic_prefix}/{key}", payload[key])
             print(f"Published data on topic: {topic_prefix}/{key}")
             
-    def set_death_payload(self, topic: str, payload: str, qos: int = 0, retain: bool = False):
+    def set_death_payload(self, device: str, payload: dict, qos: int = 1, retain: bool = False):
         """
         Set the last will message for the MQTT client.
         """
-        self.client.will_set(topic, payload, qos=qos, retain=retain)
-        print(f"Last will set for topic: {topic} with payload: {payload}")
+            
+        input_values = copy.deepcopy(payload)
+        input_values = self._topic_family.process_data(input_values)
+        if not bool(input_values):
+            print(f"WARNING: Data not found for device {device}")
+        elif not self.__check_data(input_values):
+            raise Exception(f"{self._topic_family.topic_family_name} not compatible with Mqtt")
+                    
+        topic_prefix = f"{self.__topic_header}/{device}"
+        for key in input_values.keys():
+            if isinstance(input_values[key], dict):
+                input_values[key] = json.dumps(payload[key])
+
+            self.client.will_set(f"{topic_prefix}/{key}", input_values[key])
+            print(f"LWT set on topic: {topic_prefix}/{key}")        
+            
+        self.__last_will_set = True        
+        self.__last_will = {device: input_values}
+        
+    def __publish_last_will(self):
+        """
+        Publish the last will message if it is set.
+        """
+        print(f"CLIENT DISCONNECTED. {self._topic_family.topic_family_name}. Publishing last will message...")
+        if not self.__last_will_set:         
+            return
+        
+        for device, payload in self.__last_will.items():
+            topic_prefix = f"{self.__topic_header}/{device}"
+            for key in payload.keys():
+                if isinstance(payload[key], dict):
+                    payload[key] = json.dumps(payload[key])
+                self.client.publish(f"{topic_prefix}/{key}", payload[key])
+                print(f"Published last will on topic: {topic_prefix}/{key}")
+        self.__last_will_set = False
+        self.__last_will = {}
+        

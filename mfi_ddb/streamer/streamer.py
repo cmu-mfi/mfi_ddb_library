@@ -56,14 +56,14 @@ class Streamer(Observer):
         blob_death_payload = get_blob_json_payload_from_dict(data = kv_payload,
                                                              file_name = f'{trial_id}_metadata_death.json',
                                                              trial_id = trial_id)        
-        
+
         # 3. publish the key-value metadata birth message with initial data
         # `````````````````````````````````````````````````````````````````````````
         kv_client.stream_data({"birth_metadata": kv_payload})
-        kv_client.set_death_payload("death_metadata", {"death_metadata": kv_payload})
+        kv_client.set_death_payload("death_metadata", kv_payload)
         blob_client.stream_data({"birth_metadata": blob_birth_payload})
-        blob_client.set_death_payload("death_metadata", {"death_metadata": blob_death_payload})
-        
+        blob_client.set_death_payload("death_metadata", blob_death_payload)
+
         # 4. publish the birth message of the data adapter        
         # `````````````````````````````````````````````````````````````````````````
         self.__client.publish_birth(self.__data_adp.attributes, self.__data_adp.data)
