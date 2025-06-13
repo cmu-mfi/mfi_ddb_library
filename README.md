@@ -73,3 +73,14 @@ To be able to do the above three major classes are provided:
 * [BlobTopicFamily](mfi_ddb/topic_families/blob.py)
 * [KeyValueTopicFamily](mfi_ddb/topic_families/key_value.py)
 * [SpbTopicFamily](mfi_ddb/topic_families/time_series_spb.py)
+
+## Streaming Metadata
+
+When streaming data to the broker, the following metadata is recorded through the `mfi-ddb` stream:
+
+| Metadata | Description | Recorded as |
+|-------|-------------|-------------|
+| location context | The location context of the data being streamed, which includes the enterprise, site, area, and device. | [topic structure](./schema/README.md) |
+| attributes | Key-value pairs that provide additional information about the data being streamed. These are defined in the adapter yaml configuration file. | streamed on the same topic before data using the same topic family encoding |
+| streaming configuration | The configuration of the data stream, which includes broker information, enterprise and site details. | streamed on the `kv` and `blob` at birth and death of data streaming  |
+| adapter configuration | The configuration of the adapter that is streaming the data, which includes all the components and their attributes | streamed on the `kv` and `blob` at birth and death of data streaming |  
