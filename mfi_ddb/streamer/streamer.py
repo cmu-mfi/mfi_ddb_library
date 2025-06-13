@@ -1,3 +1,4 @@
+import json
 import os
 import platform
 import socket
@@ -5,6 +6,7 @@ import time
 from datetime import datetime
 
 import paho.mqtt.client as paho_mqtt
+
 from mfi_ddb.data_adapters import *
 from mfi_ddb.topic_families import *
 from mfi_ddb.utils.exceptions import ConfigError
@@ -47,8 +49,6 @@ class Streamer(Observer):
         kv_client = globals()[TOPIC_CLIENTS['kv'][0]](config, kv_topic_family)
         blob_client = globals()[TOPIC_CLIENTS['blob'][0]](config, blob_topic_family)
         
-        kv_client.connect(['birth_metadata', 'death_metadata'])
-        blob_client.connect(['birth_metadata', 'death_metadata'])
         kv_payload = self.__generate_birth_kv_payload(self.__data_adp)
         blob_birth_payload = get_blob_json_payload_from_dict(data = kv_payload,
                                                              file_name = f'{trial_id}_metadata_birth.json',
@@ -59,11 +59,16 @@ class Streamer(Observer):
 
         # 3. publish the key-value metadata birth message with initial data
         # `````````````````````````````````````````````````````````````````````````
-        kv_client.stream_data({"birth_metadata": kv_payload})
-        kv_client.set_death_payload("death_metadata", kv_payload)
-        blob_client.stream_data({"birth_metadata": blob_birth_payload})
-        blob_client.set_death_payload("death_metadata", blob_death_payload)
-
+        
+        kv_client.set_death_payload("metadata", {'death': kv_payload})
+        kv_client.connect(['metadata'])
+        
+        blob_client.set_death_payload("metadata", blob_death_payload)
+        blob_client.connect(['metadata'])
+        
+        kv_client.stream_data({"metadata": {'birth':kv_payload}})
+        blob_client.stream_data({"metadata": blob_birth_payload})
+        
         # 4. publish the birth message of the data adapter        
         # `````````````````````````````````````````````````````````````````````````
         self.__client.publish_birth(self.__data_adp.attributes, self.__data_adp.data)
@@ -121,7 +126,7 @@ class Streamer(Observer):
                 "attributes": self.__data_adp.attributes,
                 "sample_data": self.__data_adp.data,
             },
-            "broker": self.cfg            
+            "broker": self.__client.cfg            
         }         
         
         return payload

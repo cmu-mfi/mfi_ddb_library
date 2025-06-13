@@ -57,20 +57,25 @@ class Mqtt:
         mqtt_port = int(mqtt_cfg['broker_port']) if 'broker_port' in mqtt_cfg.keys() else 1883
         mqtt_user = mqtt_cfg['username'] if 'username' in mqtt_cfg.keys() else None
         mqtt_pass = mqtt_cfg['password'] if 'password' in mqtt_cfg.keys() else None
+        if 'password' in mqtt_cfg.keys():
+            del self.cfg['mqtt']['password']  # Remove password from config for security reasons
+            
         mqtt_tls_enabled = mqtt_cfg['tls_enabled'] if 'tls_enabled' in mqtt_cfg.keys() else False
         debug = mqtt_cfg['debug'] if 'debug' in mqtt_cfg.keys() else False
         
         self.client = mqtt.Client()
         self.client.username_pw_set(mqtt_user, mqtt_pass)
         self.client.on_connect = self.__on_connect
-        self.client.on_disconnect = self.__publish_last_will()
+        
+        # LAST WILL AND TESTAMENT
+        self.__set_last_will()        
 
-        self.client.connect(mqtt_host, mqtt_port, 60)
+        self.client.connect(mqtt_host, mqtt_port, 5)
         
         while not self.client.is_connected():
             print("Connecting to MQTT broker...")
             time.sleep(1)
-            self.client.loop()
+            self.client.loop_start()
 
         self._components = component_ids
         
@@ -104,7 +109,6 @@ class Mqtt:
    
     def stream_data(self, data):
         for component_id in data.keys():
-            
             input_values = data[component_id]
             input_values = self._topic_family.process_data(input_values)
             if not bool(input_values):
@@ -120,7 +124,6 @@ class Mqtt:
         self.client.loop_stop()
         print("Disconnecting from MQTT broker...")
         self.client.disconnect()
-        pass
     
     def __check_data(self, data):       
         return True
@@ -137,28 +140,26 @@ class Mqtt:
             self.client.publish(f"{topic_prefix}/{key}", payload[key])
             print(f"Published data on topic: {topic_prefix}/{key}")
             
-    def set_death_payload(self, device: str, payload: dict, qos: int = 1, retain: bool = False):
+    def set_death_payload(self, topic:str, payload: dict, qos: int = 1, retain: bool = False):
         """
         Set the last will message for the MQTT client.
         """
-            
+        
         input_values = copy.deepcopy(payload)
         input_values = self._topic_family.process_data(input_values)
-        if not bool(input_values):
-            print(f"WARNING: Data not found for device {device}")
-        elif not self.__check_data(input_values):
-            raise Exception(f"{self._topic_family.topic_family_name} not compatible with Mqtt")
-                    
-        topic_prefix = f"{self.__topic_header}/{device}"
-        for key in input_values.keys():
-            if isinstance(input_values[key], dict):
-                input_values[key] = json.dumps(payload[key])
 
-            self.client.will_set(f"{topic_prefix}/{key}", input_values[key])
-            print(f"LWT set on topic: {topic_prefix}/{key}")        
+        if len(input_values.keys()) != 1:
+            print(f"WARNING: Death payload should have only one key. Found {len(input_values.keys())} keys.")
+            return
+        
+        if not bool(input_values):
+            print(f"WARNING: Death payload not found for {self.__topic_header}")
+        elif not self.__check_data(input_values):
+            raise Exception(f"{self._topic_family.topic_family_name} not compatible with Mqtt")      
             
-        self.__last_will_set = True        
-        self.__last_will = {device: input_values}
+        self.__last_will_set = True   
+        topic = f"{topic}/{list(input_values.keys())[0]}"
+        self.__last_will = {topic: list(input_values.values())[0]}
         
     def __publish_last_will(self):
         """
@@ -177,4 +178,16 @@ class Mqtt:
                 print(f"Published last will on topic: {topic_prefix}/{key}")
         self.__last_will_set = False
         self.__last_will = {}
+    
+    def __set_last_will(self):
+        """
+        Set the last will message for the MQTT client.
+        """
+        if not self.__last_will_set:
+            return
         
+        payload = list(self.__last_will.values())[0]
+        topic = f"{self.__topic_header}/{list(self.__last_will.keys())[0]}"
+            
+        self.client.will_set(topic, payload, qos=1, retain=False)
+        print(f"Last will set on topic: {topic}")
