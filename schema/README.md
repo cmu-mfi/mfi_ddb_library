@@ -73,7 +73,7 @@ blob topic tree expects large binary files.
 
 ## Streaming Metadata
 
-When streaming data to the broker, following metadata is recorded through the `mfi-ddb` stream:
+When streaming data to the broker, the following metadata is recorded through the `mfi-ddb` stream:
 
 | Metadata | Description | Recorded as |
 |-------|-------------|-------------|
