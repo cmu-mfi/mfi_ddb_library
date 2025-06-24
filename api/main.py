@@ -6,7 +6,7 @@ from api.connection_test  import test_mtconnect, test_mqtt
 from api.config_schema    import FullConfig
 from api.stream_wrapper   import publish_mtconnect, event_gen
 
-# http://127.0.0.1:8001/docs
+# http://127.0.0.1:8001/docs if port running on 8001
 app = FastAPI(
     title="MFI DDB Streaming API",
     version="1.0.0",
@@ -14,10 +14,11 @@ app = FastAPI(
         "MFI DDB Streaming API enables:\n"
         "1. Validation of MTConnect and MQTT configurations.\n"
         "2. Reachability tests for MTConnect agents and MQTT brokers.\n"
-        "3. Configuration stashing via a connect endpoint.\n"
+        "3. Saving configuration via a connect endpoint.\n"
         "4. Background publishing of MTConnect data to MQTT.\n"
         "5. Real-time streaming of MTConnect data over Server-Sent Events."
     ),
+    swagger_ui_parameters={"defaultModelsExpandDepth": -1},
     docs_url="/docs",
     redoc_url="/redoc",
 )
