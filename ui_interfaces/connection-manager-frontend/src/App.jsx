@@ -12,7 +12,7 @@ const App = () => {
     isEditing: false,
     editingId: null,
     type: "",
-    trailId: "",
+    trialId: "",
     configuration: "",
   });
 
@@ -21,7 +21,7 @@ const App = () => {
       isEditing: false,
       editingId: null,
       type: "",
-      trailId: "",
+      trialId: "",
       configuration: "",
     });
     setModalOpen(true);
@@ -32,7 +32,7 @@ const App = () => {
       isEditing: true,
       editingId: conn.id,
       type: conn.type,
-      trailId: conn.trailId,
+      trialId: conn.trialId,
       configuration: conn.configuration,
     });
     setModalOpen(true);
@@ -48,7 +48,7 @@ const App = () => {
                 ...c,
                 type: data.type,
                 name: data.type,
-                trailId: data.trailId,
+                trialId: data.trialId,
                 configuration: data.configuration,
               }
             : c
@@ -61,7 +61,7 @@ const App = () => {
         type: data.type,
         name: data.type,
         status: "Pending",
-        trailId: data.trailId,
+        trialId: data.trialId,
         configuration: data.configuration,
         expanded: false,
         subConnections: [
@@ -100,7 +100,7 @@ const App = () => {
         onSave={handleSave}
         initialData={{
           type: current.type,
-          trailId: current.trailId,
+          trialId: current.trialId,
           configuration: current.configuration,
         }}
         isEditing={current.isEditing}

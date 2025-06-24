@@ -491,3 +491,48 @@ body {
     width: 100%;
   }
 }
+
+.radio-group {
+  display: flex;
+  gap: 1rem; /* space between each option */
+  align-items: center;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+}
+
+.radio-label input {
+  margin-right: 0.25rem; /* space between the dot and the text */
+}
+
+/* 1. Base styles shared with inputs & textarea */
+.form-input,
+.form-textarea,
+.form-select {
+  font-family: inherit;
+  font-size: 1rem;
+  color: #374151; /* same text color */
+  background-color: #ffffff; /* same background */
+  border: 1px solid #d1d5db; /* same border */
+  border-radius: 0.375rem; /* same corner radius */
+  padding: 0.5rem 0.75rem; /* same padding */
+  line-height: 1.5;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 2. Tweak the select’s native arrow */
+.form-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg fill='%236b7280' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.25 7.5L10 12.25 14.75 7.5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1em;
+}
+
+/* 3. Add some spacing below the dropdown like your other fields */
+.form-group + .form-group {
+  margin-top: 1rem;
+}

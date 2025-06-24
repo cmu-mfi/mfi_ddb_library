@@ -3,9 +3,15 @@ import Modal from "./Modal";
 
 const CONNECTION_TYPES = ["MTConnect", "OPC UA", "MQTT", "Local Files", "ROS"];
 
+const TOPIC_FAMILIES = [
+  { label: "Key-Value (kv)", value: "kv" },
+  { label: "Blob", value: "blob" },
+  { label: "Historian", value: "historian" },
+];
+
 const EXAMPLE_CONFIGS = {
   MTConnect: {
-    trailId: "haas_online",
+    trialId: "haas_online",
     configuration: `mtconnect:
   agent_ip: 192.168.1.100
   agent_url: 'http://192.168.1.100:8082/'
@@ -14,7 +20,7 @@ const EXAMPLE_CONFIGS = {
   device_name: 'haascnc'`,
   },
   "Local Files": {
-    trailId: "testing_lfs",
+    trialId: "testing_lfs",
     configuration: `watch_dir: 
   - '/home/shobhit/repos/mfi_ddb_library/examples'
 
@@ -28,7 +34,7 @@ wait_before_read: 1 # seconds
 buffer_size: 10`,
   },
   ROS: {
-    trailId: "untitled",
+    trialId: "untitled",
     configuration: `trial_id: 'untitled'
 set_ros_callback: False
 
@@ -45,7 +51,7 @@ devices:
     ....`,
   },
   "OPC UA": {
-    trailId: `OPC-${Date.now()}`,
+    trialId: `OPC-${Date.now()}`,
     configuration: `# OPC UA Configuration
 endpoint: opc.tcp://localhost:4840
 security:
@@ -59,7 +65,7 @@ subscription:
   keepalive_count: 200`,
   },
   MQTT: {
-    trailId: `MQTT-${Date.now()}`,
+    trialId: `MQTT-${Date.now()}`,
     configuration: `# MQTT Configuration
 broker: mqtt://localhost:1883
 client_id: client-${Date.now()}
@@ -85,10 +91,10 @@ const ConnectionModal = ({
   initialData = {},
   isEditing = false,
 }) => {
-  // Store type and form fields (trailId + YAML)
+  // Store type and form fields (trialId + YAML)
   const [connectionType, setConnectionType] = useState(initialData.type || "");
   const [formData, setFormData] = useState({
-    trailId: initialData.trailId || "",
+    topicFamily: initialData.topicFamily || "",
     configuration: initialData.configuration || "",
   });
   const [validation, setValidation] = useState({
@@ -104,7 +110,7 @@ const ConnectionModal = ({
     if (isOpen) {
       setConnectionType(initialData.type || "");
       setFormData({
-        trailId: initialData.trailId || "",
+        trialId: initialData.trialId || "",
         configuration: initialData.configuration || "",
       });
       setValidation({ isValid: false, errors: {} });
@@ -112,13 +118,13 @@ const ConnectionModal = ({
     }
   }, [isOpen, initialData]);
 
-  // Extract trail_id / trial_id from YAML text
-  const extractTrailId = (yamlContent) => {
+  // Extract trial_id / trial_id from YAML text
+  const extractTrialId = (yamlContent) => {
     const lines = yamlContent.split("\n");
     for (const line of lines) {
       const match = line
         .trim()
-        .match(/^(trail_id|trial_id):\s*['"]?(.+?)['"]?$/);
+        .match(/^(trial_id|trial_id):\s*['"]?(.+?)['"]?$/);
       if (match) return match[2].trim();
     }
     return "";
@@ -231,7 +237,7 @@ const ConnectionModal = ({
     return formatErrors;
   };
 
-  // Validate entire form: type, Trail ID, and YAML content
+  // Validate entire form: type, trial ID, and YAML content
   const validateForm = (data = formData) => {
     const errors = {};
     let ok = true;
@@ -241,12 +247,12 @@ const ConnectionModal = ({
       ok = false;
     }
 
-    if (!data.trailId || data.trailId.trim() === "") {
-      errors.trailId = "Trail ID is required";
+    if (!data.topicFamily.trim()) {
+      errors.topicFamily = "Topic family is required";
       ok = false;
     }
 
-    if (!data.configuration || data.configuration.trim() === "") {
+    if (!data.configuration.trim()) {
       errors.configuration = "Configuration is required";
       ok = false;
     }
@@ -266,22 +272,22 @@ const ConnectionModal = ({
     return ok;
   };
 
-  // Handle YAML file upload (extract trail_id and fill the textarea)
+  // Handle YAML file upload (extract trial_id and fill the textarea)
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target.result;
-      const tid = extractTrailId(text);
-      setFormData({ trailId: tid || "", configuration: text });
+      const tid = extractTrialId(text);
+      setFormData({ trialId: tid || "", configuration: text });
       setIsPopulated(true);
-      validateForm({ trailId: tid || "", configuration: text });
+      validateForm({ trialId: tid || "", configuration: text });
     };
     reader.readAsText(file);
   };
 
-  // Populate sample YAML & Trail ID for the selected type
+  // Populate sample YAML & trial ID for the selected type
   const handlePopulate = () => {
     if (!connectionType) return; // do nothing if no type
     const sample = EXAMPLE_CONFIGS[connectionType];
@@ -304,17 +310,17 @@ const ConnectionModal = ({
     }
     onSave({
       type: connectionType,
-      trailId: formData.trailId,
+      topicFamily: formData.topicFamily,
       configuration: formData.configuration,
     });
     onClose();
   };
 
-  // When the user changes the dropdown, reset the YAML & Trail ID
+  // When the user changes the dropdown, reset the YAML & trial ID
   const handleTypeChange = (e) => {
     const newType = e.target.value;
     setConnectionType(newType);
-    setFormData({ trailId: "", configuration: "" });
+    setFormData({ trialId: "", configuration: "" });
     setValidation({ isValid: false, errors: {} });
     setIsPopulated(false);
   };
@@ -352,21 +358,29 @@ const ConnectionModal = ({
           )}
         </div>
 
-        {/* -------- Trail ID Field (always visible) -------- */}
+        {/* -------- Topic Family Radio Group (always visible) -------- */}
         <div className="form-group">
-          <label htmlFor="trail-id">Trail ID:</label>
-          <input
-            id="trail-id"
-            type="text"
-            className={`form-input ${validation.errors.trailId ? "error" : ""}`}
-            value={formData.trailId}
-            onChange={(e) =>
-              setFormData({ ...formData, trailId: e.target.value })
-            }
-            placeholder="Enter trail ID"
-          />
-          {validation.errors.trailId && (
-            <span className="error-message">{validation.errors.trailId}</span>
+          <label>Topic Family:</label>
+          <div className="radio-group">
+            {TOPIC_FAMILIES.map(({ label, value }) => (
+              <label key={value} className="radio-label">
+                <input
+                  type="radio"
+                  name="topicFamily"
+                  value={value}
+                  checked={formData.topicFamily === value}
+                  onChange={() =>
+                    setFormData({ ...formData, topicFamily: value })
+                  }
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+          {validation.errors.topicFamily && (
+            <span className="error-message">
+              {validation.errors.topicFamily}
+            </span>
           )}
         </div>
 
