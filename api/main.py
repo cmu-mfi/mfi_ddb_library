@@ -46,8 +46,12 @@ def api_test(cfg: FullConfig):
 def api_connect(cfg: FullConfig):
     api_validate(cfg)
     api_test(cfg)
+    raw = cfg.model_dump()
+    raw["mtconnect"]["agent_ip"]   = str(raw["mtconnect"]["agent_ip"])
+    raw["mtconnect"]["agent_url"]  = str(raw["mtconnect"]["agent_url"])
+    raw["mqtt"]["broker_address"]  = str(raw["mqtt"]["broker_address"])
     global _last_cfg
-    _last_cfg = cfg.model_dump()
+    _last_cfg = raw
     return {"status": "connected"}
 
 @app.post("/publish")

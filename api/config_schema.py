@@ -2,14 +2,14 @@ from pydantic import BaseModel, AnyUrl, IPvAnyAddress, Field
 from typing import Optional
 
 class MTConnectConfig(BaseModel):
-    agent_ip:    IPvAnyAddress
+    agent_ip:    str
     agent_url:   AnyUrl
     trial_id:    str
     stream_rate: int = Field(..., gt=0)
     device_name: str
 
 class MQTTConfig(BaseModel):
-    broker_address: IPvAnyAddress
+    broker_address: str
     broker_port:    int = Field(..., ge=1, le=65535)
     enterprise:     str
     site:           Optional[str]

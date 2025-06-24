@@ -15,5 +15,6 @@
     "password": "CMUmfi2024!",
     "tls_enabled": false,
     "debug": true
-  }
+  },
+  "topic_family": "historian"
 }
