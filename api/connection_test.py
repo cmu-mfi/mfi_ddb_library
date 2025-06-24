@@ -1,14 +1,19 @@
-import requests, threading
+import requests
+import threading
 import paho.mqtt.client as mqtt
 
-def test_mtconnect(cfg):
+
+def test_mtconnect(cfg, timeout: int = 5) -> bool:
     try:
-        r = requests.get(f"{cfg.agent_url}current", timeout=5)
+        base = str(cfg.agent_url).rstrip('/')
+        url = url = f"{base}/current"
+        r = requests.get(url, timeout=timeout)
         return r.status_code == 200
     except requests.RequestException:
         return False
 
-def test_mqtt(cfg, timeout=5):
+
+def test_mqtt(cfg, timeout: int = 5) -> bool:
     ok = threading.Event()
     client = mqtt.Client()
     client.username_pw_set(cfg.username, cfg.password)

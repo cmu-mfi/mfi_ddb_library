@@ -1,68 +1,64 @@
-# api/main.py
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
+from api.config_loader    import load_ref_mtconnect, load_ref_mqtt
+from api.config_validator import validate_mtconnect, validate_mqtt
+from api.connection_test  import test_mtconnect, test_mqtt
+from api.config_schema    import FullConfig
+from api.stream_wrapper   import publish_mtconnect, event_gen
 
-from mfi_ddb.data_adapters.mtconnect import MTconnectDataAdapter
-from .config_loader    import load_ref_mtconnect, load_ref_mqtt
-from .config_schema    import FullConfig
-from .config_validator import validate_mtconnect, validate_mqtt
-from .connection_test  import test_mtconnect, test_mqtt
-from .stream_wrapper   import publish_mtconnect, event_gen
+# http://127.0.0.1:8001/docs
+app = FastAPI(
+    title="MFI DDB Streaming API",
+    description="""
+    This service lets you:
+    1. Validate MTConnect & MQTT configs  
+    2. Test reachability  
+    3. “Connect” (stash) a config  
+    4. Publish MTConnect → MQTT in background  
+    5. Stream MTConnect data as Server-Sent Events
+    """,
+    version="1.0.0",
+)
 
-app      = FastAPI()
-ref_mt   = load_ref_mtconnect()
-ref_mq   = load_ref_mqtt()
-_last_cfg = None    # stash after “/config/connect”
+# Load reference configs
+ref_mt = load_ref_mtconnect()
+ref_mq = load_ref_mqtt()
+_last_cfg = None
 
 @app.post("/config/validate")
-def validate(cfg: FullConfig):
+def api_validate(cfg: FullConfig):
     try:
         validate_mtconnect(cfg.mtconnect, ref_mt)
         validate_mqtt(cfg.mqtt, ref_mq)
     except ValueError as e:
-        raise HTTPException(400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
     return {"status": "validated"}
 
 @app.post("/config/test")
-def test(cfg: FullConfig):
+def api_test(cfg: FullConfig):
     if not test_mtconnect(cfg.mtconnect):
-        raise HTTPException(502, "MTConnect agent unreachable")
+        raise HTTPException(status_code=502, detail="MTConnect agent unreachable")
     if not test_mqtt(cfg.mqtt):
-        raise HTTPException(502, "MQTT broker unreachable")
+        raise HTTPException(status_code=502, detail="MQTT broker unreachable")
     return {"status": "MTConnect OK, MQTT OK"}
 
 @app.post("/config/connect")
-def connect(cfg: FullConfig):
-    # re‐validate + test
-    validate(cfg)
-    test(cfg)
+def api_connect(cfg: FullConfig):
+    api_validate(cfg)
+    api_test(cfg)
     global _last_cfg
-    _last_cfg = cfg.model_dump()   # or cfg.dict()
+    _last_cfg = cfg.model_dump()
     return {"status": "connected"}
 
 @app.post("/publish")
-def publish(background_tasks: BackgroundTasks):
+def api_publish(background_tasks: BackgroundTasks):
     if _last_cfg is None:
-        raise HTTPException(400, "Must call /config/connect first")
+        raise HTTPException(status_code=400, detail="Must call /config/connect first")
     background_tasks.add_task(publish_mtconnect, _last_cfg)
     return {"status": "publishing started"}
 
-# @app.post("/stream")
-# def stream():
-#     if _last_cfg is None:
-#         raise HTTPException(400, "Must call /config/connect first")
-#     # reuse the last config for SSE
-#     adapter = MTconnectDataAdapter(_last_cfg)
-#     rate    = _last_cfg["mtconnect"]["stream_rate"]
-#     return StreamingResponse(
-#         event_gen(adapter, rate),
-#         media_type="text/event-stream"
-#     )
-
-
 @app.get("/stream")
-def stream_get():
+def api_stream():
     if _last_cfg is None:
-        raise HTTPException(400, "Must call /config/connect first")
-    # call event_gen with exactly one argument: the saved config
+        raise HTTPException(status_code=400, detail="Must call /config/connect first")
     return StreamingResponse(event_gen(_last_cfg), media_type="text/event-stream")

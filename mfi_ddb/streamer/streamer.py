@@ -31,7 +31,7 @@ class Streamer(Observer):
         
         self.__data_adp = data_adp
         
-        self.__client.connect(data_adp.component_ids)
+        self.__client.connect(data_adp.component_ids) #Establishes MQTT connection and registers components (topics)
         
         self.__data_adp.get_data()
         print("WARNING: Waiting for birth data to be populated in the data adapter for all components...")

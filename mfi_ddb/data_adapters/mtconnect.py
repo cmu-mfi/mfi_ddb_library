@@ -117,7 +117,7 @@ class MTconnectDataAdapter(BaseDataAdapter):
         
         return component_data
 
-    def __populate_data(self, raw_data):
+    def __populate_data(self, raw_data):     #populates the data from xml to dict
         
         current_time = time.time()
         
