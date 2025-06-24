@@ -9,15 +9,17 @@ from api.stream_wrapper   import publish_mtconnect, event_gen
 # http://127.0.0.1:8001/docs
 app = FastAPI(
     title="MFI DDB Streaming API",
-    description="""
-    This service lets you:
-    1. Validate MTConnect & MQTT configs  
-    2. Test reachability  
-    3. “Connect” (stash) a config  
-    4. Publish MTConnect → MQTT in background  
-    5. Stream MTConnect data as Server-Sent Events
-    """,
     version="1.0.0",
+    description=(
+        "MFI DDB Streaming API enables:\n"
+        "1. Validation of MTConnect and MQTT configurations.\n"
+        "2. Reachability tests for MTConnect agents and MQTT brokers.\n"
+        "3. Configuration stashing via a connect endpoint.\n"
+        "4. Background publishing of MTConnect data to MQTT.\n"
+        "5. Real-time streaming of MTConnect data over Server-Sent Events."
+    ),
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
 # Load reference configs
