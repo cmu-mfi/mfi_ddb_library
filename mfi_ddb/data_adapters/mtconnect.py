@@ -96,7 +96,7 @@ class MTconnectDataAdapter(BaseDataAdapter):
         print(f"MTConnect agent at {ip} is active")    
         
     def __request_agent(self, ext: str):
-        URL = self.cfg['mtconnect']['agent_url']
+        URL = str(self.cfg['mtconnect']['agent_url']).rstrip("/")
         response = requests.get(URL + ext)
         val = xmltodict.parse(response.text, encoding='utf-8')
         val = OmegaConf.create(val)        
