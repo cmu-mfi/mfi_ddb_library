@@ -1,4 +1,4 @@
-## 🌟 Enhancement
+## 🐞 Bug Fix
 
 ### Brief Description
 > Provide a short, 2-line description of the contribution.
@@ -7,18 +7,15 @@
 
 ### Details
 
-* **describe existing state (e.g., current console output, results, etc.).**
+* **steps to reproduce the bug**
   * ...
   * ...
 
-* **steps to verify the enhancement (how to run the new code and observe the improvement).**
+* **steps to verify that the bug is fixed (how to run the new code to ensure the bug is resolved).**
   * ...
   * ...
 
-* **reference relevant README files to understand the new utility**
-  * ...
-
-* **additional changes**
+* **additional details**
   * ...
 
 ### Potential failure points
