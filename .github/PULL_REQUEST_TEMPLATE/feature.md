@@ -1,4 +1,4 @@
-## 🌟 Enhancement
+## 🚀 Feature
 
 ### Brief Description
 > Provide a short, 2-line description of the contribution.
@@ -7,18 +7,15 @@
 
 ### Details
 
-* **describe existing state (e.g., current console output, results, etc.).**
+* **test/example files to run to test the new feature**
   * ...
   * ...
 
-* **steps to verify the enhancement (how to run the new code and observe the improvement).**
+* **reference relevant README files or notebooks to understand the new feature**
   * ...
   * ...
 
-* **reference relevant README files to understand the new utility**
-  * ...
-
-* **additional changes**
+* **additional details**
   * ...
 
 ### Potential failure points
