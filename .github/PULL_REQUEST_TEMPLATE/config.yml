@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+pull_request_template:
+  - name: 🐞 Bug Fix
+    description: Template for bug fix PRs
+    filename: bug.md
+  - name: 🚀 Feature
+    description: Template for new feature PRs
+    filename: feature.md
+  - name: 🌟 Enhancement
+    description: Template for enhancements or improvements
+    filename: enhancement.md
+  - name: Others
+    description: General PR template
+    filename: general.md
