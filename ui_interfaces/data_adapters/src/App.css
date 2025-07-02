@@ -20,6 +20,16 @@ body {
   min-height: 100vh;
 }
 
+/* Keyframes for animations */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 /* Connection Manager Styles */
 .connection-manager {
   padding: 2rem;
@@ -38,7 +48,6 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
 }
 
 .header-title {
@@ -47,13 +56,11 @@ body {
   color: #333;
 }
 
-/* —— Updated New Connection Button —— */
 .new-connection-button {
-  /* Removed width: 100%; so it no longer stretches the entire row */
-  background-color: #007bff;
-  color: white;
+  background-color: #dbdada;
+  color: rgb(8, 8, 8);
   border: none;
-  padding: 0.75rem 1.5rem; /* give it some horizontal padding */
+  padding: 0.75rem 1.5rem;
   border-radius: 6px;
   font-size: 1rem;
   font-weight: 500;
@@ -62,7 +69,7 @@ body {
 }
 
 .new-connection-button:hover {
-  background-color: #0056b3;
+  background-color: #e7e7e9;
 }
 
 /* Connection List Styles */
@@ -70,6 +77,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.connection-list.has-items {
+  margin-top: 2rem;
 }
 
 .connection-item {
@@ -102,6 +113,14 @@ body {
 .connection-name {
   font-weight: 500;
   color: #333;
+}
+
+.no-connections-message {
+  padding: 2rem;
+  text-align: center;
+  color: #666;
+  font-size: 1.1rem;
+  font-style: italic;
 }
 
 .connection-actions {
@@ -146,59 +165,83 @@ body {
 .edit-button:hover {
   color: #333;
 }
+
 .terminate-button {
   background: transparent;
   border: none;
   font-size: 1.25rem;
   cursor: pointer;
-  color: #c82333; /* a red color */
+  color: #c82333;
   padding: 0.25rem;
-  margin-left: 0.5rem; /* separate from the edit icon */
+  margin-left: 0.5rem;
   transition: color 0.2s;
 }
 
-/* Slightly darker red on hover */
 .terminate-button:hover {
   color: #a71d2a;
 }
 
-/* Sub-connections Styles */
-.sub-connections {
-  background-color: rgba(0, 0, 0, 0.02);
+/* Streaming Status Styles */
+.stream-data {
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #333;
   padding: 1rem 1.5rem;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
 }
 
-.sub-connection-item {
+.streaming-status-checking {
+  color: #6c757d;
+  font-style: italic;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 1rem;
-  margin: 0.25rem 0;
-  background-color: white;
-  border-radius: 4px;
+  gap: 8px;
 }
 
-.sub-connection-name {
-  font-size: 0.875rem;
-  color: #666;
+.loading-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #dee2e6;
+  border-top: 2px solid #6c757d;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
-.sub-connection-status {
-  font-size: 0.75rem;
-  padding: 0.125rem 0.5rem;
-  border-radius: 3px;
-  text-transform: capitalize;
+.streaming-status-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.sub-connection-status.connected {
-  background-color: #d4edda;
-  color: #155724;
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
 }
 
-.sub-connection-status.pending {
-  background-color: #fff3cd;
-  color: #856404;
+.status-indicator.active {
+  background-color: #28a745;
+  box-shadow: 0 0 8px rgba(40, 167, 69, 0.4);
+}
+
+.status-indicator.inactive {
+  background-color: #dc3545;
+}
+
+.streaming-status-text {
+  color: #28a745;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.streaming-status-text.inactive {
+  color: #dc3545;
+}
+
+.streaming-status-subtitle {
+  font-size: 12px;
+  color: #6c757d;
+  margin-top: 2px;
 }
 
 /* Modal Styles */
@@ -279,11 +322,16 @@ body {
 .form-input,
 .form-select,
 .form-textarea {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
+  font-family: inherit;
   font-size: 1rem;
+  color: #374151;
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  line-height: 1.5;
+  width: 100%;
+  box-sizing: border-box;
   transition: border-color 0.2s;
 }
 
@@ -306,6 +354,20 @@ body {
   font-size: 0.875rem;
 }
 
+.form-textarea.disabled {
+  background-color: #f1f3f5;
+  color: #495057;
+  cursor: not-allowed;
+}
+
+.form-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg fill='%236b7280' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.25 7.5L10 12.25 14.75 7.5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1em;
+}
+
 .error-message {
   color: #dc3545;
   font-size: 0.875rem;
@@ -313,134 +375,6 @@ body {
   display: block;
 }
 
-.form-select {
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 20 20' fill='gray' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill-rule='evenodd' d='M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.7-3.7a.75.75 0 011.08 1.04l-4.24 4.24a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z' clip-rule='evenodd'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.75rem center;
-  background-size: 1rem;
-}
-
-/* Button Styles */
-.configure-button-full,
-.save-button-full {
-  width: 100%;
-  padding: 0.875rem;
-  border: none;
-  border-radius: 6px;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.configure-button-full {
-  background-color: #007bff;
-  color: white;
-}
-
-.configure-button-full:hover {
-  background-color: #0056b3;
-}
-
-.save-button-full {
-  background-color: #28a745;
-  color: white;
-  margin-top: 1rem;
-}
-
-.save-button-full:hover {
-  background-color: #218838;
-}
-
-/* File Upload Styles */
-.file-upload-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.file-input {
-  display: none;
-}
-
-.file-upload-button {
-  padding: 0.5rem 1rem;
-  background-color: #6c757d;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.875rem;
-  transition: background-color 0.2s;
-}
-
-.file-upload-button:hover {
-  background-color: #5a6268;
-}
-
-.file-name {
-  color: #666;
-  font-size: 0.875rem;
-}
-
-/* Button Group Styles */
-.button-group {
-  display: flex;
-  gap: 1rem;
-  margin: 1.5rem 0;
-}
-
-.populate-button,
-.validate-button {
-  flex: 1;
-  padding: 0.75rem;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.populate-button {
-  background-color: #17a2b8;
-  color: white;
-}
-
-.populate-button:hover {
-  background-color: #138496;
-}
-
-.validate-button {
-  background-color: #6c757d;
-  color: white;
-}
-
-.validate-button:hover {
-  background-color: #5a6268;
-}
-
-.validate-button.valid {
-  background-color: #28a745;
-}
-
-/* Status Message Styles */
-.status-message {
-  padding: 0.75rem;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-  text-align: center;
-  font-size: 0.875rem;
-}
-
-.status-message.success {
-  background-color: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
-}
-
-/* Error Message Box */
 .error-message-box {
   background-color: #f8d7da;
   border: 1px solid #f5c6cb;
@@ -463,12 +397,135 @@ body {
   white-space: pre-wrap;
   margin: 0;
 }
-.no-connections-message {
-  padding: 2rem;
-  text-align: center;
+
+/* Button Styles */
+.button-group {
+  display: flex;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.button-group.small {
+  gap: 0.5rem;
+  justify-content: space-evenly;
+  margin-top: 1rem;
+}
+
+.small-button {
+  flex: none;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  min-width: 120px;
+}
+
+.save-button.small-button {
+  background-color: #28a745;
+  color: white;
+}
+
+.save-button.small-button:disabled {
+  background-color: #94d3a2;
+  cursor: not-allowed;
+}
+
+.save-button.small-button:hover:enabled {
+  background-color: #218838;
+}
+
+/* File Upload Styles */
+.file-upload-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+}
+
+.file-input {
+  display: none;
+}
+
+.file-upload-button.small-button {
+  background-color: white;
+  color: black;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+}
+
+.file-upload-button.small-button:hover {
+  background-color: #e9ecef;
+}
+
+.file-name {
   color: #666;
-  font-size: 1.1rem;
-  font-style: italic;
+  font-size: 0.875rem;
+}
+
+/* Segmented Control for Topic Family */
+.segmented-control {
+  display: flex;
+  background-color: #f1f3f5;
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+.segmented-control input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.segmented-control label {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  font-weight: 500;
+  color: #495057;
+  transition: background-color 0.15s, color 0.15s;
+  background: transparent;
+  margin: 0;
+}
+
+.segmented-control label:first-of-type {
+  border-top-left-radius: 0.375rem;
+  border-bottom-left-radius: 0.375rem;
+}
+
+.segmented-control label:last-of-type {
+  border-top-right-radius: 0.375rem;
+  border-bottom-right-radius: 0.375rem;
+}
+
+.segmented-control label:hover {
+  background-color: #ffffff;
+  border: 0.1px solid #c7c7c7;
+  border-radius: 0.375rem;
+}
+
+.segmented-control input:checked + label {
+  background-color: #ffffff;
+  color: #000000;
+  border: 0.1px solid #c7c7c7;
+  border-radius: 0.375rem;
+}
+
+/* Edit MQTT button */
+.edit-mqtt-button {
+  margin-top: 0.5rem;
+  background: white;
+  border: 1px solid #ced4da;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.edit-mqtt-button:hover {
+  background: #e9ecef;
 }
 
 /* Responsive Design */
@@ -485,54 +542,4 @@ body {
   .button-group {
     flex-direction: column;
   }
-
-  .populate-button,
-  .validate-button {
-    width: 100%;
-  }
-}
-
-.radio-group {
-  display: flex;
-  gap: 1rem; /* space between each option */
-  align-items: center;
-}
-
-.radio-label {
-  display: flex;
-  align-items: center;
-}
-
-.radio-label input {
-  margin-right: 0.25rem; /* space between the dot and the text */
-}
-
-/* 1. Base styles shared with inputs & textarea */
-.form-input,
-.form-textarea,
-.form-select {
-  font-family: inherit;
-  font-size: 1rem;
-  color: #374151; /* same text color */
-  background-color: #ffffff; /* same background */
-  border: 1px solid #d1d5db; /* same border */
-  border-radius: 0.375rem; /* same corner radius */
-  padding: 0.5rem 0.75rem; /* same padding */
-  line-height: 1.5;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-/* 2. Tweak the select’s native arrow */
-.form-select {
-  appearance: none;
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg fill='%236b7280' xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.25 7.5L10 12.25 14.75 7.5z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.75rem center;
-  background-size: 1em;
-}
-
-/* 3. Add some spacing below the dropdown like your other fields */
-.form-group + .form-group {
-  margin-top: 1rem;
 }
