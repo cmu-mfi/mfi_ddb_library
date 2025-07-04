@@ -64,8 +64,10 @@ class MTconnectDataAdapter(BaseDataAdapter):
                     
     def get_data(self):
         raw_data = self.__request_agent('current')
-
-        component_stream = raw_data.MTConnectStreams.Streams.DeviceStream.ComponentStream
+        devices = raw_data.MTConnectStreams.Streams.DeviceStream
+        device = devices[0] if isinstance(devices, omegaconf.listconfig.ListConfig) else devices
+        
+        component_stream = device.ComponentStream
         if not isinstance(component_stream, omegaconf.listconfig.ListConfig):
             component_stream = [component_stream]
             
@@ -73,8 +75,10 @@ class MTconnectDataAdapter(BaseDataAdapter):
     
     def update_data(self):
         raw_data = self.__request_agent('sample')
+        devices = raw_data.MTConnectStreams.Streams.DeviceStream
+        device = devices[0] if isinstance(devices, omegaconf.listconfig.ListConfig) else devices
         
-        component_stream = raw_data.MTConnectStreams.Streams.DeviceStream.ComponentStream
+        component_stream = device.ComponentStream
         if not isinstance(component_stream, omegaconf.listconfig.ListConfig):
             component_stream = [component_stream]
         
