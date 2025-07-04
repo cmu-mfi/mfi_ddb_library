@@ -85,7 +85,7 @@ class MqttSpb:
             component_attr = attributes[component_id]
             component_attr = self._topic_family.process_attr(component_attr)
             if not self.__check_attributes(component_attr):
-                raise Exception(f"{self.topic_family_name} not compatible with MqttSpb")
+                raise Exception(f"{self._topic_family.topic_family_name} not compatible with MqttSpb")
             for key in component_attr.keys():
                 self._components[component_id].attributes.set_value(key, component_attr[key])
                 
@@ -117,7 +117,7 @@ class MqttSpb:
                 print(f"Data not found for component {component_id}")
                 continue
             elif not self.__check_data(input_values):
-                raise Exception(f"{self.topic_family_name} not compatible with MqttSpb")
+                raise Exception(f"{self._topic_family.topic_family_name} not compatible with MqttSpb")
                       
             for key in input_values.keys():
                 # TODO: Add the fix below to the custom mqtt_spb_wrapper class

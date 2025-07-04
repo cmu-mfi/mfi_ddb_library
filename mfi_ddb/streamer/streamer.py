@@ -39,7 +39,15 @@ class Streamer(Observer):
         self.__client = globals()[TOPIC_CLIENTS[topic_family_name][0]](config, topic_family)
         self.__data_adp = data_adp        
         self.__client.connect(data_adp.component_ids)
+
         self.__data_adp.get_data()
+        print("WARNING: Waiting for birth data to be populated in the data adapter for all components...")
+        while any(not bool(value) for value in self.__data_adp.data.values()):
+            time.sleep(0.1)
+            self.__data_adp.get_data()
+        
+        print("Birth data populated in the data adapter for all components.")
+
         
         # 2. initialize the key-value metadata and respective topic family client
         # `````````````````````````````````````````````````````````````````````````
@@ -59,7 +67,7 @@ class Streamer(Observer):
 
         # 3. publish the key-value metadata birth message with initial data
         # `````````````````````````````````````````````````````````````````````````
-        
+                
         kv_client.set_death_payload("metadata", {'death': kv_payload})
         kv_client.connect(['metadata'])
         

@@ -112,7 +112,6 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
         payload = self.__autotype(payload)
         print(f"Received message on topic {topic}: {payload}")
         
-        
         # extract key to store the message in the data dictionary
         data = {}
         subscription_topic = self.attributes[component_id]['topic']
@@ -125,10 +124,12 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
         else:
             subtopic = 'data'
         
-        data[subtopic] = payload
+        if not isinstance(payload, dict):
+            data[subtopic] = payload
+        else:
+            data = self.__extract_key_value(payload, subtopic)
         if len(self.buffer_data[component_id]) >= self.queue_size:
             self.buffer_data[component_id].pop(0)
-        
         
         self.buffer_data[component_id].append(data)
         self._notify_observers({component_id: data})
@@ -136,7 +137,22 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
     def __autotype(self, value):
         for cast in (int, float, eval):
             try:
-                return cast(value)
-            except (ValueError, SyntaxError, TypeError):
+                if cast is eval:
+                    return eval(value.replace("true", "True").replace("false", "False"))
+                else:
+                    return cast(value)
+            except:
                 continue
+
         return value
+    
+    def __extract_key_value(self, data_item, data_item_key):
+        if isinstance(data_item, dict):
+            for key in data_item.keys():
+                substitute_key = key
+                return self.__extract_key_value(data_item[key], f'{data_item_key}/{substitute_key}')
+        elif isinstance(data_item, list):
+            for i, item in enumerate(data_item):
+                return self.__extract_key_value(item, f'{data_item_key}_{i}')
+        else:
+            return {data_item_key: self.__autotype(data_item)}
