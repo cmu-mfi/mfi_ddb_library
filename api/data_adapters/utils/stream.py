@@ -2,7 +2,7 @@ import time
 import json
 import threading
 import asyncio
-from fastapi import HTTPException
+from fastapi import HTTPException, Form
 from mfi_ddb.streamer import Streamer
 from mfi_ddb.data_adapters.mtconnect import MTconnectDataAdapter
 from mfi_ddb.data_adapters.mqtt import MqttDataAdapter
@@ -37,10 +37,8 @@ async def event_stream(adapter, rate):
 
     while True:
         try:
-            # Pull in any new file events
             adapter.get_data()
 
-            # Check for any non-empty component payload
             if any(adapter._data.values()):
                 payload = {
                     "data": adapter._data,
@@ -60,7 +58,6 @@ async def event_stream(adapter, rate):
             counter += 1
 
         except Exception as e:
-            # If something blows up, stream an error but keep going
             err = {
                 "error": str(e),
                 "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -70,47 +67,35 @@ async def event_stream(adapter, rate):
             yield f"data: {json.dumps(err)}\n\n"
             counter += 1
 
-        # throttle to your configured rate
         await asyncio.sleep(1 / rate)
-    """
-    SSE endpoint: spins up the Streamer.poll_and_stream_data loop in
-    a background thread, registers an Observer callback that pushes
-    each data update into an asyncio.Queue, and then yields those
-    updates to the client as SSE 'data:' messages.
+
+    # The following is an alternate SSE mode using Streamer + Observer
+    # (left here in case you need it later)
     """
     loop  = asyncio.get_running_loop()
     queue = asyncio.Queue()
-
-    # Build a minimal config for Streamer so it connects but does NOT re-publish
     cfg          = getattr(adapter, 'cfg', {})
     topic_family = cfg.get('topic_family', '')
     mqtt_cfg     = cfg.get('mqtt', {})
 
-    # Create the Streamer with stream_on_update=False so it won't
-    # re-publish to MQTT, but will still notify observers on each poll
     streamer = Streamer(
         {'topic_family': topic_family, 'mqtt': mqtt_cfg},
         adapter,
         stream_on_update=False
     )
 
-    # Register our callback to receive observer notifications
     def on_data(data: dict):
         loop.call_soon_threadsafe(queue.put_nowait, data)
 
-    # __observer is the Observer instance inside Streamer
     streamer._Streamer__observer.register(on_data)
 
-    # ─── Send one initial snapshot so the UI flips to Active immediately ───
     try:
         adapter.get_data()
         initial = getattr(adapter, '_data', None)
         loop.call_soon_threadsafe(queue.put_nowait, initial)
     except Exception as e:
         print("Error fetching initial data for SSE:", e)
-    # ────────────────────────────────────────────────────────────────────────
 
-    # Start polling in a daemon thread
     def poll_loop():
         streamer.poll_and_stream_data(polling_rate_hz=int(rate or 1))
 
@@ -118,7 +103,6 @@ async def event_stream(adapter, rate):
 
     counter = 0
     while True:
-        # Wait for the next data update
         data = await queue.get()
         payload = {
             'data':      data,
@@ -128,17 +112,27 @@ async def event_stream(adapter, rate):
         }
         yield f"data: {json.dumps(payload)}\n\n"
         counter += 1
+    """
 
 
-async def publish_once(mqtt_cfg, topic_family):
+async def publish_once(adapter_cfg: dict, topic_family: str):
     """
-    One-shot publish endpoint: uses the existing MqttDataAdapter + Streamer
-    to push a single snapshot to the broker.
+    One‐shot publish endpoint: push exactly one data update, then return.
     """
-    mqtt_adapter = MqttDataAdapter(mqtt_cfg.dict())
-    streamer      = Streamer(
-        mqtt_adapter.cfg,
-        mqtt_adapter,
-        topic_family=topic_family
+    # Instantiate the adapter with the full config dict
+    adapter = MqttDataAdapter(adapter_cfg)
+
+    # Pull a single snapshot
+    adapter.get_data()
+    snapshot = getattr(adapter, '_data', {})
+
+    # Publisher for its MQTT logic
+    publisher = Streamer(
+        {'topic_family': topic_family, 'mqtt': adapter_cfg['mqtt']},
+        adapter,
+        stream_on_update=False
     )
-    streamer.poll_and_stream_data()
+
+    # Publish each component once
+    for comp, payload in snapshot.items():
+        publisher._publish(comp, payload)

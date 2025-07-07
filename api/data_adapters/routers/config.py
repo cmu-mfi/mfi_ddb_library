@@ -16,10 +16,10 @@ ADAPTER_MAP = {
     'ros':       RosDataAdapter,
 }
 
-# In‐memory registries keyed by connection ID
-tmp_ADAPTERS  = {}   # id -> adapter instance
-tmp_STREAMERS = {}   # id -> Streamer or dummy True
-tmp_RATES     = {}   # id -> stream_rate
+# In-memory registries keyed by connection ID
+tmp_ADAPTERS  = {}
+tmp_STREAMERS = {}
+tmp_RATES     = {}
 
 
 def pick_protocol(cfg):
@@ -39,14 +39,13 @@ def pick_protocol(cfg):
 @router.post('/validate')
 async def validate(
     file: UploadFile = File(None),
-    text: str        = Form(None)
+    text: str = Form(None)
 ):
-    raw = (await file.read()).decode() if file else text
     cfg = await load_config(file, text)
     proto = pick_protocol(cfg)
     adapter_cfg = cfg.model_dump()
 
-    # Local‑files nested
+    # Local files nested
     if proto == 'file' and adapter_cfg.get('file') is None:
         adapter_cfg['file'] = {
             'watch_dir':        adapter_cfg.get('watch_dir'),
@@ -59,7 +58,7 @@ async def validate(
     if proto == 'mqtt':
         m = cfg.mqtt
         sub = f"mfi-v1.0-{m.topic_family}/{m.enterprise}/{m.site}/#"
-        adapter_cfg['topics']   = [ {'topic': sub, 'component_id': m.topic_family} ]
+        adapter_cfg['topics']   = [{'topic': sub, 'component_id': m.topic_family}]
         adapter_cfg['trial_id'] = None
 
     try:
@@ -72,7 +71,7 @@ async def validate(
 @router.post('/test')
 async def test(
     file: UploadFile = File(None),
-    text: str        = Form(None)
+    text: str = Form(None)
 ):
     cfg = await load_config(file, text)
     proto = pick_protocol(cfg)
@@ -89,7 +88,7 @@ async def test(
     if proto == 'mqtt':
         m = cfg.mqtt
         sub = f"mfi-v1.0-{m.topic_family}/{m.enterprise}/{m.site}/#"
-        adapter_cfg['topics']   = [ {'topic': sub, 'component_id': m.topic_family} ]
+        adapter_cfg['topics']   = [{'topic': sub, 'component_id': m.topic_family}]
         adapter_cfg['trial_id'] = None
 
     adapter = ADAPTER_MAP[proto](adapter_cfg)
@@ -103,7 +102,7 @@ async def test(
 async def connect(
     id: str = Path(..., description="Connection ID"),
     file: UploadFile = File(None),
-    text: str        = Form(None)
+    text: str = Form(None)
 ):
     cfg = await load_config(file, text)
     proto = pick_protocol(cfg)
@@ -120,35 +119,29 @@ async def connect(
     if proto == 'mqtt':
         m = cfg.mqtt
         sub = f"mfi-v1.0-{m.topic_family}/{m.enterprise}/{m.site}/#"
-        adapter_cfg['topics']   = [ {'topic': sub, 'component_id': m.topic_family} ]
+        adapter_cfg['topics']   = [{'topic': sub, 'component_id': m.topic_family}]
         adapter_cfg['trial_id'] = None
 
     # instantiate adapter
     adapter = ADAPTER_MAP[proto](adapter_cfg)
     tmp_ADAPTERS[id] = adapter
 
-    # store rate
-    rate = adapter_cfg['file']['stream_rate'] if proto == 'file' else getattr(cfg, proto).stream_rate
+    # store rate (MTConnect/file uses stream_rate; default 1 for MQTT)
+    if proto == 'file':
+        rate = adapter_cfg['file']['stream_rate']
+    elif proto == 'mtconnect':
+        rate = cfg.mtconnect.stream_rate
+    else:
+        rate = 1
     tmp_RATES[id] = rate
 
-    # streaming setup
-    if cfg.mqtt:
-        from mfi_ddb.streamer import Streamer
-        streamer = Streamer(
-            {'topic_family': cfg.mqtt.topic_family, 'mqtt': cfg.mqtt.model_dump()},
-            adapter,
-            stream_on_update=True
-        )
-        tmp_STREAMERS[id] = streamer
-    elif proto == 'file':
-        tmp_STREAMERS[id] = True
-    else:
-        tmp_STREAMERS[id] = None
+    # always use SSE-based streaming
+    tmp_STREAMERS[id] = True
 
     return {
         'connected': True,
         'protocol': proto,
-        'mqtt_streaming': bool(tmp_STREAMERS[id])
+        'streaming_via_sse': True
     }
 
 
@@ -156,23 +149,17 @@ async def connect(
 async def streaming_status(id: str = Path(...)):
     adapter = tmp_ADAPTERS.get(id)
     streamer = tmp_STREAMERS.get(id) is not None
-    
-    print(f"🔍 Status check for {id}:")
-    print(f"  - adapter: {adapter}")
-    print(f"  - streamer: {streamer}")
-    print(f"  - streamer type: {type(streamer)}")
-    
     return {
-        'adapter_connected': id in tmp_ADAPTERS and adapter is not None,
-        'is_streaming': bool(streamer),
-        'stream_rate': tmp_RATES.get(id),
+        'adapter_connected': adapter is not None,
+        'is_streaming':      streamer,
+        'stream_rate':       tmp_RATES.get(id)
     }
 
 
 @router.get('/stream/{id}')
 async def stream(id: str = Path(...)):
     adapter = tmp_ADAPTERS.get(id)
-    rate    = tmp_RATES.get(id)
+    rate = tmp_RATES.get(id)
     if not adapter or rate is None:
         raise HTTPException(400, "Must call /config/connect first")
     return StreamingResponse(
@@ -184,11 +171,18 @@ async def stream(id: str = Path(...)):
 @router.post('/publish')
 async def publish(
     background_tasks: BackgroundTasks,
-    file: UploadFile  = File(None),
-    text: str         = Form(None),
+    file: UploadFile = File(None),
+    text: str = Form(None),
     topic_family: str = Form(...)
 ):
     cfg = await load_config(file, text)
-    mqtt_cfg = cfg.mqtt.model_dump() if cfg.mqtt else {}
-    background_tasks.add_task(publish_once, mqtt_cfg, topic_family)
+    if cfg.mqtt is None:
+        raise HTTPException(400, "Publish requires an mqtt: section in your YAML")
+
+    adapter_cfg = cfg.model_dump()
+    m = cfg.mqtt
+    sub = f"mfi-v1.0-{m.topic_family}/{m.enterprise}/{m.site}/#"
+    adapter_cfg['topics']   = [{'topic': sub, 'component_id': m.topic_family}]
+    adapter_cfg['trial_id'] = None
+    background_tasks.add_task(publish_once, adapter_cfg, topic_family)
     return {'published': True}

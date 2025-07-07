@@ -20,14 +20,6 @@ const TOPIC_FAMILIES = [
 ];
 
 const EXAMPLE_CONFIGS = {
-  // MTConnect: {
-  //   configuration: `mtconnect:
-  // agent_ip: 192.168.1.100
-  // agent_url: 'http://192.168.1.100:8082/'
-  // trial_id: 'haas_online'
-  // stream_rate: 10
-  // device_name: 'haascnc'`,
-  // },
   MTConnect: {
     configuration: `mtconnect:
   agent_ip: 8.8.8.8
@@ -47,10 +39,10 @@ subscription:
   },
   "MQTT-ADP": {
     configuration: `mqtt:
-  broker_address: 128.128.128.128
+  broker_address: 128.237.92.30
   broker_port: 1883
   username: admin
-  password: password
+  password: CMUmfi2024!
 
 trial_id: 'proj_zbc0505'
 queue_size: 10
@@ -96,26 +88,15 @@ devices:
   },
 };
 
-// function makeDefaultMqttConfig() {
-//   return `mqtt:
-//   broker_address: 128.128.128.128
-//   broker_port: 1883
-//   enterprise: Mill-19-test
-//   site: HAAS-UMC750
-//   username: admin
-//   password: password
-//   tls_enabled: False
-//   debug: True`;
-// }
 function makeDefaultMqttConfig() {
   return `mqtt:
-  broker_address: broker.emqx.io
+  broker_address: 128.237.92.30
   broker_port: 1883
   enterprise: test-enterprise
   site: test-site
-  username: 
-  password: 
-  tls_enabled: False
+  username: admin
+  password: CMUmfi2024!
+  tls_enabled: True
   debug: True`;
 }
 
@@ -166,11 +147,10 @@ export default function ConnectionModal({
       const value = trimmed
         .substring(colonIndex + 1)
         .trim()
-        .replace(/["']/g, "");
+        .replace(/['"]/g, "");
 
-      if (!value) return; // Skip empty values
+      if (!value) return;
 
-      // Validate IP addresses or domain names
       if (
         (key === "broker_address" ||
           key.endsWith("_ip") ||
@@ -187,7 +167,6 @@ export default function ConnectionModal({
         );
       }
 
-      // Validate URLs
       if (
         (key.includes("url") || key === "endpoint") &&
         value &&
@@ -196,7 +175,6 @@ export default function ConnectionModal({
         errs.push(`Line ${index + 1}: "${key}" has invalid URL format`);
       }
 
-      // Validate ports
       if ((key === "broker_port" || key.includes("port")) && value) {
         if (
           !portRx.test(value) ||
@@ -267,7 +245,6 @@ export default function ConnectionModal({
     setSelectedFile(null);
     setIsSubmitting(false);
 
-    // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -278,7 +255,7 @@ export default function ConnectionModal({
     if (isOpen && (connectionType || topicFamily || configuration)) {
       const timeoutId = setTimeout(() => {
         validateForm();
-      }, 100); // Small delay to ensure state updates are complete
+      }, 100);
 
       return () => clearTimeout(timeoutId);
     }
@@ -287,19 +264,13 @@ export default function ConnectionModal({
   // === HANDLERS ===
   const handleTypeChange = useCallback((e) => {
     const selectedType = e.target.value;
-    console.log("Selected connection type:", selectedType); // Debug log
     setConnectionType(selectedType);
-
-    // Set example configuration if available
     const exampleConfig = EXAMPLE_CONFIGS[selectedType];
-    console.log("Example config for", selectedType, ":", exampleConfig); // Debug log
     if (exampleConfig && exampleConfig.configuration) {
       setConfiguration(exampleConfig.configuration);
     } else {
       setConfiguration("");
     }
-
-    // Reset topic family when changing connection type
     setTopicFamily("");
     setMqttConfig(makeDefaultMqttConfig());
     setError(null);
@@ -355,27 +326,21 @@ export default function ConnectionModal({
 
     try {
       let combinedConfig;
-      let mqttWithTopicFamily = null; // ✅ Define at the start
+      let mqttWithTopicFamily = null;
+      const rootTopicLine = `topic_family: ${topicFamily}\n\n`;
 
-      if (connectionType === "Local Files") {
-        // For Local Files, add MQTT with topic_family inside the mqtt section
-        if (mqttConfig.trim()) {
-          mqttWithTopicFamily = mqttConfig.replace(
-            "mqtt:",
-            `mqtt:\n  topic_family: ${topicFamily}`
-          );
-          combinedConfig = `${configuration}\n\n${mqttWithTopicFamily}`;
-        } else {
-          combinedConfig = configuration;
-        }
-      } else {
-        // For other protocols (MTConnect, etc.), use original logic
+      if (mqttConfig.trim()) {
         mqttWithTopicFamily = mqttConfig.replace(
           "mqtt:",
           `mqtt:\n  topic_family: ${topicFamily}`
         );
-        combinedConfig = `${configuration}\n\n${mqttWithTopicFamily}`;
       }
+
+      // Build combinedConfig with root-level topic_family always
+      combinedConfig =
+        rootTopicLine +
+        `${configuration}` +
+        (mqttWithTopicFamily ? `\n\n${mqttWithTopicFamily}` : "");
 
       console.log("Sending combined configuration:", combinedConfig);
 
@@ -387,20 +352,21 @@ export default function ConnectionModal({
 
       setStep("connect");
       await callConfig(`/config/connect/${connId}`, { text: combinedConfig });
-
-      // If all steps pass, save the configuration
+      await callConfig("/config/publish", {
+        text: combinedConfig,
+        topicFamily,
+      });
       onSave({
         id: connId,
         type: connectionType,
         topicFamily,
-        configuration: configuration,
-        mqttConfig: mqttWithTopicFamily, // ✅ Now properly defined
+        configuration,
+        mqttConfig: mqttWithTopicFamily,
       });
       onClose();
     } catch (err) {
       console.error(`Error during ${step}:`, err);
-      const errorMessage = err.message || String(err);
-      setError(`Failed at ${step} step: ${errorMessage}`);
+      setError(`Failed at ${step} step: ${err.message || err}`);
     } finally {
       setStep("");
       setIsSubmitting(false);
@@ -409,22 +375,19 @@ export default function ConnectionModal({
     validateForm,
     isSubmitting,
     configuration,
-    step,
     connectionType,
     topicFamily,
     mqttConfig,
+    connId,
     onSave,
     onClose,
-    connId,
+    step,
   ]);
 
   const handleClose = useCallback(() => {
-    if (!isSubmitting) {
-      onClose();
-    }
+    if (!isSubmitting) onClose();
   }, [isSubmitting, onClose]);
 
-  // === RENDER ===
   return (
     <Modal
       isOpen={isOpen}
