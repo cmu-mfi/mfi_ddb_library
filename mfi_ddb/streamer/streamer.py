@@ -1,5 +1,7 @@
 import json
 import os
+import copy
+import sys
 import platform
 import socket
 import time
@@ -29,14 +31,14 @@ class Streamer(Observer):
         
         # 1. initialize the data adapter and respective topic family client
         # `````````````````````````````````````````````````````````````````````````
-        self.cfg = config
+        self.cfg = copy.deepcopy(config)
         topic_family_name = config['topic_family']
         
         if topic_family_name not in TOPIC_CLIENTS:
             raise ConfigError(f"Invalid topic family: {topic_family_name}")
         
         topic_family = globals()[TOPIC_CLIENTS[topic_family_name][1]]()
-        self.__client = globals()[TOPIC_CLIENTS[topic_family_name][0]](config, topic_family)
+        self.__client = globals()[TOPIC_CLIENTS[topic_family_name][0]](self.cfg, topic_family)
         self.__data_adp = data_adp        
         self.__client.connect(data_adp.component_ids)
 
@@ -54,9 +56,9 @@ class Streamer(Observer):
         trial_id = str(self.__data_adp.cfg.get('trial_id', None))
         kv_topic_family = globals()[TOPIC_CLIENTS['kv'][1]]()
         blob_topic_family = globals()[TOPIC_CLIENTS['blob'][1]]()
-        kv_client = globals()[TOPIC_CLIENTS['kv'][0]](config, kv_topic_family)
-        blob_client = globals()[TOPIC_CLIENTS['blob'][0]](config, blob_topic_family)
-        
+        kv_client = globals()[TOPIC_CLIENTS['kv'][0]](copy.deepcopy(config), kv_topic_family)
+        blob_client = globals()[TOPIC_CLIENTS['blob'][0]](copy.deepcopy(config), blob_topic_family)
+
         kv_payload = self.__generate_birth_kv_payload(self.__data_adp)
         blob_birth_payload = get_blob_json_payload_from_dict(data = kv_payload,
                                                              file_name = f'{trial_id}_metadata_birth.json',
@@ -119,6 +121,17 @@ class Streamer(Observer):
         
     def __generate_birth_kv_payload(self, data_adp: BaseDataAdapter) -> dict:
         
+        sample_data = copy.deepcopy(self.__data_adp.data)
+        sample_data_size = sys.getsizeof(str(sample_data))
+        
+        # drop keys until the size is less than 32768 bytes
+        # since total size of payload <= 65536 bytes
+        # ref: error with paho-mqtt: "struct.error: 'H' format requires 0 <= number <= 65535"
+        while sample_data_size > 32768:
+            # remove the last key
+            sample_data.popitem()
+            sample_data_size = sys.getsizeof(str(sample_data))
+        
         payload = {
             "time": {
                 "birth": datetime.now().isoformat()
@@ -132,7 +145,7 @@ class Streamer(Observer):
                 "config": self.__data_adp.cfg,
                 "component_ids": self.__data_adp.component_ids,
                 "attributes": self.__data_adp.attributes,
-                "sample_data": self.__data_adp.data,
+                "sample_data": sample_data,
             },
             "broker": self.__client.cfg            
         }         
