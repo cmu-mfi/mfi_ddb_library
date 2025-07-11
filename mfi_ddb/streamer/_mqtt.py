@@ -70,7 +70,7 @@ class Mqtt:
         # LAST WILL AND TESTAMENT
         self.__set_last_will()        
 
-        self.client.connect(mqtt_host, mqtt_port, 300)
+        self.client.connect(mqtt_host, mqtt_port, 60)
         self.client.loop_start()
 
         while not self.client.is_connected():
