@@ -1,0 +1,6 @@
+{
+  "@context": "https://example.org/semantic-schema/core/context.jsonld",
+  "project_id": "urn:uuid:3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "trial_id":   "run-A1",
+  "extension":  "https://example.org/semantic-schema/extensions/am-waam/context.jsonld" 
+}
