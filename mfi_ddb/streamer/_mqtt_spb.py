@@ -8,6 +8,7 @@ from mfi_ddb.topic_families.base import BaseTopicFamily
 from mfi_ddb.utils.exceptions import ConfigError
 
 MAX_ARRAY_SIZE = 16
+MAX_STRING_LENGTH = 255
 
 class MqttSpb:
     def __init__(self, config: dict, topic_family: BaseTopicFamily) -> None:
@@ -140,6 +141,9 @@ class MqttSpb:
             if type(data[key]) == list:
                 if len(data[key]) > MAX_ARRAY_SIZE:
                     return False
+            if type(data[key]) == str:
+                if len(data[key]) > 255:
+                    data[key] = data[key][:255]  # Truncate string to 255 characters
         return True
     
     def set_death_payload(self, topic: str, payload: str, qos: int = 0, retain: bool = False):
