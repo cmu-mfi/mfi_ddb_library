@@ -1,4 +1,4 @@
-# MFI DDB Library v2.0
+# MFI DDB Library
 
 Library to stream data to Digital Data Backend (DDB) for the MFI project.
 
