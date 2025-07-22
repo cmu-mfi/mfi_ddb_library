@@ -70,12 +70,12 @@ class Mqtt:
         # LAST WILL AND TESTAMENT
         self.__set_last_will()        
 
-        self.client.connect(mqtt_host, mqtt_port, 5)
-        
+        self.client.connect(mqtt_host, mqtt_port, 60)
+        self.client.loop_start()
         while not self.client.is_connected():
             print("Connecting to MQTT broker...")
             time.sleep(1)
-            self.client.loop_start()
+            
 
         self._components = component_ids
         

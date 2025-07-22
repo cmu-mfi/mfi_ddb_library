@@ -1,71 +1,85 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
+# MTConnect adapter configuration
 class MTConnectConfig(BaseModel):
-    agent_ip: str
-    agent_url: str
-    stream_rate: float = Field(1.0, gt=0)
-    device_name: Optional[str]
-    trial_id: Optional[str]
+    agent_ip: str  # Agent IP address
+    agent_url: str  # Agent URL
+    stream_rate: float = Field(1.0, gt=0)  # Polling rate in seconds (>0)
+    device_name: Optional[str] = None  # Optional device identifier
+    trial_id: Optional[str] = None  # Optional trial ID
 
+# MQTT broker connection settings
 class MQTTConfig(BaseModel):
-    broker_address: str
-    broker_port: int
-    enterprise: str
-    site: str
-    username: Optional[str] = None
-    password: Optional[str] = None
-    tls_enabled: bool = False
-    debug: bool = False
+    broker_address: str  # Broker host/IP
+    broker_port: int  # Broker port
+    enterprise: str  # Organization name
+    site: str  # Site/facility name
+    username: Optional[str] = None  # Auth username
+    password: Optional[str] = None  # Auth password
+    tls_enabled: bool = False  # Enable TLS encryption
+    debug: bool = False  # Enable debug logging
 
-from pydantic import BaseModel, Field
-from typing import Optional, List
-
-class MTConnectConfig(BaseModel):
-    agent_ip: str
-    agent_url: str
-    stream_rate: float = Field(1.0, gt=0)
-    device_name: Optional[str]
-    trial_id: Optional[str]
-
-class MQTTConfig(BaseModel):
-    broker_address: str
-    broker_port: int
-    enterprise: str
-    site: str
-    topic_family: str
-    username: Optional[str]
-    password: Optional[str]
-    tls_enabled: bool = False
-    debug: bool = False
-
-class SystemConfig(BaseModel):
-    name: str
+class Topic(BaseModel):
+    topic: str
+    component_id: str
+    trial_id: Optional[str] = None
+class MQTTAdapConfig(BaseModel):
+    broker_address: str  # Adapter host/IP
+    broker_port: int  # Adapter port
+    username: Optional[str] = None  # Auth username
+    password: Optional[str] = None  # Auth password
     trial_id: str
-    description: Optional[str] = None
-    type: Optional[str] = None
+    queue_size: int = Field(..., gt=0, description="max number of messages to buffer")
+    topics: List[Topic]
+# Common system metadata
+class SystemConfig(BaseModel):
+    name: str  # System name
+    trial_id: str  # Trial/experiment ID
+    description: Optional[str] = None  # Optional description
+    type: Optional[str] = None  # Optional system type
 
+# File system adapter config
 class FileConfig(BaseModel):
-    watch_dir: List[str]
-    stream_rate: float = Field(1.0, gt=0)
-    wait_before_read: Optional[int] = 1
-    buffer_size: Optional[int] = 10
-    system: SystemConfig
+    watch_dir: List[str]  # Directories to monitor
+    wait_before_read: Optional[int] = 1  # Seconds after file creation
+    buffer_size: Optional[int] = 10  # File buffer count
+    system: SystemConfig  # System metadata
 
+# ROS device attributes
+class ROSDeviceAttributes(BaseModel):
+    description: str  # Device description
+    type: str  # Device type (e.g., "Robot")
+    version: float  # Device version
+    trial_id: Optional[str] = None  # Optional trial ID override
+
+# ROS device configuration
+class ROSDevice(BaseModel):
+    namespace: str  # ROS namespace for the device
+    rostopics: List[str]  # List of ROS topics to subscribe to
+    attributes: ROSDeviceAttributes  # Device metadata
+
+# ROS adapter configuration (live ROS connections)
 class ROSConfig(BaseModel):
-    ros_topic: str
-    ros_master_uri: str
-    stream_rate: float = Field(1.0, gt=0)
+    trial_id: str  # Trial/experiment identifier
+    set_ros_callback: bool = False  # Enable ROS callback mode
+    devices: Dict[str, ROSDevice]  # Named device configurations
 
+# ROS Files adapter configuration (bag file processing)
+class ROSFilesConfig(BaseModel):
+    trial_id: str  # Trial/experiment identifier
+    set_ros_callback: bool = False  # Enable ROS callback mode
+    devices: Dict[str, ROSDevice]  # Named device configurations
+    
+
+# Main config model (supports all adapters)
 class FullConfig(BaseModel):
+    # Nested configurations
     mtconnect: Optional[MTConnectConfig] = None
     mqtt: Optional[MQTTConfig] = None
-    file: Optional[FileConfig] = None
+    file: Optional[FileConfig] = None 
     ros: Optional[ROSConfig] = None
+    ros_files: Optional[ROSFilesConfig] = None
     
-    # Top-level fields for flat Local Files structure
-    watch_dir: Optional[List[str]] = None
-    system: Optional[SystemConfig] = None
-    wait_before_read: Optional[int] = None
-    buffer_size: Optional[int] = None
-    topic_family: Optional[str] = None  # ✅ Add topic_family at root level
+
+    topic_family: Optional[str] = None

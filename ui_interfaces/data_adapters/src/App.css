@@ -154,7 +154,6 @@ body {
 
 .edit-button {
   background: transparent;
-  border: none;
   font-size: 1.25rem;
   cursor: pointer;
   color: #666;
@@ -442,6 +441,7 @@ body {
   align-items: center;
   gap: 1rem;
   width: 100%;
+  margin-bottom: 1.5rem;
 }
 
 .file-input {
@@ -542,4 +542,235 @@ body {
   .button-group {
     flex-direction: column;
   }
+}
+
+.info-message {
+  background-color: rgb(255, 242, 64);
+  font-style: italic;
+  padding: 0px 5px;
+  text-align: center;
+}
+/* Full Banner Connection Item Styles */
+.connection-item {
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.connection-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Full-width banner that changes color based on status */
+.connection-banner {
+  width: 100%;
+  padding: 16px 20px;
+  transition: all 0.3s ease;
+}
+
+.connection-banner.green {
+  background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+  border-left: 4px solid #28a745;
+}
+
+.connection-banner.red {
+  background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+  border-left: 4px solid #dc3545;
+}
+
+.connection-banner.checking {
+  background: linear-gradient(135deg, #e2e3e5 0%, #d6d8db 100%);
+  border-left: 4px solid #6c757d;
+}
+
+.banner-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.banner-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.banner-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+.banner-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px; /* Small gap between title and detail */
+}
+
+.banner-detail {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+}
+
+.connection-banner.green .banner-title {
+  color: #155724;
+}
+
+.connection-banner.green .banner-detail {
+  color: #0f5132;
+}
+
+.connection-banner.red .banner-title {
+  color: #721c24;
+}
+
+.connection-banner.red .banner-detail {
+  color: #58151c;
+}
+
+.connection-banner.checking .banner-title {
+  color: #383d41;
+}
+
+.connection-banner.checking .banner-detail {
+  color: #4b5563;
+}
+
+.banner-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.edit-button,
+.terminate-button {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  opacity: 0.8;
+}
+
+/* Hide old status elements completely */
+.stream-data,
+.streaming-status-container,
+.status-indicator,
+.streaming-status-text,
+.connection-main,
+.connection-status,
+.connection-actions {
+  display: none !important;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .banner-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .banner-actions {
+    align-self: flex-end;
+  }
+}
+
+.textarea-container {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+.help-button-inside {
+  position: absolute;
+  top: 8px;
+  right: 18px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid #ccc;
+  background: #f8f9fa;
+  color: #666;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.help-button-inside:hover,
+.help-button-inside:focus {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+  outline: none;
+}
+
+.help-button-inside:disabled {
+  background: #e9ecef;
+  color: #adb5bd;
+  cursor: not-allowed;
+}
+
+.help-tooltip {
+  position: absolute;
+  top: 30px;
+  right: 25px;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  max-width: 400px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.help-content {
+  margin: 0;
+  padding: 12px;
+  font-family: monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  background: #f8f9fa;
+}
+
+@media (max-width: 768px) {
+  .help-tooltip {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 90vw;
+    max-height: 70vh;
+  }
+}
+.help-field-line {
+  margin-bottom: 4px;
+}
+
+.help-field-name {
+  color: #dc3545;
+  font-weight: bold;
+  font-family: monospace;
+}
+
+.help-field-desc {
+  color: #333;
+  font-family: monospace;
+}
+
+.help-text {
+  font-family: monospace;
+  font-size: small;
+  color: gray;
 }

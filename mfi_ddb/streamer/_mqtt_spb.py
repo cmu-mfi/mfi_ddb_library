@@ -111,7 +111,7 @@ class MqttSpb:
                 print(f"{component_id} not initialized for MqttSpb. Hence skipping...")
                 continue
             
-            input_values = data[component_id]
+            input_values = data[component_id] 
             input_values = self._topic_family.process_data(input_values)
             if not bool(input_values):
                 print(f"Data not found for component {component_id}")

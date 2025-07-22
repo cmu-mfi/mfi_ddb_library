@@ -65,7 +65,13 @@ class MTconnectDataAdapter(BaseDataAdapter):
     def get_data(self):
         raw_data = self.__request_agent('current')
 
-        component_stream = raw_data.MTConnectStreams.Streams.DeviceStream.ComponentStream
+        # component_stream = raw_data.MTConnectStreams.Streams.DeviceStream.ComponentStream
+        # Handle both single device and multiple devices
+        # 
+        devices = raw_data.MTConnectStreams.Streams.DeviceStream
+        device = devices[0] if isinstance(devices, omegaconf.listconfig.ListConfig) else devices
+
+        component_stream = device.ComponentStream
         if not isinstance(component_stream, omegaconf.listconfig.ListConfig):
             component_stream = [component_stream]
             
@@ -73,8 +79,9 @@ class MTconnectDataAdapter(BaseDataAdapter):
     
     def update_data(self):
         raw_data = self.__request_agent('sample')
-        
-        component_stream = raw_data.MTConnectStreams.Streams.DeviceStream.ComponentStream
+        devices = raw_data.MTConnectStreams.Streams.DeviceStream
+        device = devices[0] if isinstance(devices, omegaconf.listconfig.ListConfig) else devices
+        component_stream = device.ComponentStream
         if not isinstance(component_stream, omegaconf.listconfig.ListConfig):
             component_stream = [component_stream]
         
@@ -84,14 +91,35 @@ class MTconnectDataAdapter(BaseDataAdapter):
     def __connect(self):
         # Ping to see if MTConnect agent is active -----------------------------------
         print("Checking if MTConnect agent is active ...")
+        # ──── HTTP CHECK (for web agents like Mazak) ────
+        # Comment out this section for edge device testing
+        try:
+            agent_url = self.cfg['mtconnect']['agent_url']
+            response = requests.get(f"{agent_url}current", timeout=5)
+            if response.status_code == 200:
+                print(f"MTConnect agent at {agent_url} is active (HTTP)")
+                return
+        except Exception as e:
+            print(f"HTTP check failed: {e}")
+        
+    # ──── PING CHECK (for edge devices) ────
         ip = self.cfg['mtconnect']['agent_ip']
         
         response = ping(ip)
+        attempts = 0
+        max_attempts = 10  # 30 second timeout
         
-        while response is None:
+        while response is None and attempts < max_attempts:
+            print(f"MTConnect agent not active. Waiting... ({attempts + 1}/{max_attempts})")
+        # while response is None:
             print("MTConnect agent is not active. Waiting ...")
             time.sleep(1)
             response = ping(ip)
+            attempts += 1
+        
+        if response is None:
+            raise Exception(f"MTConnect agent at {ip} not reachable after {max_attempts}s")
+    
         
         print(f"MTConnect agent at {ip} is active")    
         

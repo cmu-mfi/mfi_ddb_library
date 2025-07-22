@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import ConnectionList from "./components/ConnectionList";
 import ConnectionModal from "./components/ConnectionModal";
 import "./App.css";
@@ -62,6 +62,7 @@ const App = () => {
           c.id === current.editingId
             ? {
                 ...c,
+                id: data.id,
                 type: data.type,
                 name: data.type,
                 topicFamily: data.topicFamily,
