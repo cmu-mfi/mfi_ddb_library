@@ -64,4 +64,10 @@ if __name__ == '__main__':
     mqtt_sub.create_message_callback(
         topic, lambda message: callback(cfs_config, message))
 
-    mqtt_sub.client.loop_forever()
+    mqtt_sub.client.loop_start()
+    
+    while KeyboardInterrupt:
+        pass
+    
+    mqtt_sub.client.loop_stop()
+    mqtt_sub.client.disconnect()
