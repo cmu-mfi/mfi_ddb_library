@@ -6,6 +6,12 @@
 
 import React, { useState, useEffect } from "react";
 
+// Add API base URL configuration
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
+
+// Note: You'll also need to update ConnectionModal.jsx to use the same API_BASE_URL
+// for its callConfig function calls.
+
 /**
  * ConnectionItem component props:
  * @param {object} connection - Connection object with id, name, and status fields
@@ -25,7 +31,7 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
 
       try {
         const response = await fetch(
-          `/config/streaming-status/${connection.id}`,
+          `${API_BASE_URL}/config/streaming-status/${connection.id}`, // Use API_BASE_URL
           {
             signal: controller.signal,
             headers: { "Content-Type": "application/json" },
@@ -38,6 +44,7 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
         }
 
         const status = await response.json();
+        console.log(`Status for ${connection.id}:`, status); // Add debug logging
         setStreamingStatus(status);
       } catch (error) {
         clearTimeout(timeoutId);
@@ -52,9 +59,9 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
 
         // Set appropriate status based on error type
         setStreamingStatus({
-          is_streaming: false,
+          status: "inactive",
           adapter_connected: false,
-          broker_connected: false,
+          is_streaming: false,
           stream_rate: null,
           network_error: isNetworkError, // Add this flag
         });
@@ -68,24 +75,7 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
     return () => clearInterval(interval);
   }, [connection.id]);
 
-  // Effect: open SSE stream when streamingStatus.is_streaming becomes true
-  useEffect(() => {
-    if (!streamingStatus?.is_streaming) return;
-
-    // Create EventSource for real-time stream events
-    const es = new EventSource(`/config/stream/${connection.id}`);
-    es.onmessage = (e) => {
-      // Optionally process real-time data here
-      // const msg = JSON.parse(e.data);
-      // console.log(`Data for ${connection.name}:`, msg);
-    };
-
-    // Close SSE connection on cleanup
-    return () => es.close();
-  }, [streamingStatus, connection.id, connection.name]);
-
-  // Create a CSS-friendly class name from connection.status
-  // Determine full banner status and color
+  // Determine full banner status and color based on new API response format
   const getBannerStatus = () => {
     if (!streamingStatus) {
       return {
@@ -96,19 +86,23 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
     }
 
     const {
+      status,
+      reason,
       adapter_connected,
-      broker_connected,
       is_streaming,
       network_error,
       connection_error,
+      protocol,
     } = streamingStatus;
+
     if (network_error) {
       return {
         color: "red",
-        text: connection.type || "Server Unreachable",
+        text: protocol || connection.type || "Server Unreachable",
         detail: "Backend server is down or unreachable",
       };
     }
+
     if (connection_error) {
       // Categorize different types of errors for better user experience
       if (
@@ -118,7 +112,7 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
       ) {
         return {
           color: "red",
-          text: connection.type || "Broker Unreachable",
+          text: protocol || connection.type || "Broker Unreachable",
           detail: connection_error,
         };
       }
@@ -128,7 +122,7 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
       ) {
         return {
           color: "red",
-          text: connection.type || "Broker Disconnected",
+          text: protocol || connection.type || "Broker Disconnected",
           detail: connection_error,
         };
       }
@@ -138,53 +132,71 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
       ) {
         return {
           color: "red",
-          text: connection.type || "Auth Failed",
+          text: protocol || connection.type || "Auth Failed",
           detail: connection_error,
         };
       }
       // Generic connection error
       return {
         color: "red",
-        text: connection.type || "Connection Error",
+        text: protocol || connection.type || "Connection Error",
         detail: connection_error,
       };
     }
-    if (adapter_connected && broker_connected && is_streaming) {
+
+    // Use the status field from the new API response
+    if (status === "active") {
       return {
         color: "green",
-        text: connection.type || "Connected",
-        detail: `Active Streaming`,
+        text: protocol || connection.type || "Connected",
+        detail: reason || "Active Streaming",
       };
     }
 
-    // Any issue = RED banner with specific message
+    if (status === "inactive") {
+      return {
+        color: "red",
+        text: protocol || connection.type || "Inactive",
+        detail: reason || "Not streaming",
+      };
+    }
+
+    if (status === "starting") {
+      return {
+        color: "yellow",
+        text: protocol || connection.type || "Starting",
+        detail: reason || "Initializing stream",
+      };
+    }
+
+    // Fallback to old logic if status field not present
+    if (adapter_connected && is_streaming) {
+      return {
+        color: "green",
+        text: protocol || connection.type || "Connected",
+        detail: "Active Streaming",
+      };
+    }
+
     if (!adapter_connected) {
       return {
         color: "red",
-        text: connection.type || "Adapter Error",
-        detail: "Adapter Not streaming",
-      };
-    }
-
-    if (!broker_connected) {
-      return {
-        color: "red",
-        text: connection.type || "Broker Error",
-        detail: "MQTT broker unreachable",
+        text: protocol || connection.type || "Adapter Error",
+        detail: "Adapter not connected",
       };
     }
 
     if (!is_streaming) {
       return {
         color: "red",
-        text: connection.type || "Stream Error",
+        text: protocol || connection.type || "Stream Error",
         detail: "Inactive - No data streaming",
       };
     }
 
     return {
       color: "red",
-      text: connection.type || "Connection Issues",
+      text: protocol || connection.type || "Connection Issues",
       detail: "Unknown error state",
     };
   };
@@ -219,13 +231,19 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
                   e.stopPropagation();
                   if (
                     window.confirm(
-                      `Are you sure you want to remove "${connection.name}"?`
+                      `Are you sure you want to remove "${
+                        connection.name || connection.type
+                      }"?`
                     )
                   ) {
                     try {
-                      await fetch(`/config/disconnect/${connection.id}`, {
-                        method: "POST",
-                      });
+                      await fetch(
+                        `${API_BASE_URL}/config/disconnect/${connection.id}`,
+                        {
+                          // Use API_BASE_URL
+                          method: "POST",
+                        }
+                      );
                       console.log("Disconnected connection:", connection.id);
                     } catch (error) {
                       console.error("Disconnect failed:", error);
