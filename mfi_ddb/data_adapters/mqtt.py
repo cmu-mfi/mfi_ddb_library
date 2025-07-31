@@ -18,6 +18,17 @@ class _Mqtt:
         
         self.client : mqtt.Client = None
     
+    def disconnect(self):
+        """
+        Disconnect from the MQTT broker and clean up resources.
+        """
+        if self.client is not None:
+            self.client.loop_stop()
+            self.client.disconnect()
+            print("Disconnected from MQTT broker")
+        else:
+            print("No MQTT client to disconnect")
+
     def connect(self):
 
         mqtt_cfg = self.mqtt_cfg
@@ -50,9 +61,6 @@ class _Mqtt:
             
         if not self.client.is_connected():
             raise ConfigError(f"Could not connect to MQTT broker {mqtt_host} after {timeout} seconds.")
-                               
-    def disconnect(self):
-        pass
     
     def create_message_callback(self, topic, callback):
         self.client.subscribe(topic)
@@ -141,6 +149,10 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
         
         self.start_listening()
         print("MqttDataAdapter initialized")
+    
+    def disconnect(self):
+        _Mqtt.disconnect(self)
+        return super().disconnect()
     
     def get_data(self):
         for component_id in self.component_ids:

@@ -5,9 +5,17 @@ class BaseDataAdapter:
     Base class for data adapters. Use as a super class for the data adapters that will be used in the PullStreamToMqtt(Spb) and PushStreamToMqtt(Spb) classes.
     """
 
+    NAME = None
     CONFIG_EXAMPLE = None
     CONFIG_HELP = None
     RECOMMENDED_TOPIC_FAMILY = None
+    
+    class SCHEMA:
+        """
+        Schema for the data adapter configuration.
+        """
+        # Define the schema for the data adapter configuration here
+        pass
 
     def __init__(self, config: dict = None) -> None:
         self.component_ids = []
@@ -43,9 +51,9 @@ class BaseDataAdapter:
 
         self._observers = []  # List of observers (listeners)
 
-    def __del__(self):
+    def disconnect(self):
         """
-        Destructor to clean up resources.
+        Disconnect from the data source and clean up resources.
         """
         self.clear_data_buffer()
         self._data.clear()

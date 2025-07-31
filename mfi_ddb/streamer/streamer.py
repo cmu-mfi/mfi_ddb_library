@@ -89,10 +89,10 @@ class Streamer(Observer):
         if stream_on_update:
             self.__data_adp.add_observer(self)
     
-    def __del__(self):
+    def disconnect(self):
         try:
             self.__client.disconnect()
-            del self.__data_adp
+            self.__data_adp.disconnect()
             print("Client disconnected and data adapter deleted.")
             print("Streamer instance deleted. Bye! \u2764\uFE0F MFI")
         except Exception as e:
