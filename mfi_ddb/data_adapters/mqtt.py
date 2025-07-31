@@ -33,16 +33,23 @@ class _Mqtt:
             del self.mqtt_cfg['password']
         mqtt_tls_enabled = mqtt_cfg['tls_enabled'] if 'tls_enabled' in mqtt_cfg.keys() else False
         debug = mqtt_cfg['debug'] if 'debug' in mqtt_cfg.keys() else False
+        timeout = mqtt_cfg['timeout'] if 'timeout' in mqtt_cfg.keys() else 5.
         
         self.client = mqtt.Client()
         self.client.username_pw_set(mqtt_user, mqtt_pass)
         self.client.on_connect = self.__on_connect
         self.client.connect(mqtt_host, mqtt_port, 60)
         
-        while not self.client.is_connected():
-            print("Connecting to MQTT broker...")
+        start_time = time.time()
+        time_elapsed = 0
+        while not self.client.is_connected() or time_elapsed < timeout:
+            print(f"Connecting to MQTT broker...{int(time_elapsed)}s")
             time.sleep(1)
             self.client.loop()
+            time_elapsed = time.time() - start_time
+            
+        if not self.client.is_connected():
+            raise ConfigError(f"Could not connect to MQTT broker {mqtt_host} after {timeout} seconds.")
                                
     def disconnect(self):
         pass

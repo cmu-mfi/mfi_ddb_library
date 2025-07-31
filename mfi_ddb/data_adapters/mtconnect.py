@@ -91,11 +91,18 @@ class MTconnectDataAdapter(BaseDataAdapter):
         ip = self.cfg['mtconnect']['agent_ip']
         
         response = ping(ip)
+        timeout = self.cfg['mtconnect'].get('timeout', 5) if 'timeout' in self.cfg['mtconnect'] else 5
         
-        while response is None:
+        start_time = time.time()
+        time_elapsed = 0
+        while response is None or time_elapsed < timeout:
             print("MTConnect agent is not active. Waiting ...")
             time.sleep(1)
             response = ping(ip)
+            time_elapsed = time.time() - start_time
+            
+        if response is None:
+            raise ConnectionError(f"MTConnect agent at {ip} is not responding after {timeout} seconds.")
         
         print(f"MTConnect agent at {ip} is active")    
         
