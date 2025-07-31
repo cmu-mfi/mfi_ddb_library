@@ -74,6 +74,43 @@ class _Mqtt:
 
 
 class MqttDataAdapter(BaseDataAdapter, _Mqtt):
+    
+    CONFIG_HELP = {
+        "mqtt": {
+            "broker_address": "Address of the MQTT broker",
+            "broker_port": "Port of the MQTT broker (default: 1883)",
+            "username": "Username for MQTT broker authentication",
+            "password": "Password for MQTT broker authentication",
+            "tls_enabled": "Enable TLS for MQTT connection (default: False)",
+            "debug": "Enable debug mode for MQTT client (default: False)",
+            "timeout": "Timeout in seconds for connecting to the MQTT broker (default: 5)"
+        },
+        
+        "trial_id": "Trial ID for the system. No spaces or special characters allowed.",
+        "queue_size": "Maximum number of messages to buffer before processing. If the buffer is full, the oldest message will be removed.",
+        "topics": "List of topics to subscribe to. Each topic should have a 'component_id' and 'topic' key. Optionally, a 'trial_id' can be provided."
+    }
+    
+    CONFIG_EXAMPLE = {
+        "mqtt": {
+            "broker_address": "mqtt.example.com",
+            "broker_port": 1883,
+        },
+        "trial_id": "trial_001",
+        "queue_size": 10,
+        "topics": [
+            {
+                "component_id": "robot-arm-1",
+                "topic": "robot-arm/1/data",
+                "trial_id": "trial_001"
+            },
+            {
+                "component_id": "machine-a",
+                "topic": "machine/a/data"
+            }
+        ]
+    }
+    
     def __init__(self, config: dict):
         BaseDataAdapter.__init__(self, config)
         _Mqtt.__init__(self, config['mqtt'])

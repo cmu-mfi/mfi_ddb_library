@@ -10,6 +10,25 @@ from mfi_ddb.data_adapters.base import BaseDataAdapter
 
 
 class MTconnectDataAdapter(BaseDataAdapter):
+    
+    CONFIG_HELP = {
+        "mtconnect": {
+            "agent_ip": "IP address of the MTConnect agent",
+            "agent_url": "URL of the MTConnect agent",
+            "device_name": "Name of the device to be used in the data object",
+            "trial_id": "Trial ID for the MTConnect device. No spaces or special characters allowed.",
+        }
+    }
+    
+    CONFIG_EXAMPLE = {
+        "mtconnect": {
+            "agent_ip": "192.168.1.1",
+            "agent_url": "http://192.168.1.1:5000",
+            "device_name": "MTConnectDevice",
+            "trial_id": "trial_001"
+        }
+    }
+
     def __init__(self, config: dict):
         super().__init__()
         
