@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import Modal from "./Modal";
+import { ConnectionManager } from "./ConnectionManager";
 import { callConfig } from "../api";
 import { EXAMPLE_CONFIGS } from "../config/exampleConfig";
 export const CONNECTION_TYPES = Object.keys(EXAMPLE_CONFIGS);
@@ -127,54 +128,54 @@ export default function ConnectionModal({
   isEditing = false,
 }) {
   // Core form data state
-  const [connectionType, setConnectionType] = useState(""); // Selected protocol type
-  const [topicFamily, setTopicFamily] = useState(""); // MQTT topic classification
-  const [configuration, setConfiguration] = useState(""); // Main adapter configuration YAML
-  const [mqttConfig, setMqttConfig] = useState(makeDefaultMqttConfig()); // MQTT broker settings
+  const [connectionType, setConnectionType] = useState("");
+  const [topicFamily, setTopicFamily] = useState("");
+  const [configuration, setConfiguration] = useState("");
+  const [mqttConfig, setMqttConfig] = useState(makeDefaultMqttConfig());
 
   // UI interaction state
-  const [isEditingMqtt, setIsEditingMqtt] = useState(false); // Controls MQTT config editability
-  const [step, setStep] = useState(""); // Current processing step for user feedback
-  const [validationError, setValidationError] = useState(""); // User-friendly validation errors
-  const [selectedFile, setSelectedFile] = useState(null); // Uploaded configuration file
-  const [isSubmitting, setIsSubmitting] = useState(false); // Prevents duplicate submissions
-  const [isValidating, setIsValidating] = useState(false); // Shows validation in progress
-  const fileInputRef = useRef(null); // Reference for programmatic file input trigger
+  const [isEditingMqtt, setIsEditingMqtt] = useState(false);
+  const [step, setStep] = useState("");
+  const [validationError, setValidationError] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const fileInputRef = useRef(null);
   const [showHelp, setShowHelp] = useState(false);
   const [activeConnectionId, setActiveConnectionId] = useState(null);
+
   // Handle connection type selection and auto-populate configuration
   const handleTypeChange = useCallback((e) => {
     const selectedType = e.target.value;
     setConnectionType(selectedType);
-    setConfiguration(EXAMPLE_CONFIGS[selectedType]?.configuration || ""); // Load example config
-    // Set default topic family based on protocol characteristics
+    setConfiguration(EXAMPLE_CONFIGS[selectedType]?.configuration || "");
     setTopicFamily(
       selectedType === "MTConnect"
-        ? "historian" // MTConnect typically streams time-series data
+        ? "historian"
         : selectedType === "Local Files"
-        ? "blob" // File monitoring handles binary/document content
-        : "" // Let user choose for other protocols
+        ? "blob"
+        : ""
     );
-    setMqttConfig(makeDefaultMqttConfig()); // Reset MQTT config to defaults
-    setValidationError(""); // Clear any previous validation errors
+    setMqttConfig(makeDefaultMqttConfig());
+    setValidationError("");
   }, []);
 
   // Handle topic family radio button selection
   const handleTopicChange = useCallback((e) => {
     setTopicFamily(e.target.value);
-    setValidationError(""); // Clear validation errors when user makes changes
+    setValidationError("");
   }, []);
 
   // Handle main configuration text area changes
   const handleConfigurationChange = useCallback((e) => {
     setConfiguration(e.target.value);
-    setValidationError(""); // Clear errors to show input is being processed
+    setValidationError("");
   }, []);
 
   // Handle MQTT broker configuration changes
   const handleMqttConfigChange = useCallback((e) => {
     setMqttConfig(e.target.value);
-    setValidationError(""); // Clear errors on any change
+    setValidationError("");
   }, []);
 
   // Handle configuration file uploads and read content
@@ -184,9 +185,8 @@ export default function ConnectionModal({
       setSelectedFile(null);
       return;
     }
-    setSelectedFile(file); // Store file reference for display
+    setSelectedFile(file);
     const reader = new FileReader();
-    // Populate configuration field with file content
     reader.onload = ({ target }) =>
       typeof target.result === "string" &&
       setConfiguration(
@@ -195,7 +195,7 @@ export default function ConnectionModal({
           : target.result
       );
     reader.onerror = () => setValidationError("Failed to read file");
-    reader.readAsText(file); // Read as text for YAML/config files
+    reader.readAsText(file);
   }, []);
 
   // Trigger hidden file input programmatically
@@ -206,7 +206,7 @@ export default function ConnectionModal({
 
   // Handle modal close with submission state protection
   const handleClose = useCallback(async () => {
-    if (isSubmitting) return; // Prevent close during save operation
+    if (isSubmitting) return;
     if (activeConnectionId) {
       try {
         await callConfig(`/config/disconnect/${activeConnectionId}`, {});
@@ -215,25 +215,22 @@ export default function ConnectionModal({
         console.warn("Failed to disconnect adapter on modal close:", error);
       }
     }
-
     onClose();
   }, [isSubmitting, onClose, activeConnectionId]);
 
   // Reset form state when modal opens or when editing different connection
   useEffect(() => {
     if (!isOpen) return;
-    // Populate fields from initial data (edit mode) or defaults (new mode)
     setConnectionType(initialData.type || "");
     setTopicFamily(initialData.topicFamily || "");
     setConfiguration(initialData.configuration || "");
     setMqttConfig(initialData.mqttConfig || makeDefaultMqttConfig());
-    // Reset UI state to defaults
     setIsEditingMqtt(false);
     setStep("");
     setValidationError("");
     setSelectedFile(null);
     setIsSubmitting(false);
-    if (fileInputRef.current) fileInputRef.current.value = ""; // Clear file input
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }, [isOpen, initialData]);
 
   // Client-side YAML format validation with regex patterns
@@ -241,7 +238,6 @@ export default function ConnectionModal({
     if (!yaml?.trim()) return ["Configuration cannot be empty"];
 
     const errs = [];
-    // Regular expressions for validating common configuration values
     const ipRx =
       /^(25[0-5]|2[0-4]\d|[01]?\d\d?)(\.(25[0-5]|2[0-4]\d|[01]?\d\d?)){3}$/;
     const domainRx =
@@ -249,32 +245,29 @@ export default function ConnectionModal({
     const urlRx = /^(https?:\/\/|mqtts?:\/\/|opc\.tcp:\/\/)[\w\d./:?=#-]+$/i;
     const portRx = /^\d{1,5}$/;
 
-    // Parse YAML line by line for format validation
     yaml.split("\n").forEach((line, index) => {
       const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#") || !trimmed.includes(":")) return; // Skip empty/comment lines
+      if (!trimmed || trimmed.startsWith("#") || !trimmed.includes(":")) return;
 
       const [key, ...rest] = trimmed.split(":");
       const cleanKey = key.trim().toLowerCase();
-      const value = rest.join(":").trim().replace(/['"]/g, ""); // Remove quotes
+      const value = rest.join(":").trim().replace(/['"]/g, "");
 
-      if (!value) return; // Skip empty values
+      if (!value) return;
 
-      // Validate IP addresses and hostnames
       if (
         (cleanKey === "broker_address" ||
           cleanKey.endsWith("_ip") ||
           cleanKey === "agent_ip") &&
         !ipRx.test(value) &&
         !domainRx.test(value) &&
-        !value.includes("://") // Allow full URLs to pass through
+        !value.includes("://")
       ) {
         errs.push(
           `Line ${index + 1}: "${cleanKey}" must be a valid IP or domain`
         );
       }
 
-      // Validate URL formats for endpoints and agent URLs
       if (
         (cleanKey.includes("url") || cleanKey === "endpoint") &&
         !urlRx.test(value)
@@ -282,7 +275,6 @@ export default function ConnectionModal({
         errs.push(`Line ${index + 1}: "${cleanKey}" has invalid URL format`);
       }
 
-      // Validate port numbers are within valid range
       if (cleanKey === "broker_port" || cleanKey.includes("port")) {
         const portNum = parseInt(value, 10);
         if (!portRx.test(value) || portNum < 1 || portNum > 65535) {
@@ -297,21 +289,18 @@ export default function ConnectionModal({
   }, []);
 
   // Parse server error responses into user-friendly messages
-  // Parse server error responses into user-friendly messages
   const parseServerError = useCallback((error) => {
     try {
       const errorStr = error.message || error.toString();
 
-      // Handle broker-specific errors first (highest priority)
       if (
         errorStr.includes("MQTT Broker Unreachable:") ||
         errorStr.includes("MQTT Connection Failed:") ||
         errorStr.includes("Connection Timeout:")
       ) {
-        return errorStr; // Return the already formatted broker error
+        return errorStr;
       }
 
-      // Handle other broker-related patterns
       if (
         errorStr.includes("MQTT broker unreachable") ||
         errorStr.includes("broker unreachable")
@@ -327,21 +316,19 @@ export default function ConnectionModal({
         return "MQTT Connection Failed: Unable to establish connection with the MQTT broker. Please verify your configuration.";
       }
 
-      // Try to extract JSON error details from API response
       if (errorStr.includes('"detail"')) {
         try {
           const jsonMatch = errorStr.match(/\{.*\}/);
           if (jsonMatch) {
             const errorObj = JSON.parse(jsonMatch[0]);
             if (errorObj.detail) {
-              // Check if the detail contains broker errors
               if (errorObj.detail.includes("MQTT broker unreachable")) {
                 return "MQTT Broker Unreachable: Cannot connect to the specified broker. Please verify the broker address and port.";
               }
               if (errorObj.detail.includes("MQTT connection failed")) {
                 return "MQTT Connection Failed: The broker rejected the connection. Please check your broker configuration.";
               }
-              return errorObj.detail; // Return clean error detail
+              return errorObj.detail;
             }
           }
         } catch (parseErr) {
@@ -349,7 +336,6 @@ export default function ConnectionModal({
         }
       }
 
-      // Pattern matching for common error types with helpful suggestions
       if (errorStr.includes("validation error")) {
         const match = errorStr.match(/validation error for ([^\\]+)/i);
         if (match) {
@@ -377,12 +363,11 @@ export default function ConnectionModal({
         return "Configuration schema error. Please check that all required fields are present and properly formatted.";
       }
 
-      // Clean up raw error messages by removing JSON artifacts
       return (
         errorStr
-          .replace(/\{.*?\}/g, "") // Remove JSON objects
-          .replace(/\\n/g, " ") // Convert escaped newlines to spaces
-          .replace(/Error:\s*/g, "") // Remove "Error:" prefix
+          .replace(/\{.*?\}/g, "")
+          .replace(/\\n/g, " ")
+          .replace(/Error:\s*/g, "")
           .trim() || "Configuration validation failed"
       );
     } catch (parseError) {
@@ -396,7 +381,6 @@ export default function ConnectionModal({
     setIsValidating(true);
 
     try {
-      // Step 1: Basic form completeness validation
       if (!connectionType) {
         throw new Error("Please select a connection type");
       }
@@ -407,13 +391,11 @@ export default function ConnectionModal({
         throw new Error("Configuration YAML is required");
       }
 
-      // Step 2: Client-side YAML format validation for main config
       const configErrors = validateYAMLFormats(configuration);
       if (configErrors.length > 0) {
         throw new Error(`Configuration errors:\n${configErrors.join("\n")}`);
       }
 
-      // Step 3: Client-side YAML format validation for MQTT config (if provided)
       if (mqttConfig.trim()) {
         const mqttErrors = validateYAMLFormats(mqttConfig);
         if (mqttErrors.length > 0) {
@@ -422,31 +404,31 @@ export default function ConnectionModal({
           );
         }
       }
+
       const wrappedConfig = wrapConfigForProtocol(
         connectionType,
         configuration
       );
-      // Step 4: Prepare combined configuration for server validation
+
       const combinedConfig =
         `topic_family: ${topicFamily}\n\n${wrappedConfig}` +
         (mqttConfig.trim()
           ? `\n\n${mqttConfig.replace(
               "mqtt:",
-              `mqtt:\n  topic_family: ${topicFamily}` // Inject topic family into MQTT config
+              `mqtt:\n  topic_family: ${topicFamily}`
             )}`
           : "");
 
-      // Step 5: Server-side validation for schema and connectivity
       await callConfig("/config/validate", {
         text: combinedConfig,
         topicFamily,
       });
 
-      return true; // Validation passed
+      return true;
     } catch (err) {
       const userFriendlyError = parseServerError(err);
       setValidationError(userFriendlyError);
-      return false; // Validation failed
+      return false;
     } finally {
       setIsValidating(false);
     }
@@ -461,18 +443,16 @@ export default function ConnectionModal({
 
   // Debounced validation effect - runs 800ms after user stops typing
   useEffect(() => {
-    // Skip validation if modal closed or form incomplete
     if (!isOpen || !connectionType || !topicFamily || !configuration.trim()) {
       setValidationError("");
       return;
     }
 
-    // Debounce validation to reduce server load
     const timeoutId = setTimeout(() => {
       validateConfiguration();
-    }, 800); // Wait 800ms after last change
+    }, 800);
 
-    return () => clearTimeout(timeoutId); // Cleanup on dependency change
+    return () => clearTimeout(timeoutId);
   }, [
     configuration,
     mqttConfig,
@@ -483,7 +463,6 @@ export default function ConnectionModal({
   ]);
 
   const wrapConfigForProtocol = (connectionType, configuration) => {
-    // Protocol mapping for UI types to config keys
     const protocolMapping = {
       ROS: "ros",
       "ROS Files": "ros_files",
@@ -494,24 +473,21 @@ export default function ConnectionModal({
 
     const protocolKey = protocolMapping[connectionType];
 
-    // If no mapping found, return as-is
     if (!protocolKey) {
       return configuration;
     }
 
-    // Wrap the configuration under the protocol key
-    return `${protocolKey}:\n${configuration.replace(/^/gm, "  ")}`; // Indent each line by 2 spaces
+    return `${protocolKey}:\n${configuration.replace(/^/gm, "  ")}`;
   };
-  // Handle save operation with validation and server connection
+
   // Handle save operation with validation and server connection
   const handleSave = useCallback(async () => {
-    if (isSubmitting) return; // Prevent duplicate submissions
+    if (isSubmitting) return;
 
     setIsSubmitting(true);
     setValidationError("");
 
     try {
-      // Final validation check before attempting connection
       const isValid = await validateConfiguration();
       if (!isValid) {
         setIsSubmitting(false);
@@ -522,67 +498,96 @@ export default function ConnectionModal({
         connectionType,
         configuration
       );
-      // Prepare complete configuration for server
       const combinedConfig =
         `topic_family: ${topicFamily}\n\n${wrappedConfig}` +
         (mqttConfig.trim()
           ? `\n\n${mqttConfig.replace(
               "mqtt:",
-              `mqtt:\n  topic_family: ${topicFamily}` // Inject topic family
+              `mqtt:\n  topic_family: ${topicFamily}`
             )}`
           : "");
 
-      const connectionId = crypto.randomUUID(); // Generate unique connection ID
-      setActiveConnectionId(connectionId);
-      setStep("Connecting to adapter..."); // Show progress to user
+      const isEditMode = initialData && initialData.id;
 
-      // Enhanced connection attempt with specific error handling
-      try {
-        await callConfig(`/config/connect/${connectionId}`, {
-          text: combinedConfig,
+      if (isEditMode) {
+        console.log("Edit mode: Updating existing connection", initialData.id);
+
+        const updatedConnectionData = {
+          id: initialData.id,
+          type: connectionType,
           topicFamily,
-        });
-      } catch (connectionError) {
-        // Check if it's a broker-related error by examining the error message
-        const errorMessage =
-          connectionError.message || connectionError.toString();
+          configuration,
+          mqttConfig: mqttConfig.trim() ? mqttConfig : null,
+          name:
+            connectionType ||
+            initialData.name ||
+            `Connection ${initialData.id.slice(0, 8)}`,
+          savedAt: initialData.savedAt,
+          updatedAt: new Date().toISOString(),
+        };
 
-        if (errorMessage.includes("502")) {
-          // 502 errors are broker/connection issues from your backend
-          if (errorMessage.includes("MQTT broker unreachable")) {
-            throw new Error(
-              "MQTT Broker Unreachable: Cannot connect to the specified broker. Please check the broker address and port."
-            );
-          } else if (errorMessage.includes("MQTT connection failed")) {
-            throw new Error(
-              "MQTT Connection Failed: The broker refused the connection. Check your broker settings and credentials."
-            );
-          } else if (errorMessage.includes("Connection timed out")) {
-            throw new Error(
-              "Connection Timeout: The broker is not responding. Please verify the broker address and your network connection."
-            );
+        ConnectionManager.saveConnection(initialData.id, updatedConnectionData);
+        console.log("Updated connection:", updatedConnectionData.name);
+
+        onSave(updatedConnectionData);
+        onClose();
+      } else {
+        console.log("Create mode: Making new connection");
+
+        const connectionId = crypto.randomUUID();
+        setActiveConnectionId(connectionId);
+        setStep("Connecting to adapter...");
+
+        try {
+          await callConfig(`/config/connect/${connectionId}`, {
+            text: combinedConfig,
+            topicFamily,
+          });
+        } catch (connectionError) {
+          const errorMessage =
+            connectionError.message || connectionError.toString();
+          if (errorMessage.includes("502")) {
+            if (errorMessage.includes("MQTT broker unreachable")) {
+              throw new Error(
+                "MQTT Broker Unreachable: Cannot connect to the specified broker. Please check the broker address and port."
+              );
+            } else if (errorMessage.includes("MQTT connection failed")) {
+              throw new Error(
+                "MQTT Connection Failed: The broker refused the connection. Check your broker settings and credentials."
+              );
+            } else if (errorMessage.includes("Connection timed out")) {
+              throw new Error(
+                "Connection Timeout: The broker is not responding. Please verify the broker address and your network connection."
+              );
+            }
           }
+          throw connectionError;
         }
 
-        // Re-throw the original error if it's not a recognized broker error
-        throw connectionError;
+        const connectionData = {
+          id: connectionId,
+          type: connectionType,
+          topicFamily,
+          configuration,
+          mqttConfig: mqttConfig.trim() ? mqttConfig : null,
+          name: connectionType || `Connection ${connectionId.slice(0, 8)}`,
+          savedAt: new Date().toISOString(),
+        };
+
+        ConnectionManager.saveConnection(connectionId, connectionData);
+        console.log("Created new connection:", connectionData.name);
+
+        onSave(connectionData);
+        onClose();
       }
-
-      // Notify parent component of successful save
-      onSave({
-        id: connectionId,
-        type: connectionType,
-        topicFamily,
-        configuration,
-        mqttConfig: mqttConfig.trim() ? mqttConfig : null, // Only include if non-empty
-      });
-
-      onClose(); // Close modal on success
     } catch (err) {
       const userFriendlyError = parseServerError(err);
-      setValidationError(`Connection failed: ${userFriendlyError}`);
+      const isEditMode = initialData && initialData.id;
+      setValidationError(
+        `${isEditMode ? "Update" : "Connection"} failed: ${userFriendlyError}`
+      );
     } finally {
-      setStep(""); // Clear processing message
+      setStep("");
       setIsSubmitting(false);
     }
   }, [
@@ -592,10 +597,28 @@ export default function ConnectionModal({
     connectionType,
     topicFamily,
     mqttConfig,
+    initialData,
     onSave,
     onClose,
     parseServerError,
   ]);
+
+  const handleCloseWithCleanup = useCallback(async () => {
+    if (isSubmitting) return;
+
+    const isEditMode = initialData && initialData.id;
+
+    if (activeConnectionId && !isEditMode) {
+      try {
+        await callConfig(`/config/disconnect/${activeConnectionId}`, {});
+        setActiveConnectionId(null);
+      } catch (error) {
+        console.warn("Failed to disconnect adapter on modal close:", error);
+      }
+    }
+
+    onClose();
+  }, [isSubmitting, activeConnectionId, initialData, onClose]);
 
   // Determine if save button should be enabled
   const canSave =
@@ -604,15 +627,17 @@ export default function ConnectionModal({
     configuration.trim() &&
     !validationError &&
     !isValidating;
+
   const helpData = CONFIG_HELP[connectionType];
+  const isEditMode = initialData && initialData.id;
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={isEditing ? "Edit Adapter" : "New Adapter"}
+      title={isEditMode ? "Edit Adapter" : "New Adapter"}
     >
       <div className="modal-content configuration-modal">
-        {/* Connection Type Selection Dropdown */}
         <div className="form-group">
           <label htmlFor="connection-type">Connection Type:</label>
           <select
@@ -631,7 +656,6 @@ export default function ConnectionModal({
           </select>
         </div>
 
-        {/* Topic Family Radio Button Selection */}
         <div className="form-group">
           <label>Topic Family:</label>
           <div className="segmented-control">
@@ -670,7 +694,6 @@ export default function ConnectionModal({
               </span>
             )}
 
-            {/* Help button inside textarea */}
             {helpData && (
               <button
                 type="button"
@@ -685,7 +708,6 @@ export default function ConnectionModal({
               </button>
             )}
 
-            {/* Help tooltip */}
             {showHelp && helpData && (
               <div className="help-tooltip">
                 <div className="help-content">{generateHelpText(helpData)}</div>
@@ -693,14 +715,16 @@ export default function ConnectionModal({
             )}
           </div>
         </div>
+
         <div style={{ textAlign: "center", margin: "8px 0" }}>OR</div>
+
         <div className="file-upload-wrapper">
           <input
             ref={fileInputRef}
             type="file"
             accept=".yaml,.yml,.txt"
             onChange={handleFileUpload}
-            style={{ display: "none" }} // Hidden file input
+            style={{ display: "none" }}
             disabled={isSubmitting}
           />
           <button
@@ -715,6 +739,7 @@ export default function ConnectionModal({
             {selectedFile ? selectedFile.name : "No file chosen"}
           </span>
         </div>
+
         <div className="form-group">
           <label htmlFor="mqtt-config">MQTT Broker Configuration:</label>
           <textarea
@@ -723,11 +748,10 @@ export default function ConnectionModal({
             className={`form-textarea ${!isEditingMqtt ? "disabled" : ""}`}
             value={mqttConfig}
             onChange={handleMqttConfigChange}
-            disabled={isSubmitting || !isEditingMqtt} // Disabled unless in edit mode
+            disabled={isSubmitting || !isEditingMqtt}
             readOnly={!isEditingMqtt}
             placeholder="MQTT broker configuration..."
           />
-          {/* Toggle button for MQTT config editing */}
           {!isEditingMqtt ? (
             <button
               type="button"
@@ -735,7 +759,7 @@ export default function ConnectionModal({
               onClick={() => setIsEditingMqtt(true)}
               disabled={isSubmitting}
             >
-              ✎ Edit Broker
+              Edit Broker
             </button>
           ) : (
             <button
@@ -744,23 +768,18 @@ export default function ConnectionModal({
               onClick={() => setIsEditingMqtt(false)}
               disabled={isSubmitting}
             >
-              ✓ Done Editing
+              Done Editing
             </button>
           )}
         </div>
       </div>
 
-      {/* MQTT Broker Configuration with Protected Editing */}
-
-      {/* Validation Status Indicator */}
       {isValidating && (
         <div className="info-message">Validating configuration...</div>
       )}
 
-      {/* Processing Step Indicator */}
       {step && <div className="info-message">{step}</div>}
 
-      {/* Validation Error Display */}
       {validationError && (
         <div className="error-message-box">
           <span className="error-title">Validation Error:</span>
@@ -768,12 +787,11 @@ export default function ConnectionModal({
         </div>
       )}
 
-      {/* Action Buttons */}
       <div className="button-group small">
         <button
           type="button"
           className="small-button cancel-button"
-          onClick={handleClose}
+          onClick={handleCloseWithCleanup}
           disabled={isSubmitting}
         >
           Cancel
@@ -782,7 +800,7 @@ export default function ConnectionModal({
           type="button"
           className="small-button save-button"
           onClick={handleSave}
-          disabled={!canSave || isSubmitting} // Disabled until form is valid
+          disabled={!canSave || isSubmitting}
         >
           {isSubmitting ? "Saving..." : "Save"}
         </button>

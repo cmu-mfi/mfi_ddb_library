@@ -51,7 +51,7 @@ class ROSDeviceAttributes(BaseModel):
     description: str  # Device description
     type: str  # Device type (e.g., "Robot")
     version: float  # Device version
-    trial_id: Optional[str] = None  # Optional trial ID override
+    trial_id: Optional[str] = "test"  # Optional trial ID override
 
 # ROS device configuration
 class ROSDevice(BaseModel):
