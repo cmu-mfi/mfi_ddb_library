@@ -5,11 +5,23 @@ import requests
 import xmltodict
 from omegaconf import OmegaConf
 from ping3 import ping
+from pydantic import BaseModel, Field
 
 from mfi_ddb.data_adapters.base import BaseDataAdapter
 
 
+class _SCHEMA(BaseModel):
+    class _MTCONNECT(BaseModel):
+        agent_ip: str = Field(..., description="IP address of the MTConnect agent")
+        agent_url: str = Field(..., description="URL of the MTConnect agent")
+        device_name: str = Field(..., description="Name of the device to be used in the data object")
+        trial_id: str = Field(..., description="Trial ID for the MTConnect device. No spaces or special characters allowed.")    
+    class SCHEMA(BaseModel):
+        mtconnect: "_MTCONNECT" = Field(..., description="Configuration for the MTConnect agent connection")
+
 class MTconnectDataAdapter(BaseDataAdapter):
+    
+    NAME = "MTConnect"
     
     CONFIG_HELP = {
         "mtconnect": {
@@ -30,6 +42,12 @@ class MTconnectDataAdapter(BaseDataAdapter):
     }
     
     RECOMMENDED_TOPIC_FAMILY = "historian"
+
+    class SCHEMA(BaseDataAdapter.SCHEMA, _SCHEMA.SCHEMA):
+        """
+        Schema for the MTConnect data adapter configuration.
+        """
+        pass
 
     def __init__(self, config: dict):
         super().__init__()

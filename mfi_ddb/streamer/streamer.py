@@ -1,13 +1,14 @@
+import copy
 import json
 import os
-import copy
-import sys
 import platform
 import socket
+import sys
 import time
 from datetime import datetime
 
 import paho.mqtt.client as paho_mqtt
+from pydantic import BaseModel, Field
 
 from mfi_ddb.data_adapters import *
 from mfi_ddb.topic_families import *
@@ -25,6 +26,17 @@ TOPIC_CLIENTS = {
 }
 
 class Streamer(Observer):
+
+    CONFIG_EXAMPLE = None
+    CONFIG_HELP = None
+    
+    class SCHEMA(BaseModel):
+        """
+        Schema for the data adapter configuration.
+        """
+        # Define the schema for the data adapter configuration here
+        pass
+        
     def __init__(self, config: dict, data_adp: BaseDataAdapter, stream_on_update:bool = False) -> None:
         super().__init__()
         

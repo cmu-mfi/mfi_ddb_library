@@ -1,14 +1,26 @@
 import time
+from typing import List, Optional
 
 import yaml
+from pydantic import BaseModel, Field
 
 from mfi_ddb.data_adapters.base import BaseDataAdapter
 
 MAX_ARRAY_SIZE = 16
 
+class _SCHEMA(BaseModel):
+    class _DEVICES(BaseModel):
+        namespace: str = Field(..., description="Namespace of the device in ROS")
+        rostopics: List[str] = Field(..., description="List of ROS topics to subscribe to for this device")
+        attributes: Optional[dict] = Field({}, description="Attributes of the device. Optional.")
+    class SCHEMA(BaseModel):
+        trial_id: str = Field(..., description="Trial ID for the ROS device. No spaces or special characters allowed.")
+        set_ros_callback: bool = Field(True, description="Set ROS callback to receive data from ROS topics. If set to False, you need to call get_data() method to get data from ROS topics.")
+        devices: List["_DEVICES"] = Field(..., description="List of devices to subscribe to.")
 
 class RosDataAdapter(BaseDataAdapter):
 
+    NAME = "ROS"
     CONFIG_HELP = {
         "trial_id": "Trial ID for the ROS device. No spaces or special characters allowed.",
         "set_ros_callback": "Set ROS callback to receive data from ROS topics. If set to False, you need to call get_data() method to get data from ROS topics.",
@@ -38,8 +50,10 @@ class RosDataAdapter(BaseDataAdapter):
             }
         }
     }    
-    
     RECOMMENDED_TOPIC_FAMILY = "historian"
+    
+    class SCHEMA(BaseDataAdapter.SCHEMA, _SCHEMA.SCHEMA):
+        pass
     
     def __init__(self, config: dict) -> None:
         super().__init__()

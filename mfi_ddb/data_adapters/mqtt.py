@@ -1,6 +1,8 @@
 import time
+from typing import List, Optional
 
 import paho.mqtt.client as mqtt
+from pydantic import BaseModel, Field
 
 from mfi_ddb.data_adapters.base import BaseDataAdapter
 from mfi_ddb.utils.exceptions import ConfigError
@@ -80,8 +82,30 @@ class _Mqtt:
     def __on_connect(self, client, userdata, flags, rc):
         print(f"Connected to broker {self.mqtt_cfg['broker_address']} with result code {rc}")            
 
+class _SCHEMA:    
+    class _MQTT(BaseModel):
+        broker_address: str = Field(..., description="Address of the MQTT broker")
+        broker_port: Optional[int] = Field(1883, description="Port of the MQTT broker (default: 1883)")
+        username: Optional[str] = Field(..., description="Username for MQTT broker authentication")
+        password: Optional[str] = Field(..., description="Password for MQTT broker authentication")
+        tls_enabled: Optional[bool] = Field(False, description="Enable TLS for MQTT connection (default: False)")
+        debug: Optional[bool] = Field(False, description="Enable debug mode for MQTT client (default: False)")
+        timeout: Optional[int] = Field(5, description="Timeout in seconds for connecting to the MQTT broker (default: 5)")
+    
+    class _TOPIC(BaseModel):
+        component_id: str = Field(..., description="Identifier for the component")
+        topic: str = Field(..., description="MQTT topic to subscribe to")
+        trial_id: Optional[str] = Field(None, description="Trial ID for the component (optional)")
+
+    class SCHEMA(BaseModel):
+        mqtt: "_MQTT" = Field(..., description="Configuration for the MQTT broker connection")
+        trial_id: str = Field(..., description="Trial ID for the system. No spaces or special characters allowed.")
+        queue_size: int = Field(10, description="Maximum number of messages to buffer before processing. If the buffer is full, the oldest message will be removed.")
+        topics: List["_TOPIC"] = Field(..., description="List of topics to subscribe to. Each topic should have a 'component_id' and 'topic' key. Optionally, a 'trial_id' can be provided.")
 
 class MqttDataAdapter(BaseDataAdapter, _Mqtt):
+    
+    NAME = "MQTT"
     
     CONFIG_HELP = {
         "mqtt": {
@@ -120,6 +144,9 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
     }
     
     RECOMMENDED_TOPIC_FAMILY = "historian"
+    
+    class SCHEMA(BaseDataAdapter.SCHEMA, _SCHEMA.SCHEMA):
+        pass        
     
     def __init__(self, config: dict):
         BaseDataAdapter.__init__(self, config)

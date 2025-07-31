@@ -1,11 +1,13 @@
+import base64
 import os
 import platform
 import socket
 import time
+from typing import List
 
-import base64
 import numpy as np
 import yaml
+from pydantic import BaseModel, Field
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
@@ -13,6 +15,8 @@ from mfi_ddb.data_adapters.base import BaseDataAdapter
 
 
 class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
+    
+    NAME = "Local Files"
     
     CONFIG_HELP = {
         "watch_dir": "List of directories to watch for new files. The first directory will be used to create a starter file.",
@@ -41,6 +45,20 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
     
     RECOMMENDED_TOPIC_FAMILY = "blob"
     
+    class _SystemInfo(BaseModel):
+        trial_id: str = Field(..., description="Trial ID for the system. No spaces or special characters allowed.")
+        name: str = Field(..., description="Name of the system.")
+                
+        model_config = {
+            "extra": "allow"
+        }        
+    
+    class SCHEMA(BaseDataAdapter.SCHEMA):
+        watch_dir: List[str] = Field(..., description="List of directories to watch for new files.")
+        buffer_size: int = Field(..., description="Maximum number of files to buffer before streaming.")
+        wait_before_read: int = Field(..., description="Time in seconds to wait before reading a new file.")
+        system: "_SystemInfo" = Field(..., description="System information including trial ID, name, and other attributes.")
+
     def __init__(self, config: dict = None) -> None:
         super().__init__(config)
         

@@ -1,5 +1,8 @@
 import threading
 
+from pydantic import BaseModel
+
+
 class BaseDataAdapter:
     """
     Base class for data adapters. Use as a super class for the data adapters that will be used in the PullStreamToMqtt(Spb) and PushStreamToMqtt(Spb) classes.
@@ -9,12 +12,12 @@ class BaseDataAdapter:
     CONFIG_EXAMPLE = None
     CONFIG_HELP = None
     RECOMMENDED_TOPIC_FAMILY = None
-    
-    class SCHEMA:
+
+    class SCHEMA(BaseModel):
         """
-        Schema for the data adapter configuration.
+        Schema for the data adapter configuration. 
+        Override this class in the child class to define the schema for the data adapter configuration.
         """
-        # Define the schema for the data adapter configuration here
         pass
 
     def __init__(self, config: dict = None) -> None:
