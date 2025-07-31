@@ -111,6 +111,8 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
         ]
     }
     
+    RECOMMENDED_TOPIC_FAMILY = "historian"
+    
     def __init__(self, config: dict):
         BaseDataAdapter.__init__(self, config)
         _Mqtt.__init__(self, config['mqtt'])

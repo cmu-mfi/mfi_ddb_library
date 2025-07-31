@@ -53,7 +53,9 @@ class RosFilesDataAdapter(BaseDataAdapter):
             }
         }
     }
-    
+
+    RECOMMENDED_TOPIC_FAMILY = "blob"
+
     def __init__(self, config: dict) -> None:
         super().__init__()
         

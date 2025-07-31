@@ -39,6 +39,8 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
         }
     }
     
+    RECOMMENDED_TOPIC_FAMILY = "blob"
+    
     def __init__(self, config: dict = None) -> None:
         super().__init__(config)
         

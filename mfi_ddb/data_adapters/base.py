@@ -7,6 +7,7 @@ class BaseDataAdapter:
 
     CONFIG_EXAMPLE = None
     CONFIG_HELP = None
+    RECOMMENDED_TOPIC_FAMILY = None
 
     def __init__(self, config: dict = None) -> None:
         self.component_ids = []

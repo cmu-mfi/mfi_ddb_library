@@ -28,6 +28,8 @@ class MTconnectDataAdapter(BaseDataAdapter):
             "trial_id": "trial_001"
         }
     }
+    
+    RECOMMENDED_TOPIC_FAMILY = "historian"
 
     def __init__(self, config: dict):
         super().__init__()
