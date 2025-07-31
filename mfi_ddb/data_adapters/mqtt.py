@@ -33,16 +33,23 @@ class _Mqtt:
             del self.mqtt_cfg['password']
         mqtt_tls_enabled = mqtt_cfg['tls_enabled'] if 'tls_enabled' in mqtt_cfg.keys() else False
         debug = mqtt_cfg['debug'] if 'debug' in mqtt_cfg.keys() else False
+        timeout = mqtt_cfg['timeout'] if 'timeout' in mqtt_cfg.keys() else 5.
         
         self.client = mqtt.Client()
         self.client.username_pw_set(mqtt_user, mqtt_pass)
         self.client.on_connect = self.__on_connect
         self.client.connect(mqtt_host, mqtt_port, 60)
         
-        while not self.client.is_connected():
-            print("Connecting to MQTT broker...")
+        start_time = time.time()
+        time_elapsed = 0
+        while not self.client.is_connected() or time_elapsed < timeout:
+            print(f"Connecting to MQTT broker...{int(time_elapsed)}s")
             time.sleep(1)
             self.client.loop()
+            time_elapsed = time.time() - start_time
+            
+        if not self.client.is_connected():
+            raise ConfigError(f"Could not connect to MQTT broker {mqtt_host} after {timeout} seconds.")
                                
     def disconnect(self):
         pass
@@ -67,6 +74,45 @@ class _Mqtt:
 
 
 class MqttDataAdapter(BaseDataAdapter, _Mqtt):
+    
+    CONFIG_HELP = {
+        "mqtt": {
+            "broker_address": "Address of the MQTT broker",
+            "broker_port": "Port of the MQTT broker (default: 1883)",
+            "username": "Username for MQTT broker authentication",
+            "password": "Password for MQTT broker authentication",
+            "tls_enabled": "Enable TLS for MQTT connection (default: False)",
+            "debug": "Enable debug mode for MQTT client (default: False)",
+            "timeout": "Timeout in seconds for connecting to the MQTT broker (default: 5)"
+        },
+        
+        "trial_id": "Trial ID for the system. No spaces or special characters allowed.",
+        "queue_size": "Maximum number of messages to buffer before processing. If the buffer is full, the oldest message will be removed.",
+        "topics": "List of topics to subscribe to. Each topic should have a 'component_id' and 'topic' key. Optionally, a 'trial_id' can be provided."
+    }
+    
+    CONFIG_EXAMPLE = {
+        "mqtt": {
+            "broker_address": "mqtt.example.com",
+            "broker_port": 1883,
+        },
+        "trial_id": "trial_001",
+        "queue_size": 10,
+        "topics": [
+            {
+                "component_id": "robot-arm-1",
+                "topic": "robot-arm/1/data",
+                "trial_id": "trial_001"
+            },
+            {
+                "component_id": "machine-a",
+                "topic": "machine/a/data"
+            }
+        ]
+    }
+    
+    RECOMMENDED_TOPIC_FAMILY = "historian"
+    
     def __init__(self, config: dict):
         BaseDataAdapter.__init__(self, config)
         _Mqtt.__init__(self, config['mqtt'])
