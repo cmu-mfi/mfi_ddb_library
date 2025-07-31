@@ -18,6 +18,11 @@ app = FastAPI(
     description="Core API for data adapter management",
 )
 
+# @app.on_event("startup")
+# def init_ros_node():
+#     import rospy
+#     rospy.init_node("mfi_ddb_ros_adapter", anonymous=True)
+
 # Enable CORS for development
 app.add_middleware(
     CORSMiddleware,
