@@ -40,6 +40,18 @@ class BaseDataAdapter:
 
         self._observers = []  # List of observers (listeners)
 
+    def __del__(self):
+        """
+        Destructor to clean up resources.
+        """
+        self.clear_data_buffer()
+        self._data.clear()
+        self._cb_data.clear()
+        self.last_updated.clear()
+        self.attributes.clear()
+        self.cfg = None
+        self._observers.clear()
+
     @property
     def data(self):
         """
