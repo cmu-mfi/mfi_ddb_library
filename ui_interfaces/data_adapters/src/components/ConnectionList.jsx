@@ -6,6 +6,10 @@ const ConnectionList = ({
   onNewConnection,
   onEditConnection,
   onTerminateConnection,
+  onRestoreConnections,
+  onPauseConnection,
+  onResumeConnection,
+  isRestoring,
 }) => {
   const hasItems = connections.length > 0;
 
@@ -14,9 +18,20 @@ const ConnectionList = ({
       <div className="connection-card">
         <div className="connection-header">
           <h1 className="header-title">Data Adapters</h1>
-          <button className="new-connection-button" onClick={onNewConnection}>
-            + New Adapter
-          </button>
+          <div className="header-actions">
+            {/* <button
+              className="restore-button"
+              onClick={onRestoreConnections}
+              disabled={isRestoring}
+              title="Reconnect all saved adapters"
+            >
+              {isRestoring ? "Restoring..." : "Restore All Adapter"}
+            </button> */}
+
+            <button className="new-connection-button" onClick={onNewConnection}>
+              + New Adapter
+            </button>
+          </div>
         </div>
         <div className={`connection-list ${hasItems ? "has-items" : ""}`}>
           {connections.map((connection) => (
@@ -25,12 +40,19 @@ const ConnectionList = ({
               connection={connection}
               onEdit={onEditConnection}
               onTerminate={onTerminateConnection}
+              onPause={onPauseConnection}
+              onResume={onResumeConnection}
             />
           ))}
           {!hasItems && (
-            <span className="connection-name no-connections-message">
-              No active adapter connection.
-            </span>
+            <div className="connection-name no-connections-message">
+              <span>No active adapter connection.</span>
+              <p className="help-text">
+                Click <strong>"+ New Adapter"</strong> to create one, or{" "}
+                <strong>"Restore Adapter"</strong> if you have saved
+                configurations.
+              </p>
+            </div>
           )}
         </div>
       </div>
