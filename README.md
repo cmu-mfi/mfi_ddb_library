@@ -5,6 +5,17 @@ Library to stream data to Digital Data Backend (DDB) for the MFI project.
 
 ## Installation
 
+### using uv manager
+
+Pre-requisite: Install [uv manager](https://docs.astral.sh/uv/getting-started/installation/)
+
+```
+git clone --recurse-submodules https://github.com/cmu-mfi/mfi_ddb_library.git
+uv sync
+```
+
+### using pip/venv
+
 **Linux**
 ```
 git clone --recurse-submodules https://github.com/cmu-mfi/mfi_ddb_library.git
