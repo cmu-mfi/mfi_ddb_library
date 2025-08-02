@@ -5,12 +5,20 @@ import sys
 import time
 from ctypes import POINTER, c_float, c_uint32, cast, pointer
 from typing import List, Optional
+import warnings
 
-import cv2
-import numpy as np
-import open3d as o3d
-import yaml
+try:
+    import cv2
+except Exception as e:
+    warnings.warn("WARNING: Unable to import cv2. RosFilesDataAdapter unavailable")
+
+try:
+    import open3d as o3d
+except Exception as e:
+    warnings.warn("WARNING: Unable to import open3d. RosFilesDataAdapter unavailable")
+
 from pydantic import BaseModel, Field
+import numpy as np
 
 from mfi_ddb.data_adapters.base import BaseDataAdapter
 
