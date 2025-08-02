@@ -19,6 +19,7 @@ dependencies = [
     "protobuf>=5.29.5",
     "pyyaml>=6.0.2",
     "requests>=2.32.4",
+    "rospkg>=1.6.0",
     "setuptools>=75.3.2",
     "watchdog>=4.0.2",
     "wheel>=0.45.1",
