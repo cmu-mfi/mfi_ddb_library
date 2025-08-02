@@ -4,11 +4,20 @@ import struct
 import sys
 import time
 from ctypes import POINTER, c_float, c_uint32, cast, pointer
+import warnings
 
-import cv2
-import numpy as np
-import open3d as o3d
+try:
+    import cv2
+except Exception as e:
+    warnings.warn("WARNING: Unable to import cv2. RosFilesDataAdapter unavailable")
+
+try:
+    import open3d as o3d
+except Exception as e:
+    warnings.warn("WARNING: Unable to import open3d. RosFilesDataAdapter unavailable")
+
 import yaml
+import numpy as np
 
 from mfi_ddb.data_adapters.base import BaseDataAdapter
 
