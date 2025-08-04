@@ -18,7 +18,8 @@ import importlib
 import inspect
 import asyncio
 import datetime
-
+import copy
+import time
 from fastapi import Path as FastAPIPath
 from fastapi.responses import StreamingResponse
 from mfi_ddb.streamer import Streamer
@@ -31,90 +32,97 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Background
 
 # Enhanced Adapter Factory
 class AdapterFactory:
-   def __init__(self):
-       self.adapter_map = self._discover_adapters()
+    def __init__(self):
+        self.adapter_map = self._discover_adapters()
 
-   def _discover_adapters(self):
-       """Discover all available adapter modules"""
-       import mfi_ddb.data_adapters as adapters_pkg
-       amap = {}
-       
-       for _, module_name, _ in pkgutil.iter_modules(adapters_pkg.__path__):
-           if module_name.startswith("_"):
-               continue
-           try:
-               module = importlib.import_module(f"{adapters_pkg.__name__}.{module_name}")
-               for cls_name, cls_obj in inspect.getmembers(module, inspect.isclass):
-                   if (cls_obj.__module__ == module.__name__ and cls_name.endswith("DataAdapter")):
-                       amap[module_name] = cls_obj
-           except ImportError as e:
-               print(f"Warning: Could not import adapter module {module_name}: {e}")
-       
-       if 'local_files' in amap:
-           amap['file'] = amap['local_files']
-           
-       return amap
+    def _discover_adapters(self):
+        """Discover all available adapter modules"""
+        import mfi_ddb.data_adapters as adapters_pkg
+        amap = {}
+        
+        for _, module_name, _ in pkgutil.iter_modules(adapters_pkg.__path__):
+            if module_name.startswith("_"):
+                continue
+            try:
+                module = importlib.import_module(f"{adapters_pkg.__name__}.{module_name}")
+                for cls_name, cls_obj in inspect.getmembers(module, inspect.isclass):
+                    if (cls_obj.__module__ == module.__name__ and cls_name.endswith("DataAdapter")):
+                        amap[module_name] = cls_obj
+            except ImportError as e:
+                print(f"Warning: Could not import adapter module {module_name}: {e}")
+        
+        if 'local_files' in amap:
+            amap['file'] = amap['local_files']
+            
+        return amap
 
-   async def create_adapter(self, protocol: str, config: dict, auto_connect: bool = False, timeout: int = 30):
-       """Create adapter instance for any protocol"""
-       if protocol not in self.adapter_map:
-           raise ValueError(f"Unknown protocol: {protocol}")
-       AdapterClass = self.adapter_map[protocol]
+    async def create_adapter(self, protocol: str, config: dict, auto_connect: bool = False, timeout: int = 30):
+        if protocol not in self.adapter_map:
+            raise ValueError(f"Unknown protocol: {protocol}")
+        
+        AdapterClass = self.adapter_map[protocol]
 
-       loop = asyncio.get_event_loop()
-       if protocol == 'mtconnect':
-           final_config = config
-       elif protocol in config and isinstance(config[protocol], dict):
-           final_config = config[protocol]
-       else:
-           final_config = config
-       try:
-           adapter = await asyncio.wait_for(
-               loop.run_in_executor(None, lambda: AdapterClass(final_config)),
-               timeout=timeout
-           )
-           if auto_connect and hasattr(adapter, 'connect'):
-               await asyncio.wait_for(
-                   loop.run_in_executor(None, adapter.connect),
-                   timeout=timeout
-               )
-           return adapter
-       except asyncio.TimeoutError:
-           raise TimeoutError(f"Adapter creation/connection timed out after {timeout} seconds")
-       except Exception as e:
-           raise RuntimeError(f"Failed to create {protocol} adapter: {e}")
+        if protocol == 'mtconnect':
+            final_config = config
+        elif protocol in config and isinstance(config[protocol], dict):
+            final_config = config[protocol]
+        else:
+            final_config = config
 
-   def supports_callbacks(self, protocol: str, adapter=None) -> bool:
-       """Check if adapter supports callback-based streaming"""
-       callback_protocols = {
-           'mqtt_adp': True,
-           'file': True,
-           'local_files': True,
-           'ros': 'dynamic',
-           'ros_files': 'dynamic'
-       }
-       
-       if protocol not in callback_protocols:
-           return False
-       
-       capability = callback_protocols[protocol]
-       if capability == 'dynamic':
-           if adapter and hasattr(adapter, 'cfg'):
-               return adapter.cfg.get('set_ros_callback', False)
-           return False
-       
-       return capability
+        try:
+            if protocol in ['ros', 'ros_files']:
+                # 👇 must run in main thread
+                adapter = AdapterClass(final_config)
+                if auto_connect and hasattr(adapter, 'connect'):
+                    adapter.connect()  # or `await adapter.connect()` if async
+            else:
+                loop = asyncio.get_event_loop()
+                adapter = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: AdapterClass(final_config)),
+                    timeout=timeout
+                )
+                if auto_connect and hasattr(adapter, 'connect'):
+                    await asyncio.wait_for(
+                        loop.run_in_executor(None, adapter.connect),
+                        timeout=timeout
+                    )
+            return adapter
+        except asyncio.TimeoutError:
+            raise TimeoutError(f"Adapter creation/connection timed out after {timeout} seconds")
+        except Exception as e:
+            raise RuntimeError(f"Failed to create {protocol} adapter: {e}")
 
-   def disconnect_adapter(self, protocol: str, adapter) -> bool:
-       """Generic adapter disconnect"""
-       try:
-           if hasattr(adapter, 'disconnect'):
-               adapter.disconnect()
-               return True
-           return True
-       except Exception as e:
-           print(f"Error disconnecting {protocol} adapter: {e}")
-           return False
+    def supports_callbacks(self, protocol: str, adapter=None) -> bool:
+        """Check if adapter supports callback-based streaming"""
+        callback_protocols = {
+            'mqtt_adp': True,
+            'file': True,
+            'local_files': True,
+            'ros': 'dynamic',
+            'ros_files': 'dynamic'
+        }
+        
+        if protocol not in callback_protocols:
+            return False
+        
+        capability = callback_protocols[protocol]
+        if capability == 'dynamic':
+            if adapter and hasattr(adapter, 'cfg'):
+                return adapter.cfg.get('set_ros_callback', False)
+            return False
+        
+        return capability
+
+    def disconnect_adapter(self, protocol: str, adapter) -> bool:
+        """Generic adapter disconnect"""
+        try:
+            if hasattr(adapter, 'disconnect'):
+                adapter.disconnect()
+                return True
+            return True
+        except Exception as e:
+            print(f"Error disconnecting {protocol} adapter: {e}")
+            return False
 
 # Initialize router and storage
 router = APIRouter()
@@ -167,7 +175,7 @@ async def _continuous_polling(conn_id: str, streamer, rate: int):
    
    # Ensure rate is valid
    try:
-       rate = float(rate) if rate else 1.0
+       rate = int(rate) if rate else 1
        sleep_interval = 1.0 / rate
    except (ValueError, ZeroDivisionError):
        rate = 1.0
@@ -233,7 +241,7 @@ async def validate(
    proto = pick_protocol(cfg)
    data = cfg.model_dump()
    try:
-       run_validation(data, proto)
+       run_validation(copy.deepcopy(data), proto)
    except ValueError as e:
        raise HTTPException(status_code=400, detail=f'Schema error: {e}')
    return {'valid': True}
@@ -265,7 +273,29 @@ async def connect(
        raise HTTPException(status_code=502, detail=f'Connection timed out: {e}')
    except Exception as e:
        raise HTTPException(status_code=502, detail=f'Connection failed: {e}')
-   
+   MAX_RETRIES = 30
+   WAIT_SEC = 0.5
+
+   print("Waiting for adapter to populate _data before starting Streamer...")
+
+   for attempt in range(MAX_RETRIES):
+        current_data = getattr(adapter, "_data", {})
+        if all(isinstance(val, dict) and bool(val) for val in current_data.values()):
+            print(f"Adapter data ready after {attempt + 1} attempts")
+            break
+
+        if hasattr(adapter, "get_data"):
+            try:
+                adapter.get_data()
+            except Exception as e:
+                print(f"get_data() failed on attempt {attempt + 1}: {e}")
+
+        time.sleep(WAIT_SEC)
+   else:
+        raise HTTPException(
+            status_code=502,
+            detail="Adapter did not populate data in time. Streamer not started."
+        )
    tmp_ADAPTERS[conn_id] = adapter
    rate = int(getattr(getattr(cfg, proto, None), 'stream_rate', 1))
    tmp_RATES[conn_id] = rate
