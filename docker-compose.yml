@@ -12,7 +12,7 @@ services:
     volumes:
       - ./web_interface/data_adapter/backend:/app
       - ./mfi_ddb:/app/mfi_ddb
-      - ${HOST_SHARED_DRIVE}:/mnt/shared_drive
+      # - ${HOST_SHARED_DRIVE}:/mnt/shared_drive
     working_dir: /app
 
   frontend:
@@ -25,6 +25,6 @@ services:
     volumes:
       - ./web_interface/data_adapter/frontend:/app    # your code
       - /app/node_modules                            # anonymous volume for node_modules
-      - ${HOST_SHARED_DRIVE}:/mnt/shared_drives
+      # - ${HOST_SHARED_DRIVE}:/mnt/shared_drives
     working_dir: /app
     command: npm start

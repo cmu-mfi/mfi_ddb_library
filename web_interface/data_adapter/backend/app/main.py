@@ -12,13 +12,17 @@ from fastapi.staticfiles import StaticFiles
 from app.routers.config import router, lifespan
 
 
-
 app = FastAPI(
     title="DDB Unified API",
     version="1.0.0",
     description="Core API for data adapter management",
     lifespan=lifespan
 )
+
+@app.on_event("startup")
+def init_ros_node():
+    import rospy
+    rospy.init_node("mfi_ddb_ros_adapter", anonymous=True)
 # Enable CORS for development
 app.add_middleware(
     CORSMiddleware,
