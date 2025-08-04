@@ -9,7 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 # Import the router and lifespan from your config module
-from api.data_adapters.routers.config import router, lifespan
+from app.routers.config import router, lifespan
+
 
 
 app = FastAPI(

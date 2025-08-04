@@ -1,0 +1,30 @@
+version: '3.9'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: web_interface/data_adapter/backend/Dockerfile
+    container_name: mfi_ddb_backend
+    network_mode: host
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./web_interface/data_adapter/backend:/app
+      - ./mfi_ddb:/app/mfi_ddb
+      - ${HOST_SHARED_DRIVE}:/mnt/shared_drive
+    working_dir: /app
+
+  frontend:
+    build:
+      context: ./web_interface/data_adapter/frontend
+    container_name: mfi_ddb_frontend
+    network_mode: host
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./web_interface/data_adapter/frontend:/app    # your code
+      - /app/node_modules                            # anonymous volume for node_modules
+      - ${HOST_SHARED_DRIVE}:/mnt/shared_drives
+    working_dir: /app
+    command: npm start

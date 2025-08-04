@@ -1,4 +1,4 @@
-from api.data_adapters.utils.loader import FullConfig
+from app.utils.loader import FullConfig
 
 """
 Configuration validation utility for data adapter protocols.
