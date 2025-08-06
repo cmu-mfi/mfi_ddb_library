@@ -4,11 +4,13 @@ import struct
 import sys
 import time
 from ctypes import POINTER, c_float, c_uint32, cast, pointer
+from typing import List, Optional
 
 import cv2
 import numpy as np
 import open3d as o3d
 import yaml
+from pydantic import BaseModel, Field
 
 from mfi_ddb.data_adapters.base import BaseDataAdapter
 
@@ -22,7 +24,54 @@ COMPATIBLE_MSG_TYPES = {
 IMG_FILE_TYPE = '.png'
 PCD_FILE_TYPE = '.ply'
 
+class _SCHEMA(BaseModel):
+    class _DEVICES(BaseModel):
+        namespace: str = Field(..., description="Namespace of the device in ROS")
+        rostopics: List[str] = Field(..., description="List of ROS topics to subscribe to for this device")
+        attributes: Optional[dict] = Field({}, description="Attributes of the device. Optional.")
+    class SCHEMA(BaseModel):
+        trial_id: str = Field(..., description="Trial ID for the ROS device. No spaces or special characters allowed.")
+        set_ros_callback: bool = Field(True, description="Set ROS callback to receive data from ROS topics. If set to False, you need to call get_data() method to get data from ROS topics.")
+        devices: List["_DEVICES"] = Field(..., description="List of devices to subscribe to.")
+
+
 class RosFilesDataAdapter(BaseDataAdapter):
+    
+    NAME = "ROS Files"
+    CONFIG_HELP = {
+        "trial_id": "Trial ID for the ROS device. No spaces or special characters allowed.",
+        "set_ros_callback": "Set ROS callback to receive data from ROS topics. If set to False, you need to call get_data() method to get data from ROS topics.",
+        "devices": "List of devices to subscribe to. Each device should have a 'namespace' and a list of 'rostopics' to subscribe to. 'attributes' are optional and can be used to set the attributes of the device.",   
+    }
+    CONFIG_EXAMPLE = {
+        "trial_id": "trial_001",
+        "set_ros_callback": True,
+        "devices": {
+            "device1": {
+                "namespace": "robot_arm",
+                "rostopics": ["/joint_states", "/camera/image_raw"],
+                "attributes": {
+                    "manufacturer": "RobotCorp",
+                    "model": "RobotArmX",
+                    "description": "A robotic arm for testing purposes."
+                }
+            },
+            "device2": {
+                "namespace": "machine_a",
+                "rostopics": ["/machine_a/status"],
+                "attributes": {
+                    "manufacturer": "MachineCorp",
+                    "version": 0.1,
+                    "description": "A machine for testing purposes."
+                }
+            }
+        }
+    }
+    RECOMMENDED_TOPIC_FAMILY = "blob"
+    
+    class SCHEMA(BaseDataAdapter.SCHEMA, _SCHEMA.SCHEMA):
+        pass
+
     def __init__(self, config: dict) -> None:
         super().__init__()
         
@@ -52,7 +101,7 @@ class RosFilesDataAdapter(BaseDataAdapter):
             config["max_wait_per_topic"] = 1
 
         if "set_ros_callback" not in config.keys():
-            config["set_ros_callback"] = False
+            config["set_ros_callback"] = True
 
         # INIT DATA MEMBERS FROM CONFIG
         self.cfg = config
