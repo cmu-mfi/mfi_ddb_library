@@ -1,13 +1,14 @@
+import copy
 import json
 import os
-import copy
-import sys
 import platform
 import socket
+import sys
 import time
 from datetime import datetime
 
 import paho.mqtt.client as paho_mqtt
+from pydantic import BaseModel, Field
 
 from mfi_ddb.data_adapters import *
 from mfi_ddb.topic_families import *
@@ -25,6 +26,17 @@ TOPIC_CLIENTS = {
 }
 
 class Streamer(Observer):
+
+    CONFIG_EXAMPLE = None
+    CONFIG_HELP = None
+    
+    class SCHEMA(BaseModel):
+        """
+        Schema for the data adapter configuration.
+        """
+        # Define the schema for the data adapter configuration here
+        pass
+        
     def __init__(self, config: dict, data_adp: BaseDataAdapter, stream_on_update:bool = False) -> None:
         super().__init__()
         
@@ -41,6 +53,7 @@ class Streamer(Observer):
         self.__client = globals()[TOPIC_CLIENTS[topic_family_name][0]](self.cfg, topic_family)
         self.__data_adp = data_adp        
         self.__client.connect(data_adp.component_ids)
+
         self.__data_adp.get_data()
         print("WARNING: Waiting for birth data to be populated in the data adapter for all components...")
         while any(not bool(value) for value in self.__data_adp.data.values()):
@@ -68,7 +81,7 @@ class Streamer(Observer):
 
         # 3. publish the key-value metadata birth message with initial data
         # `````````````````````````````````````````````````````````````````````````
-        
+                
         kv_client.set_death_payload("metadata", {'death': kv_payload})
         kv_client.connect(['metadata'])
         
@@ -87,6 +100,15 @@ class Streamer(Observer):
         
         if stream_on_update:
             self.__data_adp.add_observer(self)
+    
+    def disconnect(self):
+        try:
+            self.__client.disconnect()
+            self.__data_adp.disconnect()
+            print("Client disconnected and data adapter deleted.")
+            print("Streamer instance deleted. Bye! \u2764\uFE0F MFI")
+        except Exception as e:
+            print(f"Error while disconnecting: {e}")
         
     def reconnect(self, config=None):
         config = self.cfg if config==None else config

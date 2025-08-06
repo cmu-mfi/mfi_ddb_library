@@ -5,11 +5,50 @@ import requests
 import xmltodict
 from omegaconf import OmegaConf
 from ping3 import ping
+from pydantic import BaseModel, Field
 
 from mfi_ddb.data_adapters.base import BaseDataAdapter
 
 
+class _SCHEMA(BaseModel):
+    class _MTCONNECT(BaseModel):
+        agent_ip: str = Field(..., description="IP address of the MTConnect agent")
+        agent_url: str = Field(..., description="URL of the MTConnect agent")
+        device_name: str = Field(..., description="Name of the device to be used in the data object")
+        trial_id: str = Field(..., description="Trial ID for the MTConnect device. No spaces or special characters allowed.")    
+    class SCHEMA(BaseModel):
+        mtconnect: "_MTCONNECT" = Field(..., description="Configuration for the MTConnect agent connection")
+
 class MTconnectDataAdapter(BaseDataAdapter):
+    
+    NAME = "MTConnect"
+    
+    CONFIG_HELP = {
+        "mtconnect": {
+            "agent_ip": "IP address of the MTConnect agent",
+            "agent_url": "URL of the MTConnect agent",
+            "device_name": "Name of the device to be used in the data object",
+            "trial_id": "Trial ID for the MTConnect device. No spaces or special characters allowed.",
+        }
+    }
+    
+    CONFIG_EXAMPLE = {
+        "mtconnect": {
+            "agent_ip": "192.168.1.1",
+            "agent_url": "http://192.168.1.1:5000",
+            "device_name": "MTConnectDevice",
+            "trial_id": "trial_001"
+        }
+    }
+    
+    RECOMMENDED_TOPIC_FAMILY = "historian"
+
+    class SCHEMA(BaseDataAdapter.SCHEMA, _SCHEMA.SCHEMA):
+        """
+        Schema for the MTConnect data adapter configuration.
+        """
+        pass
+
     def __init__(self, config: dict):
         super().__init__()
         
@@ -64,13 +103,9 @@ class MTconnectDataAdapter(BaseDataAdapter):
                     
     def get_data(self):
         raw_data = self.__request_agent('current')
-
-        # component_stream = raw_data.MTConnectStreams.Streams.DeviceStream.ComponentStream
-        # Handle both single device and multiple devices
-        # 
         devices = raw_data.MTConnectStreams.Streams.DeviceStream
         device = devices[0] if isinstance(devices, omegaconf.listconfig.ListConfig) else devices
-
+        
         component_stream = device.ComponentStream
         if not isinstance(component_stream, omegaconf.listconfig.ListConfig):
             component_stream = [component_stream]
@@ -81,6 +116,7 @@ class MTconnectDataAdapter(BaseDataAdapter):
         raw_data = self.__request_agent('sample')
         devices = raw_data.MTConnectStreams.Streams.DeviceStream
         device = devices[0] if isinstance(devices, omegaconf.listconfig.ListConfig) else devices
+        
         component_stream = device.ComponentStream
         if not isinstance(component_stream, omegaconf.listconfig.ListConfig):
             component_stream = [component_stream]
@@ -91,40 +127,26 @@ class MTconnectDataAdapter(BaseDataAdapter):
     def __connect(self):
         # Ping to see if MTConnect agent is active -----------------------------------
         print("Checking if MTConnect agent is active ...")
-        # ──── HTTP CHECK (for web agents like Mazak) ────
-        # Comment out this section for edge device testing
-        try:
-            agent_url = self.cfg['mtconnect']['agent_url']
-            response = requests.get(f"{agent_url}current", timeout=5)
-            if response.status_code == 200:
-                print(f"MTConnect agent at {agent_url} is active (HTTP)")
-                return
-        except Exception as e:
-            print(f"HTTP check failed: {e}")
-        
-    # ──── PING CHECK (for edge devices) ────
         ip = self.cfg['mtconnect']['agent_ip']
         
         response = ping(ip)
-        attempts = 0
-        max_attempts = 10  # 30 second timeout
+        timeout = self.cfg['mtconnect'].get('timeout', 5) if 'timeout' in self.cfg['mtconnect'] else 5
         
-        while response is None and attempts < max_attempts:
-            print(f"MTConnect agent not active. Waiting... ({attempts + 1}/{max_attempts})")
-        # while response is None:
+        start_time = time.time()
+        time_elapsed = 0
+        while response is None or time_elapsed < timeout:
             print("MTConnect agent is not active. Waiting ...")
             time.sleep(1)
             response = ping(ip)
-            attempts += 1
-        
+            time_elapsed = time.time() - start_time
+            
         if response is None:
-            raise Exception(f"MTConnect agent at {ip} not reachable after {max_attempts}s")
-    
+            raise ConnectionError(f"MTConnect agent at {ip} is not responding after {timeout} seconds.")
         
         print(f"MTConnect agent at {ip} is active")    
         
     def __request_agent(self, ext: str):
-        URL = str(self.cfg['mtconnect']['agent_url'])
+        URL = self.cfg['mtconnect']['agent_url']
         response = requests.get(URL + ext)
         val = xmltodict.parse(response.text, encoding='utf-8')
         val = OmegaConf.create(val)        
@@ -145,7 +167,7 @@ class MTconnectDataAdapter(BaseDataAdapter):
         
         return component_data
 
-    def __populate_data(self, raw_data):     #populates the data from xml to dict
+    def __populate_data(self, raw_data):
         
         current_time = time.time()
         

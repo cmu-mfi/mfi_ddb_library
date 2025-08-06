@@ -1,10 +1,24 @@
 import threading
-import time
+
+from pydantic import BaseModel
+
 
 class BaseDataAdapter:
     """
     Base class for data adapters. Use as a super class for the data adapters that will be used in the PullStreamToMqtt(Spb) and PushStreamToMqtt(Spb) classes.
     """
+
+    NAME = None
+    CONFIG_EXAMPLE = None
+    CONFIG_HELP = None
+    RECOMMENDED_TOPIC_FAMILY = None
+
+    class SCHEMA(BaseModel):
+        """
+        Schema for the data adapter configuration. 
+        Override this class in the child class to define the schema for the data adapter configuration.
+        """
+        pass
 
     def __init__(self, config: dict = None) -> None:
         self.component_ids = []
@@ -39,6 +53,18 @@ class BaseDataAdapter:
         # cfg is a dictionary that contains the configuration of the data object.
 
         self._observers = []  # List of observers (listeners)
+
+    def disconnect(self):
+        """
+        Disconnect from the data source and clean up resources.
+        """
+        self.clear_data_buffer()
+        self._data.clear()
+        self._cb_data.clear()
+        self.last_updated.clear()
+        self.attributes.clear()
+        self.cfg = None
+        self._observers.clear()
 
     @property
     def data(self):
@@ -75,13 +101,6 @@ class BaseDataAdapter:
         Update data from the data source. If not defined in the child class, it will call the get_data() method.
         """
         self.get_data()
-
-    def clear_data_buffer(self):
-        """
-        Clear the data buffer of each component_id after the data has been streamed.
-        """
-        for component_id in self.component_ids:
-            self.data[component_id] = {}
             
     def update_config(self, config: dict):
         """
@@ -110,11 +129,11 @@ class BaseDataAdapter:
             # Run observer callback in a separate thread
             threading.Thread(target=observer.on_data_update, args=(new_value,), daemon=True).start()
             
-    def clear_data_buffer(self, component_ids:list=None):
+    def clear_data_buffer(self, component_ids:list=[]):
         """
         Clear the data buffer of each component_id. Used by streamers to clear already streamed data
         """
-        component_ids = self.component_ids if component_ids==None else component_ids
+        component_ids = component_ids if component_ids else self.component_ids
         
         for component_id in component_ids:
             self.data[component_id] = {}            

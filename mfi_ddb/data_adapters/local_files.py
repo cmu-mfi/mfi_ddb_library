@@ -1,11 +1,13 @@
+import base64
 import os
 import platform
 import socket
 import time
+from typing import List
 
-import base64
 import numpy as np
 import yaml
+from pydantic import BaseModel, Field
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
@@ -13,6 +15,50 @@ from mfi_ddb.data_adapters.base import BaseDataAdapter
 
 
 class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
+    
+    NAME = "Local Files"
+    
+    CONFIG_HELP = {
+        "watch_dir": "List of directories to watch for new files. The first directory will be used to create a starter file.",
+        "buffer_size": "Maximum number of files to buffer before streaming. If the buffer is full, the oldest file will be removed.",
+        "wait_before_read": "Time in seconds to wait before reading a new file after it is created. This is to ensure the file is fully written.",
+        "system": {
+            "name": "Name of the system",
+            "trial_id": "Trial ID for the system. No spaces or special characters allowed.",
+            "description": "Description of the system",
+            "other_attributes": "Other attributes of the system"
+        }
+    }
+    
+    CONFIG_EXAMPLE = {
+        "watch_dir": ["/path/to/watch/dir"],
+        "buffer_size": 10,
+        "wait_before_read": 2,
+        "system": {
+            "name": "local_files_system",
+            "trial_id": "trial_001",
+            "description": "Local files data adapter system",
+            "manufacturer": "Example Corp",
+            "model": "LocalFilesModel"
+        }
+    }
+    
+    RECOMMENDED_TOPIC_FAMILY = "blob"
+    
+    class _SystemInfo(BaseModel):
+        trial_id: str = Field(..., description="Trial ID for the system. No spaces or special characters allowed.")
+        name: str = Field(..., description="Name of the system.")
+                
+        model_config = {
+            "extra": "allow"
+        }        
+    
+    class SCHEMA(BaseDataAdapter.SCHEMA):
+        watch_dir: List[str] = Field(..., description="List of directories to watch for new files.")
+        buffer_size: int = Field(..., description="Maximum number of files to buffer before streaming.")
+        wait_before_read: int = Field(..., description="Time in seconds to wait before reading a new file.")
+        system: "_SystemInfo" = Field(..., description="System information including trial ID, name, and other attributes.")
+
     def __init__(self, config: dict = None) -> None:
         super().__init__(config)
         
