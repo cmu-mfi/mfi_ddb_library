@@ -129,7 +129,9 @@ class MqttSpb:
             print(f"Data published for component {component_id}")
     
     def disconnect(self):
-        pass
+        for component_id in self._components.keys():
+            self._components[component_id].disconnect()
+            print(f"Disconnected from component {component_id}")
     
     def __check_attributes(self, attributes: dict):
         return self.__check_data(attributes)
