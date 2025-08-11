@@ -26,8 +26,8 @@ def get_blob_json_payload_from_dict(data: dict, file_name: str, trial_id:str) ->
     """
     if not isinstance(data, dict):
         raise TypeError("Data must be a dictionary")
-    
-      # check if any value was bytes type
+
+    # check if any value was bytes type
     def drop_bytes_values(d: dict) -> dict:
         for key, value in list(d.items()):
             if isinstance(value, bytes):
