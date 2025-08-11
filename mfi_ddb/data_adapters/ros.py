@@ -51,6 +51,8 @@ class RosDataAdapter(BaseDataAdapter):
         }
     }    
     RECOMMENDED_TOPIC_FAMILY = "historian"
+
+    CALLBACKS_SUPPORTED = True
     
     class SCHEMA(BaseDataAdapter.SCHEMA, _SCHEMA.SCHEMA):
         pass

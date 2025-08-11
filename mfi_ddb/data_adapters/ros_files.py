@@ -68,6 +68,8 @@ class RosFilesDataAdapter(BaseDataAdapter):
         }
     }
     RECOMMENDED_TOPIC_FAMILY = "blob"
+
+    CALLBACKS_SUPPORTED = True
     
     class SCHEMA(BaseDataAdapter.SCHEMA, _SCHEMA.SCHEMA):
         pass

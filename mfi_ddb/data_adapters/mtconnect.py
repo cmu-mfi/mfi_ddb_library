@@ -43,6 +43,8 @@ class MTconnectDataAdapter(BaseDataAdapter):
     
     RECOMMENDED_TOPIC_FAMILY = "historian"
 
+    CALLBACKS_SUPPORTED = False
+
     class SCHEMA(BaseDataAdapter.SCHEMA, _SCHEMA.SCHEMA):
         """
         Schema for the MTConnect data adapter configuration.
@@ -125,29 +127,47 @@ class MTconnectDataAdapter(BaseDataAdapter):
         
         
     def __connect(self):
-        # Ping to see if MTConnect agent is active -----------------------------------
         print("Checking if MTConnect agent is active ...")
-        ip = self.cfg['mtconnect']['agent_ip']
-        
-        response = ping(ip)
-        timeout = self.cfg['mtconnect'].get('timeout', 5) if 'timeout' in self.cfg['mtconnect'] else 5
-        
-        start_time = time.time()
-        time_elapsed = 0
-        while response is None or time_elapsed < timeout:
+        url = self.cfg['mtconnect']['agent_url'].rstrip('/')
+        ip_or_host = self.cfg['mtconnect']['agent_ip']
+        timeout_sec = int(self.cfg['mtconnect'].get('timeout', 5))
+
+        # 1) Prefer HTTP probe – it’s what MTConnect guarantees
+        try:
+            r = requests.get(f"{url}/probe", timeout=timeout_sec)
+            r.raise_for_status()
+            print(f"MTConnect agent reachable via HTTP at {url}")
+            return
+        except Exception as http_err:
+            print(f"HTTP probe failed ({http_err}); falling back to ICMP ping...")
+
+        # 2) ICMP fallback (may be blocked/non-admin on Windows)
+        try:
+            resp = ping(ip_or_host, timeout=1)
+        except Exception:
+            resp = None
+
+        start = time.time()
+        while resp is None and (time.time() - start) < timeout_sec:
             print("MTConnect agent is not active. Waiting ...")
             time.sleep(1)
-            response = ping(ip)
-            time_elapsed = time.time() - start_time
-            
-        if response is None:
-            raise ConnectionError(f"MTConnect agent at {ip} is not responding after {timeout} seconds.")
-        
-        print(f"MTConnect agent at {ip} is active")    
+            try:
+                resp = ping(ip_or_host, timeout=1)
+            except Exception:
+                resp = None
+
+        if resp is None:
+            raise ConnectionError(
+                f"MTConnect agent at {ip_or_host} not reachable "
+                f"(HTTP probe failed and no ICMP reply within {timeout_sec}s)."
+            )
+
+        print(f"MTConnect agent at {ip_or_host} is active")
+  
         
     def __request_agent(self, ext: str):
-        URL = self.cfg['mtconnect']['agent_url']
-        response = requests.get(URL + ext)
+        URL = self.cfg['mtconnect']['agent_url'].rstrip('/')
+        response = requests.get(f"{URL}/{ext}")
         val = xmltodict.parse(response.text, encoding='utf-8')
         val = OmegaConf.create(val)        
         return val

@@ -12,6 +12,7 @@ class BaseDataAdapter:
     CONFIG_EXAMPLE = None
     CONFIG_HELP = None
     RECOMMENDED_TOPIC_FAMILY = None
+    CALLBACKS_SUPPORTED = False
 
     class SCHEMA(BaseModel):
         """

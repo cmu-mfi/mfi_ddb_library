@@ -33,7 +33,7 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
     CONFIG_EXAMPLE = {
         "watch_dir": ["/path/to/watch/dir"],
         "buffer_size": 10,
-        "wait_before_read": 2,
+        "wait_before_read": 5,
         "system": {
             "name": "local_files_system",
             "trial_id": "trial_001",
@@ -44,6 +44,8 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
     }
     
     RECOMMENDED_TOPIC_FAMILY = "blob"
+    
+    CALLBACKS_SUPPORTED = True
     
     class _SystemInfo(BaseModel):
         trial_id: str = Field(..., description="Trial ID for the system. No spaces or special characters allowed.")

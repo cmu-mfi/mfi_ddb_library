@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import ConnectionList from "./components/ConnectionList";
 import ConnectionModal from "./components/ConnectionModal";
 import { ConnectionManager } from "./components/ConnectionManager";
+import logoMfi from "./images/logo_mfi.png";
 import "./App.css";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
@@ -459,11 +460,20 @@ function App() {
 
   return (
     <div className="app">
-      <div className={`server-status ${serverStatus}`}>
-        Server: {serverStatus}
-        {isRestoring && " (Restoring...)"}
+      <div className="app-header">
+        <div className="logo">
+          <img
+            src={logoMfi}
+            className="app-logo"
+            alt="Manufacturing Futures Institute Logo"
+            width={200}
+          />
+        </div>
+        <div className={`server-status ${serverStatus}`}>
+          Server: {serverStatus}
+          {isRestoring && " (Restoring...)"}
+        </div>
       </div>
-
       <main className="app-main">
         <ConnectionList
           connections={connections}

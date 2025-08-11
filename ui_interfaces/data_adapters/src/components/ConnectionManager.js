@@ -1,24 +1,23 @@
-// ConnectionManager.js - Fixed to prevent auto-pausing on connection failures
+// ConnectionManager.js - Adapter-agnostic, no protocol maps, preserves exact YAML
 export class ConnectionManager {
   static STORAGE_KEY = "adapter_connections";
   static STATE_KEY = "adapter_states";
   static SESSION_KEY = "session_info";
 
-  // Save complete connection data in correct format
+  // Save complete connection data
   static saveConnection(connectionId, connectionData) {
     const connections = this.getSavedConnections();
 
-    // Store in format that restoration expects
     connections[connectionId] = {
       id: connectionId,
       name: connectionData.name || connectionData.type,
-      type: connectionData.type,
-      topicFamily: connectionData.topicFamily,
-      configuration: connectionData.configuration, // Raw YAML config
+      type: connectionData.type, // display label only
+      topicFamily: connectionData.topicFamily, // kv | blob | historian
+      configuration: connectionData.configuration, // inner text shown in UI
       mqttConfig: connectionData.mqttConfig || "",
-      protocol:
-        connectionData.protocol ||
-        this.getProtocolFromType(connectionData.type),
+      protocol: connectionData.protocol || null, // not used anymore
+      yaml: connectionData.yaml || null, // exact YAML posted to backend
+      adapterKey: connectionData.adapterKey || null, // backend-detected adapter key
       saved_at: connectionData.savedAt || new Date().toISOString(),
       updated_at: connectionData.updatedAt || null,
     };
@@ -28,18 +27,6 @@ export class ConnectionManager {
       `Saved connection data for ${connectionId}:`,
       connections[connectionId]
     );
-  }
-
-  // Add helper method:
-  static getProtocolFromType(type) {
-    const mapping = {
-      ROS: "ros",
-      "ROS Files": "ros_files",
-      "Local Files": "file",
-      MTConnect: "mtconnect",
-      "MQTT-ADP": "mqtt_adp",
-    };
-    return mapping[type] || "unknown";
   }
 
   static getSavedConnections() {
@@ -52,16 +39,15 @@ export class ConnectionManager {
     }
   }
 
-  // FIXED: Only save state when explicitly called by user actions
+  // Only save state when explicitly called by user actions
   static saveConnectionState(connectionId, state, source = "user") {
     const states = this.getConnectionStates();
 
-    // Only save state changes that come from user actions, not system failures
     if (source === "user") {
       states[connectionId] = {
-        state: state, // "streaming" or "paused"
+        state, // "streaming" | "paused"
         updated_at: new Date().toISOString(),
-        source: source, // Track what caused the state change
+        source,
       };
       localStorage.setItem(this.STATE_KEY, JSON.stringify(states));
       console.log(
@@ -74,11 +60,10 @@ export class ConnectionManager {
     }
   }
 
-  // FIXED: Don't auto-save paused state on connection failures
+  // Don't auto-save paused state on connection failures
   static markConnectionAsFailedTemporarily(connectionId, reason) {
-    // This is for logging only - don't save to localStorage
     console.log(`Connection ${connectionId} temporarily failed: ${reason}`);
-    console.log(`State will remain as saved in localStorage, not auto-paused`);
+    console.log("State will remain as saved in localStorage, not auto-paused");
   }
 
   static getConnectionState(connectionId) {
@@ -107,7 +92,7 @@ export class ConnectionManager {
     localStorage.setItem(this.STATE_KEY, JSON.stringify(states));
   }
 
-  // PERMANENT FIX: More robust restoration logic
+  // Restoration policy for the current session
   static shouldRestoreOnStartup() {
     console.log("DEBUG: Checking shouldRestoreOnStartup conditions...");
 
@@ -125,16 +110,10 @@ export class ConnectionManager {
       return false;
     }
 
-    // More lenient restoration logic:
-    // 1. Always restore if no session info exists (new session)
-    // 2. Restore if restoration was never completed successfully
-    // 3. Allow restoration if it's been more than 5 minutes since last attempt
-
     const sessionInfo = sessionStorage.getItem(this.SESSION_KEY);
     console.log("DEBUG: Session info:", sessionInfo);
 
     if (!sessionInfo) {
-      // New session - definitely restore
       console.log("DEBUG: New session detected - creating session info");
       this._createNewSession();
       return true;
@@ -144,7 +123,6 @@ export class ConnectionManager {
       const session = JSON.parse(sessionInfo);
       console.log("DEBUG: Parsed session:", session);
 
-      // If never restored successfully, allow restoration
       if (!session.restored) {
         console.log(
           "DEBUG: Never restored in this session, allowing restoration"
@@ -152,8 +130,6 @@ export class ConnectionManager {
         return true;
       }
 
-      // If last restoration was more than 5 minutes ago, allow re-restoration
-      // (handles cases where server restarted after successful frontend restoration)
       if (session.completedAt) {
         const lastRestore = new Date(session.completedAt);
         const now = new Date();
@@ -175,14 +151,10 @@ export class ConnectionManager {
         }
       }
 
-      const shouldRestore = !session.restored;
-      console.log(
-        `DEBUG: Should restore based on session.restored: ${shouldRestore}`
-      );
+      console.log("DEBUG: Should restore based on session.restored: false");
       return false;
     } catch (e) {
       console.error("DEBUG: Failed to parse session info:", e);
-      // If we can't parse session, assume we should restore
       this._createNewSession();
       return true;
     }
@@ -215,7 +187,6 @@ export class ConnectionManager {
     }
   }
 
-  // Add method to force restoration (useful for manual restore button)
   static resetRestorationState() {
     sessionStorage.removeItem(this.SESSION_KEY);
     console.log(
@@ -223,7 +194,6 @@ export class ConnectionManager {
     );
   }
 
-  // Enhanced method to check if connections are actually working
   static async verifyConnections() {
     const connections = this.getSavedConnections();
     const results = {};
@@ -271,7 +241,6 @@ export class ConnectionManager {
     sessionStorage.removeItem(this.SESSION_KEY);
   }
 
-  // Enhanced debugging method
   static debugStorage() {
     console.log("=== LOCALSTORAGE DEBUG ===");
 
@@ -304,23 +273,20 @@ export class ConnectionManager {
 
       const config = this.getYamlConfig(id);
       console.log(`  Has YAML config: ${!!config}`);
-      if (config) {
-        console.log(`  YAML length: ${config.length} chars`);
-      }
+      if (config) console.log(`  YAML length: ${config.length} chars`);
     });
 
     console.log("Should restore on startup:", this.shouldRestoreOnStartup());
     console.log("=== END DEBUG ===");
   }
 
-  // Force restoration method for debugging
   static forceRestore() {
     console.log("DEBUG: Forcing restoration by clearing session");
     sessionStorage.removeItem(this.SESSION_KEY);
     return this.shouldRestoreOnStartup();
   }
 
-  // Get YAML config for restoration (creates complete config from saved data)
+  // Get YAML config for restoration (adapter-agnostic)
   static getYamlConfig(connectionId) {
     console.log(`DEBUG: Getting YAML config for ${connectionId}`);
 
@@ -333,54 +299,48 @@ export class ConnectionManager {
       return null;
     }
 
-    console.log(`DEBUG: Found connection:`, {
-      id: connection.id,
-      name: connection.name,
-      type: connection.type,
-      topicFamily: connection.topicFamily,
-      hasConfiguration: !!connection.configuration,
-      hasMqttConfig: !!connection.mqttConfig,
-    });
-
-    const protocolMapping = {
-      ROS: "ros",
-      "ROS Files": "ros_files",
-      "Local Files": "file",
-      MTConnect: "mtconnect",
-      "MQTT-ADP": "mqtt_adp",
-    };
-
-    const protocolKey = protocolMapping[connection.type];
-    let wrappedConfig = connection.configuration;
-
-    console.log(
-      `DEBUG: Protocol mapping: ${connection.type} -> ${protocolKey}`
-    );
-
-    // Wrap configuration with protocol key if needed
-    if (
-      protocolKey &&
-      !connection.configuration.trim().startsWith(protocolKey + ":")
-    ) {
-      wrappedConfig = `${protocolKey}:\n${connection.configuration.replace(
-        /^/gm,
-        "  "
-      )}`;
-      console.log(`DEBUG: Wrapped config with protocol key`);
-    }
-
-    let combinedConfig = `topic_family: ${connection.topicFamily}\n\n${wrappedConfig}`;
-
-    // Add MQTT config if present
-    if (connection.mqttConfig && connection.mqttConfig.trim()) {
-      combinedConfig += `\n\n${connection.mqttConfig}`;
-      console.log(`DEBUG: Added MQTT config`);
+    // 1) Preferred: exact YAML saved at connect time
+    if (connection.yaml && connection.yaml.trim()) {
+      return connection.yaml.trim();
     }
 
     console.log(
-      `DEBUG: Generated YAML config (first 200 chars):`,
-      combinedConfig.substring(0, 200)
+      "DEBUG: No saved 'yaml', building from fields (legacy fallback).",
+      {
+        id: connection.id,
+        name: connection.name,
+        type: connection.type,
+        topicFamily: connection.topicFamily,
+        hasConfiguration: !!connection.configuration,
+        hasMqttConfig: !!connection.mqttConfig,
+        adapterKey: connection.adapterKey || null,
+      }
     );
-    return combinedConfig;
+
+    // 2) Adapter-agnostic fallback using backend-provided adapterKey, if present
+    let inner = (connection.configuration || "").trim();
+    const mqttPart =
+      connection.mqttConfig && connection.mqttConfig.trim()
+        ? `\n\n${connection.mqttConfig.trim()}`
+        : "";
+
+    const key = (connection.adapterKey || "").trim();
+    if (key && inner && !inner.startsWith(key + ":")) {
+      inner = `${key}:\n` + inner.replace(/^/gm, "  ");
+    }
+
+    if (!inner) {
+      console.warn(
+        `DEBUG: No configuration text to build YAML for ${connectionId}.`
+      );
+      return null;
+    }
+
+    const combined = `topic_family: ${connection.topicFamily}\n\n${inner}${mqttPart}`;
+    console.log(
+      "DEBUG: Generated YAML config (first 200 chars):",
+      combined.substring(0, 200)
+    );
+    return combined;
   }
 }

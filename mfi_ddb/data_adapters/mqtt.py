@@ -144,6 +144,8 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
     }
     
     RECOMMENDED_TOPIC_FAMILY = "historian"
+
+    CALLBACKS_SUPPORTED = True
     
     class SCHEMA(BaseDataAdapter.SCHEMA, _SCHEMA.SCHEMA):
         pass        

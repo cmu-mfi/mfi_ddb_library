@@ -238,7 +238,6 @@ export default function ConnectionItem({
       );
 
       if (resumeResponse.ok) {
-        const result = await resumeResponse.json();
         setLocalState("streaming");
         // FIXED: Only save user-triggered resume
         ConnectionManager.saveConnectionState(

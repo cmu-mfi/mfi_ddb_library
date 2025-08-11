@@ -48,9 +48,7 @@ const ConnectionList = ({
             <div className="connection-name no-connections-message">
               <span>No active adapter connection.</span>
               <p className="help-text">
-                Click <strong>"+ New Adapter"</strong> to create one, or{" "}
-                <strong>"Restore Adapter"</strong> if you have saved
-                configurations.
+                Click <strong>"+ New Adapter"</strong> to create an adapter
               </p>
             </div>
           )}
