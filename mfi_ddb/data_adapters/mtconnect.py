@@ -5,11 +5,52 @@ import requests
 import xmltodict
 from omegaconf import OmegaConf
 from ping3 import ping
+from pydantic import BaseModel, Field
 
 from mfi_ddb.data_adapters.base import BaseDataAdapter
 
 
+class _SCHEMA(BaseModel):
+    class _MTCONNECT(BaseModel):
+        agent_ip: str = Field(..., description="IP address of the MTConnect agent")
+        agent_url: str = Field(..., description="URL of the MTConnect agent")
+        device_name: str = Field(..., description="Name of the device to be used in the data object")
+        trial_id: str = Field(..., description="Trial ID for the MTConnect device. No spaces or special characters allowed.")    
+    class SCHEMA(BaseModel):
+        mtconnect: "_MTCONNECT" = Field(..., description="Configuration for the MTConnect agent connection")
+
 class MTconnectDataAdapter(BaseDataAdapter):
+    
+    NAME = "MTConnect"
+    
+    CONFIG_HELP = {
+        "mtconnect": {
+            "agent_ip": "IP address of the MTConnect agent",
+            "agent_url": "URL of the MTConnect agent",
+            "device_name": "Name of the device to be used in the data object",
+            "trial_id": "Trial ID for the MTConnect device. No spaces or special characters allowed.",
+        }
+    }
+    
+    CONFIG_EXAMPLE = {
+        "mtconnect": {
+            "agent_ip": "192.168.1.1",
+            "agent_url": "http://192.168.1.1:5000",
+            "device_name": "MTConnectDevice",
+            "trial_id": "trial_001"
+        }
+    }
+    
+    RECOMMENDED_TOPIC_FAMILY = "historian"
+
+    CALLBACKS_SUPPORTED = False
+
+    class SCHEMA(BaseDataAdapter.SCHEMA, _SCHEMA.SCHEMA):
+        """
+        Schema for the MTConnect data adapter configuration.
+        """
+        pass
+
     def __init__(self, config: dict):
         super().__init__()
         
@@ -86,22 +127,47 @@ class MTconnectDataAdapter(BaseDataAdapter):
         
         
     def __connect(self):
-        # Ping to see if MTConnect agent is active -----------------------------------
         print("Checking if MTConnect agent is active ...")
-        ip = self.cfg['mtconnect']['agent_ip']
-        
-        response = ping(ip)
-        
-        while response is None:
+        url = self.cfg['mtconnect']['agent_url'].rstrip('/')
+        ip_or_host = self.cfg['mtconnect']['agent_ip']
+        timeout_sec = int(self.cfg['mtconnect'].get('timeout', 5))
+
+        # 1) Prefer HTTP probe – it’s what MTConnect guarantees
+        try:
+            r = requests.get(f"{url}/probe", timeout=timeout_sec)
+            r.raise_for_status()
+            print(f"MTConnect agent reachable via HTTP at {url}")
+            return
+        except Exception as http_err:
+            print(f"HTTP probe failed ({http_err}); falling back to ICMP ping...")
+
+        # 2) ICMP fallback (may be blocked/non-admin on Windows)
+        try:
+            resp = ping(ip_or_host, timeout=1)
+        except Exception:
+            resp = None
+
+        start = time.time()
+        while resp is None and (time.time() - start) < timeout_sec:
             print("MTConnect agent is not active. Waiting ...")
             time.sleep(1)
-            response = ping(ip)
-        
-        print(f"MTConnect agent at {ip} is active")    
+            try:
+                resp = ping(ip_or_host, timeout=1)
+            except Exception:
+                resp = None
+
+        if resp is None:
+            raise ConnectionError(
+                f"MTConnect agent at {ip_or_host} not reachable "
+                f"(HTTP probe failed and no ICMP reply within {timeout_sec}s)."
+            )
+
+        print(f"MTConnect agent at {ip_or_host} is active")
+  
         
     def __request_agent(self, ext: str):
-        URL = self.cfg['mtconnect']['agent_url']
-        response = requests.get(URL + ext)
+        URL = self.cfg['mtconnect']['agent_url'].rstrip('/')
+        response = requests.get(f"{URL}/{ext}")
         val = xmltodict.parse(response.text, encoding='utf-8')
         val = OmegaConf.create(val)        
         return val

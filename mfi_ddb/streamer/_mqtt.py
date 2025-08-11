@@ -23,7 +23,7 @@ class Mqtt:
             if 'False' in list(map(lambda a: a in list(self.cfg['mqtt'].keys()), mqtt_keys)):
                 raise Exception("Config incomplete for mqtt. Following keys needed:",mqtt_keys)        
         
-        self.client : mqtt.Client = None
+        self.client = mqtt.Client()
         self._components: list = []
         self._topic_family = topic_family
         try:
@@ -63,7 +63,6 @@ class Mqtt:
         mqtt_tls_enabled = mqtt_cfg['tls_enabled'] if 'tls_enabled' in mqtt_cfg.keys() else False
         debug = mqtt_cfg['debug'] if 'debug' in mqtt_cfg.keys() else False
         
-        self.client = mqtt.Client()
         self.client.username_pw_set(mqtt_user, mqtt_pass)
         self.client.on_connect = self.__on_connect
         
@@ -137,7 +136,9 @@ class Mqtt:
         for key in payload.keys():
             if isinstance(payload[key], dict):
                 payload[key] = json.dumps(payload[key])
-            self.client.publish(f"{topic_prefix}/{key}", payload[key])
+            self.client.publish(topic = f"{topic_prefix}/{key}", 
+                                payload = payload[key], 
+                                qos = 1)
             print(f"Published data on topic: {topic_prefix}/{key}")
             
     def set_death_payload(self, topic:str, payload: dict, qos: int = 1, retain: bool = False):
