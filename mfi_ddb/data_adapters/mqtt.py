@@ -116,10 +116,8 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
 
         # extract key to store the message in the data dictionary
         data = {}
-        try:
-            subscription_topic = self.attributes[component_id]['topic']
-        except KeyError:
-            breakpoint()
+        subscription_topic = self.attributes[component_id]['topic']
+
         if subscription_topic.split('/')[-1] == '#':
             # If the topic ends with '#', it means we are subscribing to all subtopics
             # We need to extract the subtopic from the received topic
