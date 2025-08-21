@@ -1,3 +1,5 @@
+import re
+import sys
 import time
 
 import paho.mqtt.client as mqtt
@@ -89,8 +91,7 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
             self.attributes[component_id] = topic
             self.component_ids.append(component_id)
             
-            self.create_message_callback(topic_name,
-                lambda msg, c_id=component_id: self._topic_callback(msg, c_id))
+            self.create_message_callback(topic_name, self._topic_callback)
             print(f"Subscribed to topic: {topic}")
         
         self.start_listening()
@@ -102,7 +103,7 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
                 data = self.buffer_data[component_id].pop(0)
                 self._data[component_id] = data
     
-    def _topic_callback(self, message, component_id):
+    def _topic_callback(self, message):
         """
         Callback function to handle incoming MQTT messages.
         """
@@ -110,15 +111,19 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
         topic = message.topic
         payload = message.payload.decode('utf-8')
         payload = self.__autotype(payload)
-        print(f"Received message on topic {topic}: {payload}")
-        
+        component_id = self.__get_component_from_topic(topic)
+        print(f"Received message on topic {topic}: {payload} for component {component_id}")
+
         # extract key to store the message in the data dictionary
         data = {}
-        subscription_topic = self.attributes[component_id]['topic']
+        try:
+            subscription_topic = self.attributes[component_id]['topic']
+        except KeyError:
+            breakpoint()
         if subscription_topic.split('/')[-1] == '#':
             # If the topic ends with '#', it means we are subscribing to all subtopics
             # We need to extract the subtopic from the received topic
-            subtopic = topic[len(subscription_topic):]
+            subtopic = topic[len(subscription_topic)-1:]
             if subtopic.startswith('/'):
                 subtopic = subtopic[1:]
         else:
@@ -147,6 +152,8 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
         return value
     
     def __extract_key_value(self, data_item, data_item_key):
+        if len(data_item_key) > 0 and data_item_key[0] == '/':
+            data_item_key = data_item_key[1:]
         if isinstance(data_item, dict):
             for key in data_item.keys():
                 substitute_key = key
@@ -156,3 +163,16 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
                 return self.__extract_key_value(item, f'{data_item_key}_{i}')
         else:
             return {data_item_key: self.__autotype(data_item)}
+
+    def __get_component_from_topic(self, topic_name):
+        """
+        Extract the component ID from the topic name.
+        """
+        for component_id, attr in self.attributes.items():
+            pattern = re.escape(attr['topic']).replace(r'/\#', r'(?:/?.*)?')
+            if re.fullmatch(pattern, topic_name):
+                return component_id
+
+        raise ConfigError(f"ERROR in file {__file__} line {sys._getframe().f_lineno}.\n Please raise an issue with the development team.")
+
+        return None
