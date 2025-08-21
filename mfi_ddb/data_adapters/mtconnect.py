@@ -5,11 +5,50 @@ import requests
 import xmltodict
 from omegaconf import OmegaConf
 from ping3 import ping
+from pydantic import BaseModel, Field
 
 from mfi_ddb.data_adapters.base import BaseDataAdapter
 
 
+class _SCHEMA(BaseModel):
+    class _MTCONNECT(BaseModel):
+        agent_ip: str = Field(..., description="IP address of the MTConnect agent")
+        agent_url: str = Field(..., description="URL of the MTConnect agent")
+        device_name: str = Field(..., description="Name of the device to be used in the data object")
+        trial_id: str = Field(..., description="Trial ID for the MTConnect device. No spaces or special characters allowed.")    
+    class SCHEMA(BaseModel):
+        mtconnect: "_MTCONNECT" = Field(..., description="Configuration for the MTConnect agent connection")
+
 class MTconnectDataAdapter(BaseDataAdapter):
+    
+    NAME = "MTConnect"
+    
+    CONFIG_HELP = {
+        "mtconnect": {
+            "agent_ip": "IP address of the MTConnect agent",
+            "agent_url": "URL of the MTConnect agent",
+            "device_name": "Name of the device to be used in the data object",
+            "trial_id": "Trial ID for the MTConnect device. No spaces or special characters allowed.",
+        }
+    }
+    
+    CONFIG_EXAMPLE = {
+        "mtconnect": {
+            "agent_ip": "192.168.1.1",
+            "agent_url": "http://192.168.1.1:5000",
+            "device_name": "MTConnectDevice",
+            "trial_id": "trial_001"
+        }
+    }
+    
+    RECOMMENDED_TOPIC_FAMILY = "historian"
+
+    class SCHEMA(BaseDataAdapter.SCHEMA, _SCHEMA.SCHEMA):
+        """
+        Schema for the MTConnect data adapter configuration.
+        """
+        pass
+
     def __init__(self, config: dict):
         super().__init__()
         
@@ -91,11 +130,18 @@ class MTconnectDataAdapter(BaseDataAdapter):
         ip = self.cfg['mtconnect']['agent_ip']
         
         response = ping(ip)
+        timeout = self.cfg['mtconnect'].get('timeout', 5) if 'timeout' in self.cfg['mtconnect'] else 5
         
-        while response is None:
+        start_time = time.time()
+        time_elapsed = 0
+        while response is None or time_elapsed < timeout:
             print("MTConnect agent is not active. Waiting ...")
             time.sleep(1)
             response = ping(ip)
+            time_elapsed = time.time() - start_time
+            
+        if response is None:
+            raise ConnectionError(f"MTConnect agent at {ip} is not responding after {timeout} seconds.")
         
         print(f"MTConnect agent at {ip} is active")    
         

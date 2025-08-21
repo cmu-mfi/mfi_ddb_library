@@ -1,6 +1,8 @@
 import time
+from typing import List, Optional
 
 import paho.mqtt.client as mqtt
+from pydantic import BaseModel, Field
 
 from mfi_ddb.data_adapters.base import BaseDataAdapter
 from mfi_ddb.utils.exceptions import ConfigError
@@ -18,6 +20,17 @@ class _Mqtt:
         
         self.client : mqtt.Client = None
     
+    def disconnect(self):
+        """
+        Disconnect from the MQTT broker and clean up resources.
+        """
+        if self.client is not None:
+            self.client.loop_stop()
+            self.client.disconnect()
+            print("Disconnected from MQTT broker")
+        else:
+            print("No MQTT client to disconnect")
+
     def connect(self):
 
         mqtt_cfg = self.mqtt_cfg
@@ -33,19 +46,23 @@ class _Mqtt:
             del self.mqtt_cfg['password']
         mqtt_tls_enabled = mqtt_cfg['tls_enabled'] if 'tls_enabled' in mqtt_cfg.keys() else False
         debug = mqtt_cfg['debug'] if 'debug' in mqtt_cfg.keys() else False
+        timeout = mqtt_cfg['timeout'] if 'timeout' in mqtt_cfg.keys() else 5.
         
         self.client = mqtt.Client()
         self.client.username_pw_set(mqtt_user, mqtt_pass)
         self.client.on_connect = self.__on_connect
         self.client.connect(mqtt_host, mqtt_port, 60)
         
-        while not self.client.is_connected():
-            print("Connecting to MQTT broker...")
+        start_time = time.time()
+        time_elapsed = 0
+        while not self.client.is_connected() or time_elapsed < timeout:
+            print(f"Connecting to MQTT broker...{int(time_elapsed)}s")
             time.sleep(1)
             self.client.loop()
-                               
-    def disconnect(self):
-        pass
+            time_elapsed = time.time() - start_time
+            
+        if not self.client.is_connected():
+            raise ConfigError(f"Could not connect to MQTT broker {mqtt_host} after {timeout} seconds.")
     
     def create_message_callback(self, topic, callback):
         self.client.subscribe(topic)
@@ -65,8 +82,72 @@ class _Mqtt:
     def __on_connect(self, client, userdata, flags, rc):
         print(f"Connected to broker {self.mqtt_cfg['broker_address']} with result code {rc}")            
 
+class _SCHEMA:    
+    class _MQTT(BaseModel):
+        broker_address: str = Field(..., description="Address of the MQTT broker")
+        broker_port: Optional[int] = Field(1883, description="Port of the MQTT broker (default: 1883)")
+        username: Optional[str] = Field(..., description="Username for MQTT broker authentication")
+        password: Optional[str] = Field(..., description="Password for MQTT broker authentication")
+        tls_enabled: Optional[bool] = Field(False, description="Enable TLS for MQTT connection (default: False)")
+        debug: Optional[bool] = Field(False, description="Enable debug mode for MQTT client (default: False)")
+        timeout: Optional[int] = Field(5, description="Timeout in seconds for connecting to the MQTT broker (default: 5)")
+    
+    class _TOPIC(BaseModel):
+        component_id: str = Field(..., description="Identifier for the component")
+        topic: str = Field(..., description="MQTT topic to subscribe to")
+        trial_id: Optional[str] = Field(None, description="Trial ID for the component (optional)")
+
+    class SCHEMA(BaseModel):
+        mqtt: "_MQTT" = Field(..., description="Configuration for the MQTT broker connection")
+        trial_id: str = Field(..., description="Trial ID for the system. No spaces or special characters allowed.")
+        queue_size: int = Field(10, description="Maximum number of messages to buffer before processing. If the buffer is full, the oldest message will be removed.")
+        topics: List["_TOPIC"] = Field(..., description="List of topics to subscribe to. Each topic should have a 'component_id' and 'topic' key. Optionally, a 'trial_id' can be provided.")
 
 class MqttDataAdapter(BaseDataAdapter, _Mqtt):
+    
+    NAME = "MQTT"
+    
+    CONFIG_HELP = {
+        "mqtt": {
+            "broker_address": "Address of the MQTT broker",
+            "broker_port": "Port of the MQTT broker (default: 1883)",
+            "username": "Username for MQTT broker authentication",
+            "password": "Password for MQTT broker authentication",
+            "tls_enabled": "Enable TLS for MQTT connection (default: False)",
+            "debug": "Enable debug mode for MQTT client (default: False)",
+            "timeout": "Timeout in seconds for connecting to the MQTT broker (default: 5)"
+        },
+        
+        "trial_id": "Trial ID for the system. No spaces or special characters allowed.",
+        "queue_size": "Maximum number of messages to buffer before processing. If the buffer is full, the oldest message will be removed.",
+        "topics": "List of topics to subscribe to. Each topic should have a 'component_id' and 'topic' key. Optionally, a 'trial_id' can be provided."
+    }
+    
+    CONFIG_EXAMPLE = {
+        "mqtt": {
+            "broker_address": "mqtt.example.com",
+            "broker_port": 1883,
+        },
+        "trial_id": "trial_001",
+        "queue_size": 10,
+        "topics": [
+            {
+                "component_id": "robot-arm-1",
+                "topic": "robot-arm/1/data",
+                "trial_id": "trial_001"
+            },
+            {
+                "component_id": "machine-a",
+                "topic": "machine/a/data"
+            }
+        ]
+    }
+    
+    RECOMMENDED_TOPIC_FAMILY = "historian"
+    
+    class SCHEMA(BaseDataAdapter.SCHEMA, _SCHEMA.SCHEMA):
+        pass        
+    
     def __init__(self, config: dict):
         BaseDataAdapter.__init__(self, config)
         _Mqtt.__init__(self, config['mqtt'])
@@ -95,6 +176,10 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
         
         self.start_listening()
         print("MqttDataAdapter initialized")
+    
+    def disconnect(self):
+        _Mqtt.disconnect(self)
+        return super().disconnect()
     
     def get_data(self):
         for component_id in self.component_ids:
