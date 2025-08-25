@@ -107,7 +107,7 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
         """
         Callback function to handle incoming MQTT messages.
         """
-
+        
         topic = message.topic
         payload = message.payload.decode('utf-8')
         payload = self.__autotype(payload)
@@ -133,16 +133,18 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
             data = self.__extract_key_value(payload, subtopic)
         if len(self.buffer_data[component_id]) >= self.queue_size:
             self.buffer_data[component_id].pop(0)
-        
+
         self.buffer_data[component_id].append(data)
         self._notify_observers({component_id: data})
-        
+                
     def __autotype(self, value):
         for cast in (int, float, eval):
             try:
                 if cast is eval:
                     return eval(value.replace("true", "True").replace("false", "False"))
                 else:
+                    if cast is int and '.' in value:
+                        return float(value)
                     return cast(value)
             except:
                 continue
@@ -153,12 +155,16 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
         if len(data_item_key) > 0 and data_item_key[0] == '/':
             data_item_key = data_item_key[1:]
         if isinstance(data_item, dict):
+            extracted_data = {}
             for key in data_item.keys():
                 substitute_key = key
-                return self.__extract_key_value(data_item[key], f'{data_item_key}/{substitute_key}')
+                extracted_data.update(self.__extract_key_value(data_item[key], f'{data_item_key}/{substitute_key}'))
+            return extracted_data
         elif isinstance(data_item, list):
+            extracted_data = {}
             for i, item in enumerate(data_item):
-                return self.__extract_key_value(item, f'{data_item_key}_{i}')
+                extracted_data.update(self.__extract_key_value(item, f'{data_item_key}_{i}'))
+            return extracted_data
         else:
             return {data_item_key: self.__autotype(data_item)}
 
