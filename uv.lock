@@ -1703,8 +1703,11 @@ dependencies = [
     { name = "ping3" },
     { name = "protobuf", version = "5.29.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "protobuf", version = "6.31.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
+<<<<<<< HEAD
     { name = "pydantic", version = "2.10.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "pydantic", version = "2.11.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
+=======
+>>>>>>> fcd9b9760c4d4e665d13948c538e0a13b27b4d0b
     { name = "pyyaml" },
     { name = "requests" },
     { name = "rospkg" },
@@ -1727,7 +1730,10 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.0.3" },
     { name = "ping3", specifier = ">=4.0.8" },
     { name = "protobuf", specifier = ">=5.29.5" },
+<<<<<<< HEAD
     { name = "pydantic", specifier = ">=2.10.6" },
+=======
+>>>>>>> fcd9b9760c4d4e665d13948c538e0a13b27b4d0b
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "requests", specifier = ">=2.32.4" },
     { name = "rospkg", specifier = ">=1.6.0" },
@@ -2564,6 +2570,7 @@ wheels = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "pydantic"
 version = "2.10.6"
 source = { registry = "https://pypi.org/simple" }
@@ -2850,6 +2857,8 @@ wheels = [
 ]
 
 [[package]]
+=======
+>>>>>>> fcd9b9760c4d4e665d13948c538e0a13b27b4d0b
 name = "pyparsing"
 version = "3.1.4"
 source = { registry = "https://pypi.org/simple" }
@@ -3822,6 +3831,7 @@ wheels = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "typing-inspection"
 version = "0.4.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3834,6 +3844,8 @@ wheels = [
 ]
 
 [[package]]
+=======
+>>>>>>> fcd9b9760c4d4e665d13948c538e0a13b27b4d0b
 name = "tzdata"
 version = "2025.2"
 source = { registry = "https://pypi.org/simple" }
