@@ -11,6 +11,7 @@ Pre-requisite: Install [uv manager](https://docs.astral.sh/uv/getting-started/in
 
 ```
 git clone --recurse-submodules https://github.com/cmu-mfi/mfi_ddb_library.git
+cd mfi_ddb_library
 uv sync
 ```
 
