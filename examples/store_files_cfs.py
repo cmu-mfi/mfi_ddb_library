@@ -1,5 +1,6 @@
 import json
 import os
+import uuid
 
 import yaml
 
@@ -12,6 +13,9 @@ def read_config():
         open(os.path.join(current_dir, f'{name}.yaml'))) for name in ['mqtt', 'cfs'])
 
     return mqtt, cfs
+
+def generate_uid():
+    return str(uuid.uuid4())[-12:]
 
 def callback(config, message):
     data_type, data = BlobTopicFamily.process_message(message)
@@ -35,7 +39,8 @@ def callback(config, message):
         save_dir = config['save_directory']
         os.makedirs(save_dir, exist_ok=True)
         
-        file_name = f"{data['file_name']}"
+        unique_id = generate_uid()
+        file_name = f"{unique_id}.{data['file_type']}"
         file_path = os.path.join(save_dir, file_name)
         with open(file_path, 'wb') as file:
             file.write(data["file"])
@@ -43,7 +48,7 @@ def callback(config, message):
         
         # SAVE METADATA FILE
         data.pop("file")
-        metadata_file_name = f"{data['file_name']}.json"
+        metadata_file_name = f"{unique_id}.json"
         metadata_file_path = os.path.join(save_dir, metadata_file_name)
         with open(metadata_file_path, 'w') as file:
             json.dump(data, file, indent=4)
