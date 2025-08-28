@@ -23,7 +23,7 @@ git clone --recurse-submodules https://github.com/cmu-mfi/mfi_ddb_library.git
 cd mfi_ddb_library
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .
+pip install .
 ```
 
 **Windows CMD**
@@ -32,7 +32,7 @@ git clone --recurse-submodules https://github.com/cmu-mfi/mfi_ddb_library.git
 cd mfi_ddb_library
 python -m venv .venv
 .venv\Scripts\activate.bat
-pip install -e .
+pip install .
 ```
 
 ## Concept
