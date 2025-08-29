@@ -45,6 +45,8 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
     
     RECOMMENDED_TOPIC_FAMILY = "blob"
     
+    SELF_UPDATE = True  # This data adapter will update the data by itself in a separate thread.
+    
     class _SystemInfo(BaseModel):
         trial_id: str = Field(..., description="Trial ID for the system. No spaces or special characters allowed.")
         name: str = Field(..., description="Name of the system.")
