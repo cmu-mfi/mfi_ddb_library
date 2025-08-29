@@ -12,6 +12,7 @@ class BaseDataAdapter:
     CONFIG_EXAMPLE = None
     CONFIG_HELP = None
     RECOMMENDED_TOPIC_FAMILY = None
+    SELF_UPDATE = False  # If True, the data adapter will update the data by itself in a separate thread.
 
     class SCHEMA(BaseModel):
         """

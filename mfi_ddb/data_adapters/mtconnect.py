@@ -42,7 +42,9 @@ class MTconnectDataAdapter(BaseDataAdapter):
     }
     
     RECOMMENDED_TOPIC_FAMILY = "historian"
-
+    
+    SELF_UPDATE = False
+    
     class SCHEMA(BaseDataAdapter.SCHEMA, _SCHEMA.SCHEMA):
         """
         Schema for the MTConnect data adapter configuration.

@@ -8,7 +8,7 @@ from typing import List
 import numpy as np
 import yaml
 from pydantic import BaseModel, Field
-from watchdog.events import FileSystemEventHandler
+from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
 from mfi_ddb.data_adapters.base import BaseDataAdapter
@@ -44,6 +44,8 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
     }
     
     RECOMMENDED_TOPIC_FAMILY = "blob"
+    
+    SELF_UPDATE = True  # This data adapter will update the data by itself in a separate thread.
     
     class _SystemInfo(BaseModel):
         trial_id: str = Field(..., description="Trial ID for the system. No spaces or special characters allowed.")
@@ -90,9 +92,9 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
         if len(self.buffer_data) > 0:
             data = self.buffer_data.pop(0)
             self._data[self.system_name] = data
-            return        
-                    
-    def on_created(self, event):
+            return
+
+    def on_created(self, event: FileSystemEvent):
         """
         Handles the event when a new file is created in the watched directory.
         Parameters:
@@ -125,6 +127,9 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
             
         self.buffer_data.append(data)
         self._notify_observers({self.system_name: data})
+        
+    def on_modified(self, event: FileSystemEvent) -> None:
+        return self.on_created(event)
 
     def update_config(self, config: dict):
         """
