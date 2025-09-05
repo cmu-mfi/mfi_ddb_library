@@ -99,8 +99,11 @@ class Streamer(Observer):
         self.__last_poll_update = 0
         
         if stream_on_update:
-            self.__data_adp.add_observer(self)
-    
+            if(self.__data_adp.SELF_UPDATE):
+                self.__data_adp.add_observer(self)
+            else:
+                raise Exception("Data adapter does not support self update notifications.")
+
     def disconnect(self):
         try:
             self.__client.disconnect()
