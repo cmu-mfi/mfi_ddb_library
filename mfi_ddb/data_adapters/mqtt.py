@@ -147,6 +147,8 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
     
     RECOMMENDED_TOPIC_FAMILY = "historian"
     
+    SELF_UPDATE = True  # This data adapter will update the data by itself in a separate thread.
+    
     class SCHEMA(BaseDataAdapter.SCHEMA, _SCHEMA.SCHEMA):
         pass        
     
