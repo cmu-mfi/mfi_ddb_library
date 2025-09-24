@@ -1,5 +1,4 @@
 trial_id: 'untitled'
-set_ros_callback: False
 
 devices:
   yk_architect:

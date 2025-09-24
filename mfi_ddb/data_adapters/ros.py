@@ -1,3 +1,4 @@
+import threading
 import time
 from typing import List, Optional
 
@@ -70,6 +71,7 @@ class RosDataAdapter(BaseDataAdapter):
             self.AnyMsg = AnyMsg
             self.rostopic = rostopic
             self.rospy = rospy
+            self.rosgraph = rosgraph
 
         except ImportError as e:
             raise Exception(
@@ -149,23 +151,16 @@ class RosDataAdapter(BaseDataAdapter):
                     del self.raw_data[device][topic]
                     continue
 
+        self.__init_callback()
+        rospy.sleep(1)  # wait for subscribers to connect
         print("RosDataAdapter initialized successfully.")
-        
-        # SET ROS CALLBACK
-        if self.cfg["set_ros_callback"]:
-            self.__init_callback()
 
     def get_data(self):
         if len(self.component_ids) == 0:
             print("ERROR: No components found in the data object.")
             exit(1)
-
-        self.__poll_ros_topics()
-
-        for device in self.component_ids:
-            for topic in self.raw_data[device]:
-                # self.cb_data = self.__process_rawdata(device, topic)
-                self.__process_rawdata(device, topic)
+            
+        self.rospy.sleep(0.1)  # allow some time for callback to get data
 
     def __poll_ros_topics(self):
 
@@ -201,16 +196,16 @@ class RosDataAdapter(BaseDataAdapter):
                 if key in msg.__slots__:
                     msg.__slots__.remove(key)
 
-        msg_dict = yaml.safe_load(str(msg))
         topic_name = topic.replace(f"/{device}/", "")
-        print(f"Msg: {msg_dict}")
+        msg_dict = yaml.safe_load(str(msg))            
+        # print(f"Msg: {msg_dict}")
         new_data = self.__get_keyvalue_from_dict(msg_dict, f"{topic_name}/")
 
         self._data[device].update(new_data)
         self.last_updated[device] = time.time()
         self._notify_observers({device: new_data})
 
-        return {device: new_data}
+        # return {device: new_data}
 
     def __get_keyvalue_from_dict(self, data_dict, key_prefix=""):
         data = {}
@@ -264,8 +259,6 @@ class RosDataAdapter(BaseDataAdapter):
                     callback=self.__callback,
                     callback_args=(device, topic),
                 )
-
-        self.rospy.spin()
 
     def __callback(self, anymsg, callback_args):
         device = callback_args[0]
