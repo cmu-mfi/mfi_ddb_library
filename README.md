@@ -62,6 +62,7 @@ To be able to do the above three major classes are provided:
 * [LocalFilesDataAdapter](mfi_ddb/data_adapters/local_files.py)
 * [MqttDataAdapter](mfi_ddb/data_adapters/mqtt.py)
 * [MTconnectDataAdapter](mfi_ddb/data_adapters/mtconnect.py)
+* [Ros2DataAdapter](mfi_ddb/data_adapters/ros2.py)
 
 ### Streamer
 
