@@ -16,7 +16,6 @@ class _SCHEMA(BaseModel):
         attributes: Optional[dict] = Field({}, description="Attributes of the device. Optional.")
     class SCHEMA(BaseModel):
         trial_id: str = Field(..., description="Trial ID for the ROS device. No spaces or special characters allowed.")
-        set_ros_callback: bool = Field(True, description="Set ROS callback to receive data from ROS topics. If set to False, you need to call get_data() method to get data from ROS topics.")
         devices: List["_DEVICES"] = Field(..., description="List of devices to subscribe to.")
 
 class RosDataAdapter(BaseDataAdapter):
@@ -24,12 +23,10 @@ class RosDataAdapter(BaseDataAdapter):
     NAME = "ROS"
     CONFIG_HELP = {
         "trial_id": "Trial ID for the ROS device. No spaces or special characters allowed.",
-        "set_ros_callback": "Set ROS callback to receive data from ROS topics. If set to False, you need to call get_data() method to get data from ROS topics.",
         "devices": "List of devices to subscribe to. Each device should have a 'namespace' and a list of 'rostopics' to subscribe to. 'attributes' are optional and can be used to set the attributes of the device.",   
     }
     CONFIG_EXAMPLE = {
         "trial_id": "trial_001",
-        "set_ros_callback": True,
         "devices": {
             "device1": {
                 "namespace": "robot_arm",
@@ -84,9 +81,6 @@ class RosDataAdapter(BaseDataAdapter):
 
         if "max_wait_per_topic" not in config.keys():
             config["max_wait_per_topic"] = 1
-
-        if "set_ros_callback" not in config.keys():
-            config["set_ros_callback"] = False
 
         # INIT DATA MEMBERS FROM CONFIG
         self.cfg = config
