@@ -79,9 +79,6 @@ class RosDataAdapter(BaseDataAdapter):
         if "devices" not in config.keys():
             raise Exception("No devices found in the config file.")
 
-        if "max_wait_per_topic" not in config.keys():
-            config["max_wait_per_topic"] = 1
-
         # INIT DATA MEMBERS FROM CONFIG
         self.cfg = config
         self.raw_data = {}
@@ -155,25 +152,6 @@ class RosDataAdapter(BaseDataAdapter):
             exit(1)
             
         self.rospy.sleep(0.1)  # allow some time for callback to get data
-
-    def __poll_ros_topics(self):
-
-        if self.rospy.is_shutdown():
-            raise KeyboardInterrupt("ROS shutdown signal received.")
-
-        for device in self.component_ids:
-            for topic in self.raw_data[device]:
-                try:
-                    wait_time = self.cfg["max_wait_per_topic"]
-                    msg_type = self.rostopic.get_topic_class(topic)[0]
-                    self.raw_data[device][topic] = self.rospy.wait_for_message(
-                        topic, msg_type, wait_time
-                    )
-                except Exception as e:
-                    print(f"Exception: {e}")
-                    print(
-                        f"Warning: Could not get data from topic {topic}. Try increasing max_wait_per_topic in config file."
-                    )
 
     def __process_rawdata(self, device, topic):
         msg = self.raw_data[device][topic]
