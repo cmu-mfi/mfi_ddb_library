@@ -242,8 +242,8 @@ class RosDataAdapter(BaseDataAdapter):
         msg_class = self.get_message_class(msg_type_name)
 
         msg = msg_class().deserialize(anymsg._buff)
+
         self.raw_data[device][topic] = msg
-        # self.cb_data = self.__process_rawdata(device, topic)
         self.__process_rawdata(device, topic)
 
     def __ros_shutdown(self):
