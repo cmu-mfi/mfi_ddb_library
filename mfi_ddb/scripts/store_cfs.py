@@ -34,7 +34,10 @@ def callback(config, message):
         os.makedirs(save_dir, exist_ok=True)
         
         unique_id = generate_uid()
-        file_name = f"{unique_id}.{data['file_type']}"
+        if data['file_type'][0] == ".":
+            file_name = f"{unique_id}{data['file_type']}"
+        else:
+            file_name = f"{unique_id}.{data['file_type']}" 
         file_path = os.path.join(save_dir, file_name)
         with open(file_path, 'wb') as file:
             file.write(data["file"])
@@ -59,7 +62,6 @@ def main(mqtt_cfg_file, cfs_cfg_file):
     mqtt_config = yaml.safe_load(open(mqtt_cfg_file))
     cfs_config = yaml.safe_load(open(cfs_cfg_file))
 
-    breakpoint()
     # INIT A CONNECTION
     mqtt_sub = Subscriber(mqtt_config)
 
