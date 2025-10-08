@@ -1,18 +1,12 @@
 import json
 import os
 import uuid
+import argparse
 
 import yaml
 
 from mfi_ddb import BlobTopicFamily, Subscriber
 from mfi_ddb.utils.script_utils import get_topic_from_config
-
-def read_config():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    mqtt, cfs = (yaml.safe_load(
-        open(os.path.join(current_dir, f'{name}.yaml'))) for name in ['mqtt', 'cfs'])
-
-    return mqtt, cfs
 
 def generate_uid():
     return str(uuid.uuid4())[-12:]
@@ -40,7 +34,10 @@ def callback(config, message):
         os.makedirs(save_dir, exist_ok=True)
         
         unique_id = generate_uid()
-        file_name = f"{unique_id}.{data['file_type']}"
+        if data['file_type'][0] == ".":
+            file_name = f"{unique_id}{data['file_type']}"
+        else:
+            file_name = f"{unique_id}.{data['file_type']}" 
         file_path = os.path.join(save_dir, file_name)
         with open(file_path, 'wb') as file:
             file.write(data["file"])
@@ -56,10 +53,14 @@ def callback(config, message):
         print("===========================\n")
     
 
-if __name__ == '__main__':
+def main(mqtt_cfg_file, cfs_cfg_file):
+
+    print(f"Using MQTT config file: {os.path.abspath(mqtt_cfg_file)}\n")
+    print(f"Using CFS config file: {os.path.abspath(cfs_cfg_file)}\n")
 
     # LOAD CONFIG FILES
-    mqtt_config, cfs_config = read_config()
+    mqtt_config = yaml.safe_load(open(mqtt_cfg_file))
+    cfs_config = yaml.safe_load(open(cfs_cfg_file))
 
     # INIT A CONNECTION
     mqtt_sub = Subscriber(mqtt_config)
@@ -76,3 +77,10 @@ if __name__ == '__main__':
     
     mqtt_sub.client.loop_stop()
     mqtt_sub.client.disconnect()
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Subscribe to a topic and save files based on configuration.")
+    parser.add_argument("mqtt_config_path", help="Path to the MQTT configuration file (e.g., mqtt.yaml).")
+    parser.add_argument("cfs_config_path", help="Path to the CFS configuration file (e.g., cfs.yaml).")
+    args = parser.parse_args()
+    main(args.mqtt_config_path, args.cfs_config_path)
