@@ -77,6 +77,8 @@ class RosFilesDataAdapter(BaseDataAdapter):
     }
     RECOMMENDED_TOPIC_FAMILY = "blob"
     
+    SELF_UPDATE = True
+    
     class SCHEMA(BaseDataAdapter.SCHEMA, _SCHEMA.SCHEMA):
         pass
 
