@@ -8,6 +8,7 @@ maintainers = [
     { name="Shobhit Aggarwal", email="shobhit@cmu.edu" },
     { name="Stephanie Steren-Ruta", email="ssterenr@andrew.cmu.edu" }
 ]
+license = "BSD-3-Clause"
 dependencies = [
     "cmake>=4.0.3",
     "numpy>=1.24.4",
