@@ -104,7 +104,7 @@ When streaming data to the broker, the following metadata is recorded through th
 ```
 usage: store_cfs.py [-h] mqtt_config_path cfs_config_path
 
-Subscribe to a topic and save files based on configuration.
+Subscribe to a topic and save files to Cloud File Store (CFS) based on configuration.
 
 positional arguments:
   mqtt_config_path  Path to the MQTT configuration file (e.g., mqtt.yaml).
@@ -115,4 +115,46 @@ positional arguments:
 # Example usage:
 
 python -m mfi_ddb.scripts.store_cfs path/to/mqtt.yaml path/to/cfs.yaml
+```
+
+### [stream_adapter.py](mfi_ddb/scripts/stream_adapter.py)
+
+```
+usage: stream_adapter.py [-h] --data_adapter DATA_ADAPTER [--config_dir CONFIG_DIR]
+                         [--adapter_cfg ADAPTER_CFG] [--mqtt_cfg MQTT_CFG] [--polling POLLING]
+                         [--poll_rate POLL_RATE]
+
+Stream data using MFI-DDB library.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --data_adapter DATA_ADAPTER, -d DATA_ADAPTER
+                        Type of data adapter to use. Supported: 'Local Files', 'MTConnect', 'MQTT',
+                        'ROS', 'ROS Files'
+  --config_dir CONFIG_DIR, -cd CONFIG_DIR
+                        (optional) Directory containing the configuration files (localfiles.yaml and
+                        mqtt.yaml). If --mqtt_cfg or --adapter_cfg are provided, this argument is
+                        ignored.
+  --adapter_cfg ADAPTER_CFG, -a ADAPTER_CFG
+                        (optional) Path to the local files adapter configuration file
+                        (localfiles.yaml).
+  --mqtt_cfg MQTT_CFG, -m MQTT_CFG
+                        (optional) Path to the MQTT configuration file (mqtt.yaml).
+  --polling POLLING, -p POLLING
+                        Enable polling mode. Default is False.
+  --poll_rate POLL_RATE, -r POLL_RATE
+                        Polling rate in Hz. Default is 1 Hz, if --polling is set to True.
+```
+
+```
+Example usage:
+
+Use a configuration directory:
+$ python -m mfi_ddb.scripts.stream_adapter --data_adapter 'MQTT' --config_dir ./configs
+
+Use specific configuration files:
+$ python -m mfi_ddb.scripts.stream_adapter -d 'Local Files' --adapter_cfg ./configs/localfiles.yaml --mqtt_cfg ./configs/mqtt.yaml
+
+Enable polling mode with a specific rate (in Hz):
+$ python -m mfi_ddb.scripts.stream_adapter -d 'MTConnect' -a ./configs/mtconnect.yaml -m ./configs/mqtt.yaml -p True -r 2
 ```
