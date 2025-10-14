@@ -1,11 +1,12 @@
 [project]
 name = "mfi_ddb"
-version = "0.2"
+version = "1.0.0"
 description = "MFI DDB: Python library for streaming data"
 readme = "README.md"
 requires-python = ">=3.8,<3.13"
-authors = [
-    { name="Shobhit Aggarwal", email="shobhit@cmu.edu" }
+maintainers = [
+    { name="Shobhit Aggarwal", email="shobhit@cmu.edu" },
+    { name="Stephanie Steren-Ruta", email="ssterenr@andrew.cmu.edu" }
 ]
 dependencies = [
     "cmake>=4.0.3",

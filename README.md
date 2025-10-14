@@ -116,3 +116,7 @@ positional arguments:
 
 python -m mfi_ddb.scripts.store_cfs path/to/mqtt.yaml path/to/cfs.yaml
 ```
+
+## License
+
+This project is licensed under the BSD-3-Clause License - see the [LICENSE](LICENSE) file for details.
