@@ -30,7 +30,7 @@ jobs:
         
       - name: 6. Execute configuration generation script
         id: generate
-        run: uv run -m mfi_ddb.scripts.generate_config_examples --output-dir examples/configs
+        run: uv run -m mfi_ddb.scripts.generate_config_examples --output_dir examples/configs
           
       - name: 7. Commit and Push generated files
         # Ref: https://github.com/marketplace/actions/git-auto-commit
