@@ -43,4 +43,4 @@ jobs:
         with:
           commit_message: "CI: Auto-generate configuration examples"
           file_pattern: "examples/configs/*.yaml"
-          branch: ${{ github.ref_name || github.head_ref }}
+          branch: ${{ github.head_ref || github.ref_name }}
