@@ -1,0 +1,41 @@
+name: Generate Config Examples
+
+on:
+  push:
+    # branches: [ main ]
+    paths:
+      # Trigger only if there are changes in the directory containing data adapters
+      - 'src/mfi_ddb/data_adapters/**'
+
+jobs:
+  generate-configs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Checkout repository
+        uses: actions/checkout@v4
+        # Set a token to allow the git-auto-commit-action to push changes
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: 2. Install uv
+        uses: astral-sh/setup-uv@v6
+        
+      - name: 4. Install the mfi_ddb package using uv
+        # Installs the package from the current repository using uv pip install
+        run: uv sync
+        
+      - name: 5. Create output directory for configs if it doesn't exist
+        run: mkdir -p examples/configs
+        
+      - name: 6. Execute configuration generation script
+        id: generate
+        run: uv run -m mfi_ddb.scripts.generate_config_examples --output-dir examples/configs
+          
+      - name: 7. Commit and Push generated files
+        # Ref: https://github.com/marketplace/actions/git-auto-commit
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: "CI: Auto-generate configuration examples"
+          file_pattern: "examples/configs/*.yaml"
+          branch: ${{ github.ref_name }} # Ensures it pushes back to the current branch (main)
