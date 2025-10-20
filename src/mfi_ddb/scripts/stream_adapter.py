@@ -15,10 +15,11 @@ if __name__ == "__main__":
         try:
             adapter_class = getattr(mfi_ddb.data_adapters, adapter)
             if adapter_class.NAME:
-                data_adapters[adapter] = adapter_class.NAME
+                data_adapters[adapter_class.NAME] = adapter_class
         except AttributeError:
             continue
-    supported_adapters = ", ".join(f"'{adapter}'" for adapter in data_adapters.values())
+    # supported_adapters = ", ".join(f"'{adapter}'" for adapter in data_adapters.values())
+    supported_adapters = ", ".join(f"'{adapter}'" for adapter in data_adapters.keys())
     
     # INPUT ARGUMENTS
     # =======================================================
@@ -30,10 +31,10 @@ if __name__ == "__main__":
     $ python -m mfi_ddb.scripts.stream_adapter --data_adapter 'MQTT' --config_dir ./configs
     
     Use specific configuration files:
-    $ python -m mfi_ddb.scripts.stream_adapter -d 'Local Files' --adapter_cfg ./configs/localfiles.yaml --mqtt_cfg ./configs/mqtt.yaml
-    
+    $ python -m mfi_ddb.scripts.stream_adapter -d 'Local Files' --adapter_cfg ./configs/local_files.yaml --streamer_cfg ./configs/streamer.yaml
+
     Enable polling mode with a specific rate (in Hz):
-    $ python -m mfi_ddb.scripts.stream_adapter -d 'MTConnect' -a ./configs/mtconnect.yaml -m ./configs/mqtt.yaml -p True -r 2
+    $ python -m mfi_ddb.scripts.stream_adapter -d 'MTConnect' -a ./configs/mtconnect.yaml -s ./configs/streamer.yaml -p True -r 2
     """
     parser = argparse.ArgumentParser(
         description="Stream data using MFI-DDB library.",
@@ -51,20 +52,20 @@ if __name__ == "__main__":
         "--config_dir",
         "-cd",
         type=str,
-        help="(optional) Directory containing the configuration files (localfiles.yaml and mqtt.yaml).\
-            If --mqtt_cfg or --adapter_cfg are provided, this argument is ignored.",
+        help="Directory containing the configuration files (local_files.yaml and mqtt.yaml).\
+            If --streamer_cfg or --adapter_cfg are provided, this argument is ignored.",
     )
     parser.add_argument(
         "--adapter_cfg",
         "-a",
         type=str,
-        help="(optional) Path to the local files adapter configuration file (localfiles.yaml).",
+        help="Path to the local files adapter configuration file (local_files.yaml).",
     )
     parser.add_argument(
         "--streamer_cfg",
         "-s",
         type=str,
-        help="(optional) Path to the Streamer configuration file (streamer.yaml).",
+        help="Path to the Streamer configuration file (streamer.yaml).",
     )
     parser.add_argument(
         "--polling",
@@ -86,30 +87,40 @@ if __name__ == "__main__":
         streamer_config_file = args.streamer_cfg
         adapter_config_file = args.adapter_cfg
     elif args.config_dir:
-        streamer_config_file = os.path.join(args.config_dir, "mqtt.yaml")
-        adapter_config_file = os.path.join(args.config_dir, "localfiles.yaml")
+        streamer_config_file = os.path.join(args.config_dir, "streamer.yaml")
+        adapter_config_name = args.data_adapter.lower().replace(" ", "_") + ".yaml"
+        adapter_config_file = os.path.join(args.config_dir, adapter_config_name)
     else:
         exception_msg = (
-            "Either --config_dir or both --mqtt_cfg and --adapter_cfg must be provided."
+            "Either --config_dir or both --streamer_cfg and --adapter_cfg must be provided."
         )
         raise Exception(exception_msg)  
     
     # LOAD CONFIG FILES
     # =======================================================
 
-    with open(adapter_config_file, "r") as file:
-        adapter_config = yaml.load(file, Loader=yaml.FullLoader)
-
-    with open(streamer_config_file, "r") as file:
-        streamer_config = yaml.load(file, Loader=yaml.FullLoader)
-
     try:
-        adapter_class = getattr(mfi_ddb.data_adapters, args.data_adapter)
-    except AttributeError:
+        adapter_class = data_adapters[args.data_adapter]
+    except KeyError:
         exception_msg = (
             f"Data adapter '{args.data_adapter}' not found. Supported adapters: {supported_adapters}"
         )
         raise Exception(exception_msg)
+
+    try:
+        with open(adapter_config_file, "r") as file:
+            adapter_config = yaml.load(file, Loader=yaml.FullLoader)
+    except FileNotFoundError:
+        exception_msg = f"ADAPTER CONFIG NOT FOUND. ENSURE THE FILE EXISTS: {os.path.abspath(adapter_config_file)}"
+        raise Exception(exception_msg)
+
+    try:
+        with open(streamer_config_file, "r") as file:
+            streamer_config = yaml.load(file, Loader=yaml.FullLoader)
+    except FileNotFoundError:
+        exception_msg = f"STREAMER CONFIG NOT FOUND. ENSURE THE FILE EXISTS: {os.path.abspath(streamer_config_file)}"
+        raise Exception(exception_msg)
+
     
     # INITIALIZE ADAPTER AND STREAMER
     # =======================================================
