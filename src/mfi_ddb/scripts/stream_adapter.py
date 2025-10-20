@@ -61,10 +61,10 @@ if __name__ == "__main__":
         help="(optional) Path to the local files adapter configuration file (localfiles.yaml).",
     )
     parser.add_argument(
-        "--mqtt_cfg",
-        "-m",
+        "--streamer_cfg",
+        "-s",
         type=str,
-        help="(optional) Path to the MQTT configuration file (mqtt.yaml).",
+        help="(optional) Path to the Streamer configuration file (streamer.yaml).",
     )
     parser.add_argument(
         "--polling",
@@ -82,11 +82,11 @@ if __name__ == "__main__":
     )    
     args = parser.parse_args()
     
-    if args.mqtt_cfg and args.adapter_cfg:
-        mqtt_config_file = args.mqtt_cfg
+    if args.streamer_cfg and args.adapter_cfg:
+        streamer_config_file = args.streamer_cfg
         adapter_config_file = args.adapter_cfg
     elif args.config_dir:
-        mqtt_config_file = os.path.join(args.config_dir, "mqtt.yaml")
+        streamer_config_file = os.path.join(args.config_dir, "mqtt.yaml")
         adapter_config_file = os.path.join(args.config_dir, "localfiles.yaml")
     else:
         exception_msg = (
@@ -100,8 +100,8 @@ if __name__ == "__main__":
     with open(adapter_config_file, "r") as file:
         adapter_config = yaml.load(file, Loader=yaml.FullLoader)
 
-    with open(mqtt_config_file, "r") as file:
-        mqtt_config = yaml.load(file, Loader=yaml.FullLoader)
+    with open(streamer_config_file, "r") as file:
+        streamer_config = yaml.load(file, Loader=yaml.FullLoader)
 
     try:
         adapter_class = getattr(mfi_ddb.data_adapters, args.data_adapter)
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     # =======================================================
     adapter = adapter_class(adapter_config)
     
-    streamer = mfi_ddb.Streamer(mqtt_config, adapter, stream_on_update=not args.polling)
+    streamer = mfi_ddb.Streamer(streamer_config, adapter, stream_on_update=not args.polling)
     
     if args.polling:
         print("\nPolling method selected.")
