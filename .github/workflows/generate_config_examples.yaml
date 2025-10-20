@@ -2,7 +2,7 @@ name: Generate Config Examples
 
 on:
   push:
-    # branches: [ main ]
+    branches: [ main ]
     paths:
       # Trigger only if there are changes in the directory containing data adapters
       - 'src/mfi_ddb/data_adapters/**'

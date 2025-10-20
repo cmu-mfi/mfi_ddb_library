@@ -4,5 +4,3 @@ from .mqtt import MqttDataAdapter
 from .mtconnect import MTconnectDataAdapter
 from .ros_files import RosFilesDataAdapter
 from .ros import RosDataAdapter
-
-#mock edit 3
