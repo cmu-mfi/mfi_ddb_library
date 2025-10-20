@@ -7,6 +7,9 @@ on:
       # Trigger only if there are changes in the directory containing data adapters
       - 'src/mfi_ddb/data_adapters/**'
 
+permissions:
+  contents: write  # To allow pushing changes back to the repository
+
 jobs:
   generate-configs:
     runs-on: ubuntu-latest
