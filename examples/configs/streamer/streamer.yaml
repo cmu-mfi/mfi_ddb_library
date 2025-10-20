@@ -1,0 +1,10 @@
+topic_family: blob
+mqtt:
+  broker_address: test.mosquitto.org
+  broker_port: 1883
+  enterprise: CMU
+  site: Machine Shop
+  username: mqtt_user
+  password: mqtt_password
+  tls_enabled: false
+  debug: false
