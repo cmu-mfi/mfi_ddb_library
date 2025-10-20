@@ -43,9 +43,9 @@ class _SCHEMA:
 class Streamer(Observer):
 
     CONFIG_EXAMPLE = {
-        "topic_family": "historian",
+        "topic_family": "blob",
         "mqtt": {
-            "broker_address": "mqtt.example.com",
+            "broker_address": "test.mosquitto.org",
             "broker_port": 1883,
             "enterprise": "CMU",
             "site": "Machine Shop",
