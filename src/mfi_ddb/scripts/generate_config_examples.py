@@ -58,7 +58,7 @@ if __name__ == "__main__":
         config_example_pretty = yaml.dump(config_example, sort_keys=False)
         config_help_pretty = yaml.dump(config_help, sort_keys=False)        
         
-        example_output_path = f"{data_adapter_config_dir}/{adapter.NAME.lower().replace(' ', '_')}_config.yaml"
+        example_output_path = f"{data_adapter_config_dir}/{adapter.NAME.lower().replace(' ', '_')}.yaml"
         help_output_path = f"{data_adapter_config_dir}/{adapter.NAME.lower().replace(' ', '_')}_help.yaml"
         yaml.dump(config_example, open(example_output_path, "w"), sort_keys=False)
         yaml.dump(config_help, open(help_output_path, "w"), sort_keys=False)
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     config_example_pretty = yaml.dump(config_example, sort_keys=False)
     config_help_pretty = yaml.dump(config_help, sort_keys=False)
 
-    example_output_path = f"{streamer_config_dir}/streamer_config.yaml"
+    example_output_path = f"{streamer_config_dir}/streamer.yaml"
     help_output_path = f"{streamer_config_dir}/streamer_help.yaml"
     yaml.dump(config_example, open(example_output_path, "w"), sort_keys=False)
     yaml.dump(config_help, open(help_output_path, "w"), sort_keys=False)

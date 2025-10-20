@@ -1,5 +1,0 @@
-mtconnect:
-  agent_ip: IP address of the MTConnect agent
-  agent_url: URL of the MTConnect agent
-  device_name: Name of the device to be used in the data object
-  trial_id: Trial ID for the MTConnect device. No spaces or special characters allowed.
