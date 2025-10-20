@@ -1,0 +1,10 @@
+topic_family: historian
+mqtt:
+  broker_address: mqtt.example.com
+  broker_port: 1883
+  enterprise: CMU
+  site: Machine Shop
+  username: mqtt_user
+  password: mqtt_password
+  tls_enabled: false
+  debug: false

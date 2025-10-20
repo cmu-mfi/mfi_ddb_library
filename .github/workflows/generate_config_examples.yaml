@@ -6,6 +6,7 @@ on:
     paths:
       # Trigger only if there are changes in the directory containing data adapters
       - 'src/mfi_ddb/data_adapters/**'
+      - 'src/mfi_ddb/streamer/streamer.py'
 
 permissions:
   contents: write  # To allow pushing changes back to the repository
@@ -33,7 +34,7 @@ jobs:
         
       - name: 6. Execute configuration generation script
         id: generate
-        run: uv run -m mfi_ddb.scripts.generate_config_examples --output_dir examples/data_adapters_configs
+        run: uv run -m mfi_ddb.scripts.generate_config_examples --output_dir examples/configs
           
       - name: 7. Commit and Push generated files
         # Ref: https://github.com/marketplace/actions/git-auto-commit
