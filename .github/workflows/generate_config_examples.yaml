@@ -2,11 +2,16 @@ name: Generate Config Examples
 
 on:
   push:
-    branches: [ main ]
     paths:
       # Trigger only if there are changes in the directory containing data adapters
       - 'src/mfi_ddb/data_adapters/**'
       - 'src/mfi_ddb/streamer/streamer.py'
+  pull_request:
+    paths:
+      - 'src/mfi_ddb/data_adapters/**'
+      - 'src/mfi_ddb/streamer/streamer.py'
+  workflow_dispatch:
+
 
 permissions:
   contents: write  # To allow pushing changes back to the repository
