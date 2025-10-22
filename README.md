@@ -163,3 +163,7 @@ optional arguments:
   --poll_rate POLL_RATE, -r POLL_RATE
                         Polling rate in Hz. Default is 1 Hz, if --polling is set to True.
 ```
+
+## License
+
+This project is licensed under the BSD-3-Clause License - see the [LICENSE](LICENSE) file for details.
