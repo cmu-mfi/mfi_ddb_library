@@ -136,7 +136,7 @@ class MTconnectDataAdapter(BaseDataAdapter):
         
         start_time = time.time()
         time_elapsed = 0
-        while response is None or time_elapsed < timeout:
+        while response is None and time_elapsed < timeout:
             print("MTConnect agent is not active. Waiting ...")
             time.sleep(1)
             response = ping(ip)
