@@ -105,14 +105,12 @@ class Streamer(Observer):
         self.__last_poll_update = time.time()
         
     def on_data_update(self, data: dict):
-        print("DEBUG: ON DATA UPDATE CALLED")
         if self.__refresh_birth_data_with_new_keys(data):
             self.__reset_stream()        
         self.__client.stream_data(data)
         self.__data_adp.clear_data_buffer(list(data.keys()))
 
     def stream_data(self):
-        print("DEBUG: STREAM DATA CALLED")
         if self.__refresh_birth_data_with_new_keys():
             self.__reset_stream()
         self.__client.stream_data(self.__data_adp.data)
@@ -151,7 +149,7 @@ class Streamer(Observer):
         
         return payload
 
-    def __refresh_birth_data_with_new_keys(self, data: dict) -> bool:
+    def __refresh_birth_data_with_new_keys(self, data: dict = {}) -> bool:
         """
         Check for new keys in incoming data that are not present in the stored birth data.
 
@@ -163,8 +161,6 @@ class Streamer(Observer):
             Updates the object's stored birth data in-place to include newly discovered keys.
             
         """
-        print("DEBUG: REFRESH BIRTH DATA WITH NEW KEYS CALLED")
-        
         if not data:
             data = self.__data_adp.data
         
