@@ -122,8 +122,9 @@ positional arguments:
 ### [stream_data.py](mfi_ddb/scripts/stream_data.py)
 
 #### Example usage
-```
+
 Use a configuration directory:
+```
 $ python -m mfi_ddb.scripts.stream_data --data_adapter 'MQTT' --config_dir ./configs
 ```
 
