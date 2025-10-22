@@ -1,0 +1,11 @@
+topic_family: Topic family to use (e.g., 'historian', 'kv', 'blob')
+mqtt:
+  broker_address: Address of the MQTT broker
+  broker_port: 'Port of the MQTT broker (default: 1883)'
+  enterprise: Enterprise name for MQTT connection
+  site: Site name for MQTT connection
+  username: Username for MQTT broker authentication
+  password: Password for MQTT broker authentication
+  tls_enabled: 'Enable TLS for MQTT connection (default: False)'
+  debug: 'Enable debug mode for MQTT client (default: False)'
+  timeout: 'Timeout in seconds for connecting to the MQTT broker (default: 5)'

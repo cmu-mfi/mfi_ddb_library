@@ -1,0 +1,10 @@
+watch_dir:
+- /path/to/watch/dir
+buffer_size: 10
+wait_before_read: 2
+system:
+  name: local_files_system
+  trial_id: trial_001
+  description: Local files data adapter system
+  manufacturer: Example Corp
+  model: LocalFilesModel

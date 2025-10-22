@@ -1,9 +1,0 @@
-topic:
-  version: 1.0
-  topic_family: blob
-  enterprise: test-enterprise
-  # site: 
-  # area: living_room
-  # device: thermostat
-
-save_directory: ./examples
