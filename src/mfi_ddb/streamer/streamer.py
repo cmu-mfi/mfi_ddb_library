@@ -162,10 +162,6 @@ class Streamer(Observer):
         Side effects:
             Updates the object's stored birth data in-place to include newly discovered keys.
             
-        Notes:
-            - This method only adds missing keys to the birth data; it does not change values
-              for keys that already exist.
-            - Each key stores first seen value from the data adapter.
         """
         print("DEBUG: REFRESH BIRTH DATA WITH NEW KEYS CALLED")
         
@@ -190,6 +186,8 @@ class Streamer(Observer):
                     print(f"New data key detected in data adapter for component {key}: {sub_key}. Updating birth data.")
                     self.__birth_data[key][sub_key] = copy.deepcopy(data[key][sub_key])
                     new_key_detected = True
+                else:
+                    self.__birth_data[key][sub_key] = copy.deepcopy(data[key][sub_key])
  
         return new_key_detected
     
