@@ -143,6 +143,8 @@ class Streamer(Observer):
                 "fqdn": socket.getfqdn(),
             },
             "adapter": {
+                "name": self.__data_adp.NAME,
+                "config_help": self.__data_adp.CONFIG_HELP,
                 "config": self.__data_adp.cfg,
                 "component_ids": self.__data_adp.component_ids,
                 "attributes": self.__data_adp.attributes,
