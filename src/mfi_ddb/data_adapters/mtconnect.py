@@ -1,3 +1,29 @@
+"""MTConnect Data Adapter Module.
+
+This module provides a data adapter for interfacing with MTConnect agents.
+MTConnect is a manufacturing industry standard for data exchange between
+manufacturing equipment and software applications.
+
+The MTconnectDataAdapter class handles:
+- Connecting to MTConnect agents via HTTP
+- Retrieving device probe information to understand device structure
+- Polling current and sample data from MTConnect devices
+- Converting MTConnect XML data into a structured format for streaming
+- Managing component IDs, attributes, and data buffers
+
+Typical usage:
+    config = {
+        'mtconnect': {
+            'agent_ip': '192.168.1.100',
+            'agent_url': 'http://192.168.1.100:5000',
+            'device_name': 'CNC_Machine',
+            'trial_id': 'trial_001'
+        }
+    }
+    adapter = MTconnectDataAdapter(config)
+    adapter.get_data()  # Retrieves current device data
+"""
+
 import time
 
 import omegaconf
@@ -20,6 +46,27 @@ class _SCHEMA(BaseModel):
         mtconnect: "_MTCONNECT" = Field(..., description="Configuration for the MTConnect agent connection")
 
 class MTconnectDataAdapter(BaseDataAdapter):
+    """Data adapter for MTConnect manufacturing devices.
+    
+    This adapter connects to an MTConnect agent (a server that exposes device data
+    via HTTP) and retrieves manufacturing device information. It handles:
+    
+    - Device connectivity verification via ICMP ping
+    - Device probe to discover component structure and data items
+    - Continuous data polling from MTConnect current/sample endpoints
+    - XML-to-dict conversion and data structuring
+    - Automatic type conversion for numeric values
+    
+    The adapter organizes data by component IDs (e.g., "MachineName/ComponentID")
+    and maintains attributes and timestamps for each component.
+    
+    Attributes:
+        NAME (str): Identifier for this adapter type
+        CONFIG_HELP (dict): Help text for configuration parameters
+        CONFIG_EXAMPLE (dict): Example configuration structure
+        RECOMMENDED_TOPIC_FAMILY (str): Suggested topic family for streaming ("historian")
+        SELF_UPDATE (bool): Whether adapter auto-updates (False - requires polling)
+    """
     
     NAME = "MTConnect"
     
@@ -52,6 +99,27 @@ class MTconnectDataAdapter(BaseDataAdapter):
         pass
 
     def __init__(self, config: dict):
+        """Initialize the MTConnect data adapter.
+        
+        Performs the following initialization steps:
+        1. Validates connection to the MTConnect agent via ping
+        2. Sends a probe request to discover device structure
+        3. Extracts device and component information
+        4. Populates component IDs, attributes, and data buffers
+        
+        Args:
+            config (dict): Configuration dictionary containing MTConnect agent
+                connection details. Must include 'mtconnect' key with:
+                - agent_ip: IP address of the MTConnect agent
+                - agent_url: Full URL to the MTConnect agent
+                - device_name: Name identifier for the device
+                - trial_id: Trial identifier for data organization
+                - mtconnect_uuid (optional): Specific device UUID if multiple devices exist
+                - timeout (optional): Connection timeout in seconds (default: 5)
+        
+        Raises:
+            ConnectionError: If MTConnect agent is not reachable within timeout period
+        """
         super().__init__()
         
         self.cfg = config
@@ -104,6 +172,16 @@ class MTconnectDataAdapter(BaseDataAdapter):
                     self._data[component_id][f'{data_item["@id"]}/{key}'] = str(data_item[key])                
                     
     def get_data(self):
+        """Retrieve current data from the MTConnect agent.
+        
+        Queries the MTConnect 'current' endpoint to get the latest snapshot
+        of all data items across all device components. This provides a
+        complete picture of the device state at the current moment.
+        
+        The retrieved data is parsed and stored in the internal data buffer,
+        organized by component IDs. This method is typically called for
+        initial data population or one-time queries.
+        """
         raw_data = self.__request_agent('current')
         devices = raw_data.MTConnectStreams.Streams.DeviceStream
         device = devices[0] if isinstance(devices, omegaconf.listconfig.ListConfig) else devices
@@ -115,6 +193,15 @@ class MTconnectDataAdapter(BaseDataAdapter):
         self.__populate_data(component_stream)
     
     def update_data(self):
+        """Update data by polling the MTConnect sample endpoint.
+        
+        Queries the MTConnect 'sample' endpoint to retrieve time-series data
+        samples. This is used for continuous monitoring and is typically called
+        in a polling loop to capture device data changes over time.
+        
+        The retrieved samples are parsed and update the internal data buffer,
+        with timestamps tracking when each component was last updated.
+        """
         raw_data = self.__request_agent('sample')
         devices = raw_data.MTConnectStreams.Streams.DeviceStream
         device = devices[0] if isinstance(devices, omegaconf.listconfig.ListConfig) else devices
@@ -127,6 +214,23 @@ class MTconnectDataAdapter(BaseDataAdapter):
         
         
     def __connect(self):
+        """Verify connectivity to the MTConnect agent.
+        
+        Uses ICMP ping to check if the MTConnect agent is reachable on the network.
+        Retries for a configurable timeout period (default 5 seconds) before failing.
+        
+        The while loop condition ensures both conditions must be true to continue waiting:
+        - response is None (no successful ping yet)
+        - time_elapsed < timeout (haven't exceeded timeout period)
+        
+        This prevents infinite waiting and ensures timely failure detection.
+        
+        Raises:
+            ConnectionError: If the agent doesn't respond within the timeout period
+        
+        Note:
+            Prints status messages to console during connection attempts
+        """
         # Ping to see if MTConnect agent is active -----------------------------------
         print("Checking if MTConnect agent is active ...")
         ip = self.cfg['mtconnect']['agent_ip']
@@ -148,6 +252,22 @@ class MTconnectDataAdapter(BaseDataAdapter):
         print(f"MTConnect agent at {ip} is active")    
         
     def __request_agent(self, ext: str):
+        """Send HTTP request to the MTConnect agent.
+        
+        Constructs and sends a GET request to the MTConnect agent, appending
+        the specified endpoint extension to the base URL. Common extensions are:
+        - 'probe': Get device structure and capabilities
+        - 'current': Get current snapshot of all data items
+        - 'sample': Get time-series samples of data
+        
+        Args:
+            ext (str): Endpoint extension to append to the agent URL
+                (e.g., 'probe', 'current', 'sample')
+        
+        Returns:
+            OmegaConf: Parsed MTConnect XML response as an OmegaConf object,
+                providing dict-like access to the structured data
+        """
         URL = self.cfg['mtconnect']['agent_url']
         response = requests.get(URL + ext)
         val = xmltodict.parse(response.text, encoding='utf-8')
@@ -155,6 +275,21 @@ class MTconnectDataAdapter(BaseDataAdapter):
         return val
             
     def __get_probe_components(self, data, component_data=None):
+        """Recursively extract components with DataItems from probe response.
+        
+        Traverses the hierarchical structure of the MTConnect probe response
+        to find all components that contain DataItems (actual data points).
+        This recursive function handles nested components at any depth.
+        
+        Args:
+            data: MTConnect probe data structure (dict or list)
+            component_data (list, optional): Accumulator list for found components.
+                Defaults to None (creates new list).
+        
+        Returns:
+            list: All components that have DataItems defined, which represent
+                the actual data sources within the device
+        """
         if component_data is None:
             component_data = []
         
@@ -170,6 +305,26 @@ class MTconnectDataAdapter(BaseDataAdapter):
         return component_data
 
     def __populate_data(self, raw_data):
+        """Parse and store MTConnect stream data into internal data buffer.
+        
+        Processes component stream data from MTConnect current/sample responses.
+        Recursively extracts key-value pairs from the hierarchical data structure
+        and stores them in the component-specific data buffers.
+        
+        The method handles:
+        - Events and Samples data from each component
+        - Nested data structures (dicts and lists)
+        - Special key substitutions (e.g., '#text' becomes 'value')
+        - Automatic type conversion for numeric values
+        - Timestamp tracking for each component update
+        
+        Args:
+            raw_data (list): List of ComponentStream objects from MTConnect response,
+                containing Events and/or Samples data for each component
+        
+        Note:
+            Updates self._data and self.last_updated for each affected component
+        """
         
         current_time = time.time()
         
@@ -203,6 +358,19 @@ class MTconnectDataAdapter(BaseDataAdapter):
                             extract_key_value(data_item, data_item_id)                                                         
 
     def __autotype(self, value):
+        """Automatically convert string values to appropriate numeric types.
+        
+        Attempts to convert the input value to int first, then float,
+        falling back to the original value if neither conversion succeeds.
+        This ensures numeric data is stored in proper types for analysis.
+        
+        Args:
+            value: Input value (typically string from XML parsing)
+        
+        Returns:
+            int, float, or original value: Converted value in the most
+                appropriate type (int preferred over float over string)
+        """
         try:
             return int(value)
         except:
