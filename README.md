@@ -5,13 +5,25 @@ Library to stream data to Digital Data Backend (DDB) for the MFI project.
 
 ## Installation
 
+### using uv manager
+
+Pre-requisite: Install [uv manager](https://docs.astral.sh/uv/getting-started/installation/)
+
+```
+git clone --recurse-submodules https://github.com/cmu-mfi/mfi_ddb_library.git
+cd mfi_ddb_library
+uv sync
+```
+
+### using pip/venv
+
 **Linux**
 ```
 git clone --recurse-submodules https://github.com/cmu-mfi/mfi_ddb_library.git
 cd mfi_ddb_library
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .
+pip install .
 ```
 
 **Windows CMD**
@@ -20,7 +32,7 @@ git clone --recurse-submodules https://github.com/cmu-mfi/mfi_ddb_library.git
 cd mfi_ddb_library
 python -m venv .venv
 .venv\Scripts\activate.bat
-pip install -e .
+pip install .
 ```
 
 ## Concept
@@ -84,3 +96,27 @@ When streaming data to the broker, the following metadata is recorded through th
 | attributes | Key-value pairs that provide additional information about the data being streamed. These are defined in the adapter yaml configuration file. | streamed on the same topic before data using the same topic family encoding |
 | streaming configuration | The configuration of the data stream, which includes broker information, enterprise and site details. | streamed on the `kv` and `blob` at birth and death of data streaming  |
 | adapter configuration | The configuration of the adapter that is streaming the data, which includes all the components and their attributes | streamed on the `kv` and `blob` at birth and death of data streaming |  
+
+## Executable Modules
+
+### [store_cfs.py](mfi_ddb/scripts/store_cfs.py)
+
+```
+usage: store_cfs.py [-h] mqtt_config_path cfs_config_path
+
+Subscribe to a topic and save files based on configuration.
+
+positional arguments:
+  mqtt_config_path  Path to the MQTT configuration file (e.g., mqtt.yaml).
+  cfs_config_path   Path to the CFS configuration file (e.g., cfs.yaml).
+```
+
+```
+# Example usage:
+
+python -m mfi_ddb.scripts.store_cfs path/to/mqtt.yaml path/to/cfs.yaml
+```
+
+## License
+
+This project is licensed under the BSD-3-Clause License - see the [LICENSE](LICENSE) file for details.
