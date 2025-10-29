@@ -24,11 +24,54 @@ The schema consists of two primary tables, `project_detail` and `trial_detail`, 
 #### Table `project_detail`
 ```
 CREATE TABLE project_detail (
-    project_id       VARCHAR(255) PRIMARY KEY,
-    name      	     VARCHAR(255),
-    created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    details	         JSONB
+    project_id           VARCHAR(255) PRIMARY KEY,
+    name      	         VARCHAR(255),
+    created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by_user_id   VARCHAR(255),
+    created_by_domain    VARCHAR(255),
+    details	             JSONB,
+    CONSTRAINT fk_project_created_by FOREIGN KEY (created_by_user_id, created_by_domain) REFERENCES user_detail(user_id, domain),
+);
+```
+#### Table `user_detail`
+```
+CREATE TABLE user_detail (
+    user_id            VARCHAR(255) NOT NULL,
+    domain             VARCHAR(255) NOT NULL,
+    created_by_user_id VARCHAR(255),
+    created_by_domain  VARCHAR(255),
+    email              VARCHAR(255),
+    name               VARCHAR(255),
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, domain),
+    CONSTRAINT fk_user_created_by FOREIGN KEY (created_by_user_id, created_by_domain) REFERENCES user_detail(user_id, domain) DEFERRABLE INITIALLY DEFERRED
+);
+```
+
+#### enum type `user_role` for user project roles
+```
+DO $$
+BEGIN
+   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+       CREATE TYPE user_role AS ENUM ('admin','operator');
+   END IF;
+END$$;
+```
+
+#### Table `user_project_role_linking`
+```
+CREATE TABLE user_project_role_linking (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     VARCHAR(255) NOT NULL,
+    domain      VARCHAR(255) NOT NULL,
+    project_id  VARCHAR(255) NOT NULL REFERENCES project_detail(project_id),
+    role        user_role NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_user_detail FOREIGN KEY (user_id, domain) REFERENCES user_detail(user_id, domain),
+    CONSTRAINT unique_user_project_role UNIQUE (user_id, domain, project_id)
 );
 ```
 
@@ -36,13 +79,16 @@ CREATE TABLE project_detail (
 ```
 CREATE TABLE trial_detail (
     trial_id         VARCHAR(255) PRIMARY KEY,
+    user_id          VARCHAR(255),
+    user_domain      VARCHAR(255),
     project_id       VARCHAR(255) REFERENCES project_detail(project_id),
     birth_timestamp  TIMESTAMPTZ  NOT NULL,
     death_timestamp  TIMESTAMPTZ,
     clean_exit	     BOOLEAN DEFAULT FALSE,
     metadata         JSONB,
     created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_trial_user FOREIGN KEY (user_id, user_domain) REFERENCES user_detail(user_id, domain)
 );
 ```
 
@@ -71,6 +117,24 @@ EXECUTE PROCEDURE set_updated_at_timestamp();
 DROP TRIGGER IF EXISTS trial_detail_set_updated_at ON trial_detail;
 CREATE TRIGGER trial_detail_set_updated_at
 BEFORE UPDATE ON trial_detail
+FOR EACH ROW
+EXECUTE PROCEDURE set_updated_at_timestamp();
+```
+
+#### Trigger `user_detail_set_updated_at` to update `updated_at` column in `user_detail` table
+```
+DROP TRIGGER IF EXISTS user_detail_set_updated_at ON user_detail;
+CREATE TRIGGER user_detail_set_updated_at
+BEFORE UPDATE ON user_detail
+FOR EACH ROW
+EXECUTE PROCEDURE set_updated_at_timestamp();
+```
+
+#### Trigger `user_project_role_linking_set_updated_at` to update `updated_at` column in `user_project_role_linking` table
+```
+DROP TRIGGER IF EXISTS user_project_role_linking_set_updated_at ON user_project_role_linking;
+CREATE TRIGGER user_project_role_linking_set_updated_at
+BEFORE UPDATE ON user_project_role_linking
 FOR EACH ROW
 EXECUTE PROCEDURE set_updated_at_timestamp();
 ```
