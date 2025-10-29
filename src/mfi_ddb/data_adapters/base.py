@@ -21,7 +21,7 @@ class BaseDataAdapter:
         """
         pass
 
-    def __init__(self, config: dict = None) -> None:
+    def __init__(self, config: dict = {}) -> None:
         self.component_ids = []
         # component_ids is a list of identifiers for the components that are part of the data object.
         # e.g.: self.component_ids = ["robot-arm-1", "machine-a"]
@@ -64,7 +64,7 @@ class BaseDataAdapter:
         self._cb_data.clear()
         self.last_updated.clear()
         self.attributes.clear()
-        self.cfg = None
+        self.cfg = {}
         self._observers.clear()
 
     @property
