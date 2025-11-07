@@ -1,5 +1,4 @@
 trial_id: trial_001
-set_ros_callback: true
 devices:
   device1:
     namespace: robot_arm
