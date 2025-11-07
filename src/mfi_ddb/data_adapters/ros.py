@@ -1,3 +1,4 @@
+import threading
 import time
 from typing import List, Optional
 
@@ -15,7 +16,6 @@ class _SCHEMA(BaseModel):
         attributes: Optional[dict] = Field({}, description="Attributes of the device. Optional.")
     class SCHEMA(BaseModel):
         trial_id: str = Field(..., description="Trial ID for the ROS device. No spaces or special characters allowed.")
-        set_ros_callback: bool = Field(True, description="Set ROS callback to receive data from ROS topics. If set to False, you need to call get_data() method to get data from ROS topics.")
         devices: List["_DEVICES"] = Field(..., description="List of devices to subscribe to.")
 
 class RosDataAdapter(BaseDataAdapter):
@@ -23,12 +23,10 @@ class RosDataAdapter(BaseDataAdapter):
     NAME = "ROS"
     CONFIG_HELP = {
         "trial_id": "Trial ID for the ROS device. No spaces or special characters allowed.",
-        "set_ros_callback": "Set ROS callback to receive data from ROS topics. If set to False, you need to call get_data() method to get data from ROS topics.",
         "devices": "List of devices to subscribe to. Each device should have a 'namespace' and a list of 'rostopics' to subscribe to. 'attributes' are optional and can be used to set the attributes of the device.",   
     }
     CONFIG_EXAMPLE = {
         "trial_id": "trial_001",
-        "set_ros_callback": True,
         "devices": {
             "device1": {
                 "namespace": "robot_arm",
@@ -72,6 +70,7 @@ class RosDataAdapter(BaseDataAdapter):
             self.AnyMsg = AnyMsg
             self.rostopic = rostopic
             self.rospy = rospy
+            self.rosgraph = rosgraph
 
         except ImportError as e:
             raise Exception(
@@ -81,12 +80,6 @@ class RosDataAdapter(BaseDataAdapter):
         # CHECK CONFIG FOR REQUIRED KEYS
         if "devices" not in config.keys():
             raise Exception("No devices found in the config file.")
-
-        if "max_wait_per_topic" not in config.keys():
-            config["max_wait_per_topic"] = 1
-
-        if "set_ros_callback" not in config.keys():
-            config["set_ros_callback"] = False
 
         # INIT DATA MEMBERS FROM CONFIG
         self.cfg = config
@@ -151,42 +144,16 @@ class RosDataAdapter(BaseDataAdapter):
                     del self.raw_data[device][topic]
                     continue
 
+        self.__init_callback()
+        rospy.sleep(1)  # wait for subscribers to connect
         print("RosDataAdapter initialized successfully.")
-        
-        # SET ROS CALLBACK
-        if self.cfg["set_ros_callback"]:
-            self.__init_callback()
 
     def get_data(self):
         if len(self.component_ids) == 0:
             print("ERROR: No components found in the data object.")
             exit(1)
-
-        self.__poll_ros_topics()
-
-        for device in self.component_ids:
-            for topic in self.raw_data[device]:
-                # self.cb_data = self.__process_rawdata(device, topic)
-                self.__process_rawdata(device, topic)
-
-    def __poll_ros_topics(self):
-
-        if self.rospy.is_shutdown():
-            raise KeyboardInterrupt("ROS shutdown signal received.")
-
-        for device in self.component_ids:
-            for topic in self.raw_data[device]:
-                try:
-                    wait_time = self.cfg["max_wait_per_topic"]
-                    msg_type = self.rostopic.get_topic_class(topic)[0]
-                    self.raw_data[device][topic] = self.rospy.wait_for_message(
-                        topic, msg_type, wait_time
-                    )
-                except Exception as e:
-                    print(f"Exception: {e}")
-                    print(
-                        f"Warning: Could not get data from topic {topic}. Try increasing max_wait_per_topic in config file."
-                    )
+            
+        self.rospy.sleep(0.1)  # allow some time for callback to get data
 
     def __process_rawdata(self, device, topic):
         msg = self.raw_data[device][topic]
@@ -203,16 +170,16 @@ class RosDataAdapter(BaseDataAdapter):
                 if key in msg.__slots__:
                     msg.__slots__.remove(key)
 
-        msg_dict = yaml.safe_load(str(msg))
         topic_name = topic.replace(f"/{device}/", "")
-        print(f"Msg: {msg_dict}")
+        msg_dict = yaml.safe_load(str(msg))            
+        # print(f"Msg: {msg_dict}")
         new_data = self.__get_keyvalue_from_dict(msg_dict, f"{topic_name}/")
 
         self._data[device].update(new_data)
         self.last_updated[device] = time.time()
         self._notify_observers({device: new_data})
 
-        return {device: new_data}
+        # return {device: new_data}
 
     def __get_keyvalue_from_dict(self, data_dict, key_prefix=""):
         data = {}
@@ -267,8 +234,6 @@ class RosDataAdapter(BaseDataAdapter):
                     callback_args=(device, topic),
                 )
 
-        self.rospy.spin()
-
     def __callback(self, anymsg, callback_args):
         device = callback_args[0]
         topic = callback_args[1]
@@ -279,8 +244,8 @@ class RosDataAdapter(BaseDataAdapter):
         msg_class = self.get_message_class(msg_type_name)
 
         msg = msg_class().deserialize(anymsg._buff)
+
         self.raw_data[device][topic] = msg
-        # self.cb_data = self.__process_rawdata(device, topic)
         self.__process_rawdata(device, topic)
 
     def __ros_shutdown(self):

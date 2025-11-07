@@ -138,7 +138,7 @@ class MqttSpb:
     
     def __check_data(self, data: dict):
         for key in data.keys():
-            if type(data[key]) not in [int, float, str, list]:
+            if type(data[key]) not in [int, float, str, list, bool]:
                 return False         
             if type(data[key]) == list:
                 if len(data[key]) > MAX_ARRAY_SIZE:
