@@ -24,25 +24,25 @@ The schema consists of two primary tables, `project_detail` and `trial_detail`, 
 #### Table `project_detail`
 ```
 CREATE TABLE project_detail (
-    project_id           VARCHAR(255) PRIMARY KEY,
-    name      	         VARCHAR(255),
+    project_id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name      	         VARCHAR(50),
     created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    created_by_user_id   VARCHAR(255),
-    created_by_domain    VARCHAR(255),
+    created_by_user_id   VARCHAR(50),
+    created_by_domain    VARCHAR(50),
     details	             JSONB,
-    CONSTRAINT fk_project_created_by FOREIGN KEY (created_by_user_id, created_by_domain) REFERENCES user_detail(user_id, domain),
+    CONSTRAINT fk_project_created_by FOREIGN KEY (created_by_user_id, created_by_domain) REFERENCES user_detail(user_id, domain)
 );
 ```
 #### Table `user_detail`
 ```
 CREATE TABLE user_detail (
-    user_id            VARCHAR(255) NOT NULL,
-    domain             VARCHAR(255) NOT NULL,
-    created_by_user_id VARCHAR(255),
-    created_by_domain  VARCHAR(255),
-    email              VARCHAR(255),
-    name               VARCHAR(255),
+    user_id            VARCHAR(50) NOT NULL,
+    domain             VARCHAR(50) NOT NULL,
+    created_by_user_id VARCHAR(50),
+    created_by_domain  VARCHAR(50),
+    email              VARCHAR(254),
+    name               VARCHAR(50),
     created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (user_id, domain),
@@ -55,7 +55,9 @@ CREATE TABLE user_detail (
 DO $$
 BEGIN
    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
-       CREATE TYPE user_role AS ENUM ('admin','operator');
+       -- 'admin' and 'maintainer' have the same roles
+       -- 'operator' and 'researcher' have the same roles
+       CREATE TYPE user_role AS ENUM ('admin', 'operator', 'maintainer', 'researcher');
    END IF;
 END$$;
 ```
@@ -64,9 +66,9 @@ END$$;
 ```
 CREATE TABLE user_project_role_linking (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     VARCHAR(255) NOT NULL,
-    domain      VARCHAR(255) NOT NULL,
-    project_id  VARCHAR(255) NOT NULL REFERENCES project_detail(project_id),
+    user_id     VARCHAR(50) NOT NULL,
+    domain      VARCHAR(50) NOT NULL,
+    project_id  UUID NOT NULL REFERENCES project_detail(project_id),
     role        user_role NOT NULL,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -78,11 +80,12 @@ CREATE TABLE user_project_role_linking (
 #### Table `trial_detail`
 ```
 CREATE TABLE trial_detail (
-    trial_id         VARCHAR(255) PRIMARY KEY,
-    user_id          VARCHAR(255),
-    user_domain      VARCHAR(255),
-    project_id       VARCHAR(255) REFERENCES project_detail(project_id),
-    birth_timestamp  TIMESTAMPTZ  NOT NULL,
+    id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    trial_name       VARCHAR(255),
+    user_id          VARCHAR(50),
+    user_domain      VARCHAR(50),
+    project_id       UUID REFERENCES project_detail(project_id),
+    birth_timestamp  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     death_timestamp  TIMESTAMPTZ,
     clean_exit	     BOOLEAN DEFAULT FALSE,
     metadata         JSONB,
@@ -152,7 +155,7 @@ This approach transforms implicit references into explicit, queryable relationsh
 ```
 CREATE TABLE graph_edges (
     edge_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    source_trial_id    VARCHAR(255) NOT NULL REFERENCES trial_detail(trial_id),
+    source_trial_id    UUID NOT NULL REFERENCES trial_detail(id),
     target_entity_id   VARCHAR(255) NOT NULL,
     target_entity_type VARCHAR(50) NOT NULL --  ('trial', 'project', 'tag')
 );
