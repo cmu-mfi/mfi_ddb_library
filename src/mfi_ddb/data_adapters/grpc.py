@@ -16,7 +16,8 @@ from mfi_ddb.data_adapters.base import BaseDataAdapter
 class _SCHEMA(BaseModel):
     class _GRPCComponent(BaseModel):
         component_id: str = Field(..., description="ID of the gRPC component to monitor")
-        attributes: Optional[dict] = Field(None, description="Additional attributes for the gRPC component (optional)")
+        attributes: dict = Field(..., description="Additional attributes for the gRPC component (optional)")
+        trial_id: str = Field(..., description="Trial ID for the gRPC device. No spaces or special characters allowed (optional)")
         proto_path: str = Field(..., description="Path to the .proto file defining the gRPC service")
         request_method: str = Field(..., description="Name of the gRPC service method to call. Only `Read` method is supported.")
         stub_class: str = Field(..., description="Name of the gRPC stub class to use for communication")
@@ -50,7 +51,7 @@ class GrpcDataAdapter(BaseDataAdapter):
         "server_address": "localhost",
         "server_port": 50051,
         "certificate_path": "/path/to/cert.pem",
-        "trial_id": "proj_zbc0505",
+        "trial_id": "exp1",
         "protobufs_dir": "/path/to/protos",
         "compiled_protos_dir": "/path/to/compiled_protos",
         "components": [
@@ -74,6 +75,7 @@ class GrpcDataAdapter(BaseDataAdapter):
                     "description": "something something",
                     "unit": "Percentage"
                 },
+                "trial_id": "exp1_parallelA",
                 "proto_rel_path": "/path/to/humidity.proto",
                 "stub_class": "HumidityServiceStub",
                 "request_class": "HumidityRequest",
@@ -101,7 +103,7 @@ class GrpcDataAdapter(BaseDataAdapter):
         
         # 1. OPEN GRPC CHANNEL
         addr = f"{self.cfg['server_address']}:{self.cfg['server_port']}"
-        if self.cfg['certificate_path']:
+        if 'certificate_path' in self.cfg:
             with open(self.cfg['certificate_path'], 'rb') as f:
                 root_certificates = f.read()
             cred = grpc.ssl_channel_credentials(root_certificates=root_certificates)
@@ -112,13 +114,14 @@ class GrpcDataAdapter(BaseDataAdapter):
             grpc.channel_ready_future(self.channel).result(timeout=5)
         except grpc.FutureTimeoutError:
             raise ConnectionError('Error connecting to gRPC server')
+        print(f"Connected to gRPC server at {addr}")
         
         # 2. PREPARE COMPILED PROTOBUFS
-        if self.cfg['compiled_protos_path']:
-            if not os.path.exists(self.cfg['compiled_protos_path']):
-                os.makedirs(self.cfg['compiled_protos_path'])
+        if not os.path.exists(self.cfg['compiled_protos_dir']):
+            os.makedirs(self.cfg['compiled_protos_dir'])
 
-        compiled_dir = Path(self.cfg['compiled_protos_path'])
+        compiled_dir = Path(self.cfg['compiled_protos_dir'])
+        sys.path.append(str(compiled_dir.resolve()))
 
         self.did_i_compile_once = False
         self.components = []
@@ -126,34 +129,35 @@ class GrpcDataAdapter(BaseDataAdapter):
         while i < len(self.cfg['components']):
             component = self.cfg['components'][i]
             proto_name = component['proto_rel_path'].split('/')[-1].replace('.proto', '')
-            
+            proto_rel_path = component['proto_rel_path']
+            proto_full_path = Path(os.path.join(compiled_dir, proto_rel_path))
+
+            sys.path.append(str(proto_full_path.parent.resolve()))
             # Import compiled protobuf stubs dynamically
             # ``````````````````````````````````````````
-            stub_spec = importlib.util.spec_from_file_location(proto_name,
-                                                               os.path.join(compiled_dir, f"{proto_name}_pb2_grpc.py"))
-            if not stub_spec or not stub_spec.loader:
+            
+            stub_module = importlib.import_module(f"{proto_name}_pb2_grpc")
+            if not stub_module:
                 if not self.did_i_compile_once:
                     self.__generate_compiled_protos()
                     self.did_i_compile_once = True
                     continue
-                raise ImportError(f"Could not load compiled protobuf stub for {proto_name}")
-            stub_file = importlib.util.module_from_spec(stub_spec)
-            
-            stub_class = getattr(stub_file, component['stub_class'])
+                raise ImportError(f"Could not import compiled protobuf module for {proto_name}")
+
+            stub_class = getattr(stub_module, component['stub_class'])
             
             # Import compiled protobuf request dynamically
             # ``````````````````````````````````````````            
-            request_spec = importlib.util.spec_from_file_location(proto_name,
-                                                                 os.path.join(compiled_dir, f"{proto_name}_pb2.py"))
-            if not request_spec or not request_spec.loader:
+            
+            request_module = importlib.import_module(f"{proto_name}_pb2")
+            if not request_module:
                 if not self.did_i_compile_once:
                     self.__generate_compiled_protos()
                     self.did_i_compile_once = True
                     continue
-                raise ImportError(f"Could not load compiled protobuf request for {proto_name}")
-            request_file = importlib.util.module_from_spec(request_spec)
+                raise ImportError(f"Could not import compiled protobuf request module for {proto_name}")
 
-            request_class = getattr(request_file, component['request_class'])
+            request_class = getattr(request_module, component['request_class'])
             request_dict = component['request']
             
             # Instantiate stub and request
@@ -164,9 +168,10 @@ class GrpcDataAdapter(BaseDataAdapter):
 
             # Populate BaseDataAdapter data members: component_ids and attributes
             # ```````````````````````````````````````````````````````````````````
-            attributes = component.get('attributes', {})
+            if 'trial_id' not in component:
+                component['trial_id'] = self.cfg['trial_id']
             self.component_ids.append(component['component_id'])
-            self.attributes[component['component_id']] = attributes
+            self.attributes[component['component_id']] = component
             self._data[component['component_id']] = {}
             
 
@@ -180,10 +185,9 @@ class GrpcDataAdapter(BaseDataAdapter):
 
     def get_data(self):
         for comp in self.components:
-            response = getattr(comp['stub'], comp['request_method'])(comp['request_instance'])
+            raw_response = getattr(comp['stub'], comp['request_method'])(comp['request_instance'])
             # Assuming response has a 'data' attribute; adjust as needed
-            raw_response = response.data
-            self._data[comp['component_id']] = self.__process_data(raw_response, comp['component_id'])
+            self._data[comp['component_id']] = self.__process_data(raw_response)
             self.last_updated[comp['component_id']] = time.time()
         
     def __generate_compiled_protos(self):
@@ -199,16 +203,36 @@ class GrpcDataAdapter(BaseDataAdapter):
         done
         '''
         protoc = [sys.executable, "-m", "grpc_tools.protoc"]
-        protopath = self.cfg.get('proto_base_path', './protobuf')
-        output = self.cfg['compiled_protos_path']
+        protopath = self.cfg['protobufs_dir']
+        output = self.cfg['compiled_protos_dir']
 
-        find_cmd = ["find", protopath, "-type", "f", "-print0"]
-        while True:
-            file = subprocess.run(find_cmd, capture_output=True, text=True)
-            if not file.stdout:
-                break
-            file = file.stdout.strip('\0')
-            subprocess.run(protoc + ["-I" + protopath, "--python_out=" + output, "--grpc_python_out=" + output, file], check=True)
+        if not os.path.exists(protopath):
+            raise FileNotFoundError(f"Protobuf path {protopath} does not exist")
+        os.makedirs(output, exist_ok=True)
+
+        # Run find once
+        result = subprocess.run(
+            ["find", protopath, "-type", "f", "-print0"],
+            capture_output=True,
+            check=True
+        )
+
+        # Split null-separated results
+        files = result.stdout.split(b"\0")
+        files = [f.decode() for f in files if f]   # remove empty trailing b""
+
+        for file in files:
+            cmd = protoc + [
+                "-I" + protopath,
+                "--python_out=" + output,
+                "--grpc_python_out=" + output,
+                file,
+            ]
+
+            # print("Running:", cmd)
+            subprocess.run(cmd, check=True)
+
+        print("Compiled protobufs successfully.")
             
     def __process_data(self, raw_response):
         '''
