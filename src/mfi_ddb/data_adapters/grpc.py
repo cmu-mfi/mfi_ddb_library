@@ -18,7 +18,7 @@ class _SCHEMA(BaseModel):
         component_id: str = Field(..., description="ID of the gRPC component to monitor")
         attributes: dict = Field(..., description="Additional attributes for the gRPC component (optional)")
         trial_id: str = Field(..., description="Trial ID for the gRPC device. No spaces or special characters allowed (optional)")
-        proto_path: str = Field(..., description="Path to the .proto file defining the gRPC service")
+        proto_rel_path: str = Field(..., description="Relative path to the .proto file defining the gRPC service")
         request_method: str = Field(..., description="Name of the gRPC service method to call. Only `Read` method is supported.")
         stub_class: str = Field(..., description="Name of the gRPC stub class to use for communication")
         request_class: str = Field(..., description="Name of the request class to use for the gRPC service call.")
@@ -27,9 +27,9 @@ class _SCHEMA(BaseModel):
     class SCHEMA(BaseModel):
         server_address: str = Field(..., description="Network Address of the gRPC server")
         server_port: int = Field(..., description="Port of the gRPC server")
-        certificate_path: str = Field("", description="Path to the gRPC server certificate file (optional)")
-        protobufs_dir: str = Field(..., description="Path to the directory containing .proto files")
-        compiled_protos_dir: str = Field("./compiled_protos", description="Path to the compiled protobuf stubs (optional)")
+        certificate_path: str = Field("", description="Full path to the gRPC server certificate file (optional)")
+        protobufs_dir: str = Field(..., description="Full path to the directory containing .proto files")
+        compiled_protos_dir: str = Field("./compiled_protos", description="Full path to the compiled protobuf stubs (optional)")
         trial_id: str = Field(..., description="Trial ID for the gRPC device. No spaces or special characters allowed.")
         components: List['_GRPCComponent'] = Field(..., description="List of gRPC components to monitor")
         
@@ -40,9 +40,9 @@ class GrpcDataAdapter(BaseDataAdapter):
     CONFIG_HELP = {
         "server_address": "Network Address of the gRPC server (string)",
         "server_port": "Port of the gRPC server (int)",
-        "certificate_path": "Path to the gRPC server certificate file (optional, string)",
-        "protobufs_dir": "Path to the directory containing .proto files (string)",
-        "compiled_protos_dir": "Path to the compiled protobuf stubs (optional, string)",
+        "certificate_path": "Full path to the gRPC server certificate file (optional, string)",
+        "protobufs_dir": "Full path to the directory containing .proto files (string)",
+        "compiled_protos_dir": "Full path to the compiled protobuf stubs (optional, string)",
         "trial_id": "Trial ID for the gRPC device. No spaces or special characters allowed. (string)",
         "components": "List of gRPC components to monitor (list of dicts with keys: component_id, attributes (optional), proto_path, stub_class, request_class, request)"
     }
@@ -50,10 +50,10 @@ class GrpcDataAdapter(BaseDataAdapter):
     CONFIG_EXAMPLE = {
         "server_address": "localhost",
         "server_port": 50051,
-        "certificate_path": "/path/to/cert.pem",
+        "certificate_path": "/full/path/to/cert.pem",
         "trial_id": "exp1",
-        "protobufs_dir": "/path/to/protos",
-        "compiled_protos_dir": "/path/to/compiled_protos",
+        "protobufs_dir": "/full/path/to/protos",
+        "compiled_protos_dir": "/full/path/to/compiled_protos",
         "components": [
             {
                 "component_id": "sensor.temperature",
@@ -61,7 +61,7 @@ class GrpcDataAdapter(BaseDataAdapter):
                     "description": "something something",
                     "unit": "Celsius"
                 },
-                "proto_rel_path": "/path/to/temperature.proto",
+                "proto_rel_path": "relative/path/to/temperature.proto",
                 "stub_class": "TemperatureServiceStub",
                 "request_class": "TemperatureRequest",
                 "request": {
@@ -76,7 +76,7 @@ class GrpcDataAdapter(BaseDataAdapter):
                     "unit": "Percentage"
                 },
                 "trial_id": "exp1_parallelA",
-                "proto_rel_path": "/path/to/humidity.proto",
+                "proto_rel_path": "relative/path/to/humidity.proto",
                 "stub_class": "HumidityServiceStub",
                 "request_class": "HumidityRequest",
                 "request": {
