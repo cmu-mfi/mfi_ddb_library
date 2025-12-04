@@ -1,4 +1,5 @@
 import os
+import queue
 import shutil
 import threading
 import time
@@ -45,9 +46,11 @@ def test_system_polling():
 
     streamer.poll_and_stream_data()
 
-    streamer.disconnect()
+    #wait for the streamer to finish processing before deleting the directory
+    time.sleep(2)
     shutil.rmtree(dir_path)
-
+    
+    
 def test_system_callback():
     
     dir_path = "tests/watch_dir"
@@ -59,7 +62,7 @@ def test_system_callback():
         "wait_before_read": 1,
         "system": {
             "name": "test_system",
-            "trial_id": "trial_001",
+            "trial_id": "trial_002",
             "description": "Test system for LocalFilesDataAdapter",
         }
         
@@ -75,8 +78,16 @@ def test_system_callback():
     }
     
     adapter = mfi_ddb.data_adapters.LocalFilesDataAdapter(adapter_config)
-    stream_thread = threading.Thread(target=lambda: mfi_ddb.Streamer(streamer_config, adapter, stream_on_update=True))
-    stream_thread.daemon = True
+    exec_queue = queue.Queue()
+    
+    def run_streamer():
+        try:
+            mfi_ddb.Streamer(streamer_config, adapter, stream_on_update=True)
+        except Exception as e:
+            exec_queue.put(e)
+            
+    
+    stream_thread = threading.Thread(target=run_streamer, daemon=True)
     stream_thread.start()
     
     time.sleep(2)
@@ -88,25 +99,24 @@ def test_system_callback():
     time.sleep(1)
     
     stream_thread.join()
-    
-    '''
-    streamer = mfi_ddb.Streamer(streamer_config, adapter, stream_on_update=True)
-    
-    # wait for 2 seconds
-    wait_time = 2
-    start_time = time.time()
-    while time.time() - start_time < wait_time:
-        time.sleep(0.1)
         
-    #create a new file
-    file_path = Path(dir_path) / "sample.txt"
-    file_path.write_text("sample text")
-    
-    # wait for 2 seconds
-    wait_time = 5
-    start_time = time.time()
-    while time.time() - start_time < wait_time:
-        time.sleep(0.1)
-    '''
-    
+    if not exec_queue.empty():
+        raise exec_queue.get()
+        
+    #wait for the streamer to finish processing before deleting the directory
+    time.sleep(2)
     shutil.rmtree(dir_path)
+    
+    
+# Run tests if this file is executed directly
+if __name__ == "__main__":
+    print("Running tests for LocalFilesDataAdapter...")
+    print("==================================")
+    print("STARTING TEST 1: test_system_polling")
+    test_system_polling()
+    print("\nTEST 1 COMPLETED")
+    print("==================================")
+    print("STARTING TEST 2: test_system_callback")    
+    test_system_callback()
+    print("\nTEST 2 COMPLETED")
+    print("==================================")
