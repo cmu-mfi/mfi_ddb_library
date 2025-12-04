@@ -63,6 +63,7 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
 
     def __init__(self, config: dict = None) -> None:
         super().__init__(config)
+        self.cfg['trial_id'] = self.cfg['system']['trial_id']
         
         system_config = config['system']
         self.system_name = system_config['name']
