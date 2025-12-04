@@ -6,6 +6,7 @@ import socket
 import sys
 import time
 from datetime import datetime
+from typing import Optional
 
 import paho.mqtt.client as paho_mqtt
 from pydantic import BaseModel, Field
@@ -25,16 +26,51 @@ TOPIC_CLIENTS = {
     "blob": ("Mqtt", "BlobTopicFamily"),
 }
 
-class Streamer(Observer):
-
-    CONFIG_EXAMPLE = None
-    CONFIG_HELP = None
+class _SCHEMA:
+    class _MQTT(BaseModel):
+        broker_address: str = Field(..., description="Address of the MQTT broker")
+        broker_port: Optional[int] = Field(1883, description="Port of the MQTT broker (default: 1883)")
+        username: Optional[str] = Field(..., description="Username for MQTT broker authentication")
+        password: Optional[str] = Field(..., description="Password for MQTT broker authentication")
+        tls_enabled: Optional[bool] = Field(False, description="Enable TLS for MQTT connection (default: False)")
+        debug: Optional[bool] = Field(False, description="Enable debug mode for MQTT client (default: False)")
+        timeout: Optional[int] = Field(5, description="Timeout in seconds for connecting to the MQTT broker (default: 5)")    
     
     class SCHEMA(BaseModel):
-        """
-        Schema for the data adapter configuration.
-        """
-        # Define the schema for the data adapter configuration here
+        topic_family: str = Field(..., description="Topic family to use (e.g., 'historian', 'kv', 'blob')")
+        mqtt: "_MQTT" = Field(..., description="MQTT configuration parameters")
+
+class Streamer(Observer):
+
+    CONFIG_EXAMPLE = {
+        "topic_family": "blob",
+        "mqtt": {
+            "broker_address": "test.mosquitto.org",
+            "broker_port": 1883,
+            "enterprise": "CMU",
+            "site": "Machine Shop",
+            "username": "mqtt_user",
+            "password": "mqtt_password",
+            "tls_enabled": False,
+            "debug": False,
+        }
+    }
+    CONFIG_HELP = {
+        "topic_family": "Topic family to use (e.g., 'historian', 'kv', 'blob')",
+        "mqtt": {
+            "broker_address": "Address of the MQTT broker",
+            "broker_port": "Port of the MQTT broker (default: 1883)",
+            "enterprise": "Enterprise name for MQTT connection",
+            "site": "Site name for MQTT connection",
+            "username": "Username for MQTT broker authentication",
+            "password": "Password for MQTT broker authentication",
+            "tls_enabled": "Enable TLS for MQTT connection (default: False)",
+            "debug": "Enable debug mode for MQTT client (default: False)",
+            "timeout": "Timeout in seconds for connecting to the MQTT broker (default: 5)"
+        },        
+    }
+    
+    class SCHEMA(_SCHEMA.SCHEMA):
         pass
         
     def __init__(self, config: dict, data_adp: BaseDataAdapter, stream_on_update:bool = False) -> None:

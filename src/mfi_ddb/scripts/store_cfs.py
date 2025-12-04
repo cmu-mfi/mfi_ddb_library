@@ -79,7 +79,7 @@ def main(mqtt_cfg_file, cfs_cfg_file):
     mqtt_sub.client.disconnect()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Subscribe to a topic and save files based on configuration.")
+    parser = argparse.ArgumentParser(description="Subscribe to a topic and save files to Cloud File Store (CFS) based on configuration.")
     parser.add_argument("mqtt_config_path", help="Path to the MQTT configuration file (e.g., mqtt.yaml).")
     parser.add_argument("cfs_config_path", help="Path to the CFS configuration file (e.g., cfs.yaml).")
     args = parser.parse_args()

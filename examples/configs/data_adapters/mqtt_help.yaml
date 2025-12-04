@@ -1,0 +1,14 @@
+mqtt:
+  broker_address: Address of the MQTT broker
+  broker_port: '(optional) Port of the MQTT broker (default: 1883)'
+  username: (optional) Username for MQTT broker authentication
+  password: (optional) Password for MQTT broker authentication
+  tls_enabled: '(optional) Enable TLS for MQTT connection (default: False)'
+  debug: '(optional) Enable debug mode for MQTT client (default: False)'
+  timeout: '(optional) Timeout in seconds for connecting to the MQTT broker (default:
+    5)'
+trial_id: Trial ID for the system. No spaces or special characters allowed.
+queue_size: '(optional) Maximum number of messages to buffer before processing. If
+  the buffer is full, the oldest message will be removed. (default: 10)'
+topics: List of topics to subscribe to. Each topic should have a 'component_id' and
+  'topic' key. Optionally, a 'trial_id' can be provided.
