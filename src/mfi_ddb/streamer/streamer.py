@@ -29,15 +29,17 @@ TOPIC_CLIENTS = {
 class _SCHEMA:
     class _MQTT(BaseModel):
         broker_address: str = Field(..., description="Address of the MQTT broker")
-        broker_port: Optional[int] = Field(1883, description="Port of the MQTT broker (default: 1883)")
-        username: Optional[str] = Field(..., description="Username for MQTT broker authentication")
-        password: Optional[str] = Field(..., description="Password for MQTT broker authentication")
-        tls_enabled: Optional[bool] = Field(False, description="Enable TLS for MQTT connection (default: False)")
-        debug: Optional[bool] = Field(False, description="Enable debug mode for MQTT client (default: False)")
-        timeout: Optional[int] = Field(5, description="Timeout in seconds for connecting to the MQTT broker (default: 5)")    
+        broker_port: int = Field(1883, description="Port of the MQTT broker (default: 1883)")
+        username: str = Field("", description="Username for MQTT broker authentication")
+        password: str = Field("", description="Password for MQTT broker authentication")
+        tls_enabled: bool = Field(False, description="Enable TLS for MQTT connection (default: False)")
+        debug: bool = Field(False, description="Enable debug mode for MQTT client (default: False)")
+        timeout: int = Field(5, description="Timeout in seconds for connecting to the MQTT broker (default: 5)")    
+        enterprise: str = Field(..., description="Enterprise name for MQTT connection")
+        site: str = Field("", description="Site name for MQTT connection")
     
     class SCHEMA(BaseModel):
-        topic_family: str = Field(..., description="Topic family to use (e.g., 'historian', 'kv', 'blob')")
+        topic_family: str = Field("", description="Topic family to use (e.g., 'historian', 'kv', 'blob')")
         mqtt: "_MQTT" = Field(..., description="MQTT configuration parameters")
 
 class Streamer(Observer):
@@ -81,6 +83,9 @@ class Streamer(Observer):
         # `````````````````````````````````````````````````````````````````````````
         self.cfg = copy.deepcopy(config)
         topic_family_name = config['topic_family']
+        
+        if topic_family_name == "":
+            topic_family_name = data_adp.RECOMMENDED_TOPIC_FAMILY
         
         if topic_family_name not in TOPIC_CLIENTS:
             raise ConfigError(f"Invalid topic family: {topic_family_name}")
