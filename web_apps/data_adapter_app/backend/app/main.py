@@ -14,33 +14,21 @@ Key Features:
 """
 
 import os
+import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 # Import configuration router and application lifespan manager
-from api.data_adapters.routers.config import router, lifespan
+from app.api.v0.router import router
 
 # FastAPI application instance with metadata and lifecycle management
 app = FastAPI(
-    title="DDB Unified API",
-    version="1.0.0",
-    description="Core API for data adapter management",
-    lifespan=lifespan  # Manages startup/shutdown tasks for adapters and connections
+    title="DAA - DATA ADAPTER APP - CORE API",
+    version="0.2.0",
+    description="Core API for data adapter application",
+    # lifespan=lifespan  # Manages startup/shutdown tasks for adapters and connections
 )
-
-#ROS GLOBAL NODE INITIALIZATION (UNCOMMENT WHEN RUNNING ON ROS DEVICE)
-# =====================================================================
-# Uncomment the following lines when deploying on a system with ROS installed.
-# This initializes a global ROS node that all ROS adapters can share.
-# Initialize ROS node
-# @app.on_event("startup")
-# def init_ros_node():
-#     import rospy
-#     rospy.init_node("mfi_ddb_ros_adapter", anonymous=True)
-
-# =====================================================================
-
 
 # Enables cross-origin requests from React development servers and production deployments
 app.add_middleware(
@@ -56,9 +44,9 @@ app.add_middleware(
     allow_headers=["*"],           # Allow all headers
 )
 
-# Register all configuration management routes under /config prefix
+# Register all configuration management routes under /connections prefix
 # This includes adapter discovery, validation, connection management, and monitoring endpoints
-app.include_router(router, prefix="/config", tags=["Configuration"])
+app.include_router(router, prefix="/connections", tags=["Connections"])
 
 @app.get("/")
 async def root():
@@ -68,7 +56,7 @@ async def root():
     Returns:
         Dictionary with service status and name for health monitoring
     """
-    return {"status": "healthy", "service": "DDB Unified API"}
+    return {"status": "healthy", "service": "MFI DDB: DATA ADAPTER APP"}
 
 # Static file serving for production UI deployment
 # Serves the built React application from the ui_interfaces build directory
@@ -83,6 +71,5 @@ if os.path.isdir(build_dir):
 # Development server configuration
 # Only runs when script is executed directly (not when imported as module)
 if __name__ == "__main__":
-    import uvicorn
     # Start development server with auto-reload for code changes
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
