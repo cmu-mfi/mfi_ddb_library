@@ -82,14 +82,15 @@ class Streamer(Observer):
         # 1. initialize the data adapter and respective topic family client
         # `````````````````````````````````````````````````````````````````````````
         self.cfg = copy.deepcopy(config)
-        topic_family_name = config['topic_family']
-        
-        if topic_family_name == "":
+                
+        if "topic_family" not in config:
             topic_family_name = data_adp.RECOMMENDED_TOPIC_FAMILY
-        
-        if topic_family_name not in TOPIC_CLIENTS:
-            raise ConfigError(f"Invalid topic family: {topic_family_name}")
-        
+        elif config['topic_family'] not in TOPIC_CLIENTS:
+            print(f"WARNING: Topic family '{config['topic_family']}' not recognized. Using recommended topic family '{data_adp.RECOMMENDED_TOPIC_FAMILY}' instead.")
+            topic_family_name = data_adp.RECOMMENDED_TOPIC_FAMILY
+        else:
+            topic_family_name = config['topic_family']
+            
         topic_family = globals()[TOPIC_CLIENTS[topic_family_name][1]]()
         self.__client = globals()[TOPIC_CLIENTS[topic_family_name][0]](self.cfg, topic_family)
         self.__data_adp = data_adp        

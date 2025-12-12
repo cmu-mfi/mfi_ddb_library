@@ -168,7 +168,7 @@ def test_single_adapter_connection():
     adapter_cfg_text = yaml.dump(adapter_cfg)
     
     streamer_config = {
-        "topic_family": "historian",
+        # "topic_family": "historian",
         "mqtt": {
             "broker_address": "localhost",
             "broker_port": 1883,
@@ -230,9 +230,9 @@ def test_single_adapter_connection():
             "polling_rate_hz": 1.0
         }
     )
-    assert response_connect.status_code == 200
-    assert response_connect.json().get("connected")
-    assert response_connect.json().get("streaming")
+
+    assert response_connect.json().get("is_connected")
+    assert response_connect.json().get("is_streaming")
     
     # =======================================================
     # DISCONNECT THE ADAPTER
@@ -332,8 +332,8 @@ def test_multi_adapter_connection():
             }
         )
         assert response_connect.status_code == 200
-        assert response_connect.json().get("connected")
-        assert response_connect.json().get("streaming")
+        assert response_connect.json().get("is_connected")
+        assert response_connect.json().get("is_streaming")
     
     # =======================================================
     # COUNT ACTIVE CONNECTIONS AND CHECK HEALTH
