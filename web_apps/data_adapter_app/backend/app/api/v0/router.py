@@ -417,8 +417,8 @@ async def connect_endpoint(
             )
 
     return {
-        "connected": connection.is_connected,
-        "streaming": connection.is_streaming,
+        "is_connected": connection.is_connected,
+        "is_streaming": connection.is_streaming,
         "mode": "polling" if connection.is_polling else "callback",
     }
 
@@ -441,8 +441,8 @@ async def resume_endpoint(
         )
         
     return {
-        "connected": connection.is_connected,
-        "streaming_to_broker": connection.is_streaming,
+        "is_connected": connection.is_connected,
+        "is_streaming": connection.is_streaming,
         "mode": "polling" if connection.is_polling else "callback",
     }      
 
@@ -463,8 +463,8 @@ async def pause_endpoint(
         raise HTTPException(status_code=502, detail=f"Streaming pause failed: {err}")
 
     return {
-        "connected": connection.is_connected,
-        "streaming_to_broker": connection.is_streaming,
+        "is_connected": connection.is_connected,
+        "is_streaming": connection.is_streaming,
         "mode": "polling" if connection.is_polling else "callback",
     }
 
@@ -493,7 +493,7 @@ async def disconnect_endpoint(
     return {"disconnected": True}
 
 
-# @SA TODO: REVIEW AND EDIT
+# @SA REVIEWED AND EDITED
 @router.get("/streaming-status/{conn_id}")
 async def streaming_status_endpoint(conn_id: str = FastAPIPath(...)) -> dict:
     """Structured status for UI polling."""
