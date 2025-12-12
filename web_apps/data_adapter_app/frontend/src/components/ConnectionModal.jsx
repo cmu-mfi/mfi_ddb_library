@@ -7,13 +7,11 @@ import React, {
 } from "react";
 import Modal from "./Modal";
 import { ConnectionManager } from "./ConnectionManager";
-import { callConfig } from "../api";
+import { makeDefaultStreamerConfig } from "../data/defaults";
+import { getConnCtr, setConnCtr } from "../state/conn_ctr";
+import { connectConnection, disconnectConnection, fetchAdapters } from "../api";
+import { validateAdapterConfig, validateStreamerConfig } from "../api";
 
-const TOPIC_FAMILIES = [
-  { label: "Key-Value (kv)", value: "kv" },
-  { label: "Blob", value: "blob" },
-  { label: "Historian", value: "historian" },
-];
 
 const generateNestedHelpText = (helpData, indentLevel = 0) => {
   if (!helpData || typeof helpData !== "string") return null;
@@ -25,7 +23,7 @@ const generateNestedHelpText = (helpData, indentLevel = 0) => {
 
       // Check indentation level by counting leading spaces
       const leadingSpaces = line.match(/^(\s*)/)[1].length;
-      const currentIndentLevel = Math.floor(leadingSpaces / 2); 
+      const currentIndentLevel = Math.floor(leadingSpaces / 2);
       const indentStyle = {
         marginLeft: (indentLevel + currentIndentLevel) * 16,
       };
@@ -89,47 +87,6 @@ const generateNestedHelpText = (helpData, indentLevel = 0) => {
     .filter(Boolean); // Filter out null values
 };
 
-const parseServerError = (error) => {
-  try {
-    const err = (error?.message || error?.toString() || "").toLowerCase();
-    if (
-      err.includes("mqtt broker unreachable") ||
-      err.includes("mqtt connection failed") ||
-      err.includes("connection timeout")
-    ) {
-      return error.message || err;
-    }
-    if (err.includes("validation error")) {
-      const m = err.match(/validation failed for ([^:]+)/i);
-      if (m) return `Configuration error: ${m[1].trim()}`;
-    }
-    if (err.includes("missing")) return err;
-    if (err.includes("schema error"))
-      return "Configuration schema error. Please ensure all required fields are correct.";
-    return (
-      err
-        .replace(/\{.*?\}/g, "")
-        .replace(/\\n/g, " ")
-        .replace(/error:\s*/g, "")
-        .trim() || "Configuration validation failed"
-    );
-  } catch {
-    return "Configuration validation failed. Please check your settings.";
-  }
-};
-
-const makeDefaultMqttConfig = () => `mqtt:
-  broker_address: 128.237.92.30
-  broker_port: 1883
-  enterprise: Mill-19-test
-  site: HAAS-UMC750
-  username: admin
-  password: password
-  tls_enabled: False
-  debug: True
-
-`;
-
 export default function ConnectionModal({
   isOpen,
   onClose,
@@ -137,12 +94,10 @@ export default function ConnectionModal({
   initialData = {},
 }) {
   const [connectionType, setConnectionType] = useState("");
-  const [topicFamily, setTopicFamily] = useState("");
   const [configuration, setConfiguration] = useState("");
-  const [mqttConfig, setMqttConfig] = useState(makeDefaultMqttConfig());
+  const [streamerConfig, setStreamerConfig] = useState(makeDefaultStreamerConfig());
   const [adapters, setAdapters] = useState([]);
-
-  const [isEditingMqtt, setIsEditingMqtt] = useState(false);
+  const [isEditingStreamer, setIsEditingStreamer] = useState(false);
   const [step, setStep] = useState("");
   const [validationError, setValidationError] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
@@ -152,27 +107,12 @@ export default function ConnectionModal({
   const fileInputRef = useRef(null);
   const [showHelp, setShowHelp] = useState(false);
   const [activeConnectionId, setActiveConnectionId] = useState(null);
-  const [detectedAdapter, setDetectedAdapter] = useState(null);
 
   // Track the last payload we validated to avoid re-validating identical text
   const lastValidatedRef = useRef("");
 
-  // Fetch adapter metadata
-  useEffect(() => {
-    async function fetchAdapters() {
-      try {
-        const res = await fetch("/config/adapters");
-        if (!res.ok) throw new Error("Failed to fetch adapters");
-        const data = await res.json();
-        setAdapters(data);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    fetchAdapters();
-  }, []);
-
   const connectionTypes = adapters.map((a) => a.name);
+
   const configHelpMap = useMemo(
     () =>
       adapters.reduce((m, a) => {
@@ -218,9 +158,7 @@ export default function ConnectionModal({
         .map((l) => `  ${l}`)
         .join("\n");
       return `${key}:\n${indented}`;
-    },
-    [adapters]
-  );
+    }, [adapters]);
 
   // Build exampleConfigMap using the stable wrapper
   const exampleConfigMap = useMemo(() => {
@@ -236,25 +174,18 @@ export default function ConnectionModal({
       const t = e.target.value;
       setConnectionType(t);
       setConfiguration(exampleConfigMap[t] || "");
-      const meta = adapters.find((a) => a.name === t);
-      setTopicFamily(meta?.recommendedTopicFamily || "");
-      setMqttConfig(makeDefaultMqttConfig());
+      setStreamerConfig(makeDefaultStreamerConfig());
       setValidationError("");
       lastValidatedRef.current = ""; // force a fresh validate on type change
-    },
-    [adapters, exampleConfigMap]
-  );
+    }, [exampleConfigMap]);
 
-  const handleTopicChange = (e) => {
-    setTopicFamily(e.target.value);
-    lastValidatedRef.current = ""; // ensure revalidate
-  };
   const handleConfigurationChange = (e) => {
     setConfiguration(e.target.value);
     // no need to touch lastValidatedRef: the effect compares current payload
   };
-  const handleMqttConfigChange = (e) => {
-    setMqttConfig(e.target.value);
+
+  const handleStreamerConfigChange = (e) => {
+    setStreamerConfig(e.target.value);
     // no need to touch lastValidatedRef: the effect compares current payload
   };
 
@@ -271,31 +202,19 @@ export default function ConnectionModal({
   const handleClose = useCallback(async () => {
     if (isSubmitting) return;
     if (activeConnectionId) {
-      await callConfig(`/config/disconnect/${activeConnectionId}`);
-      setActiveConnectionId(null);
+      const is_disconnected = await disconnectConnection(activeConnectionId);
+      if (is_disconnected) {
+        setActiveConnectionId(null);
+      } else {
+        console.error("Failed to disconnect active connection");
+      }
     }
     onClose();
   }, [isSubmitting, activeConnectionId, onClose]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    setConnectionType(initialData.type || "");
-    setTopicFamily(initialData.topicFamily || "");
-    setConfiguration(initialData.configuration || "");
-    setMqttConfig(initialData.mqttConfig || makeDefaultMqttConfig());
-    setIsEditingMqtt(false);
-    setStep("");
-    setValidationError("");
-    setSelectedFile(null);
-    setIsSubmitting(false);
-    lastValidatedRef.current = ""; // reset on open
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [isOpen, initialData]);
-
   const validateYAMLFormats = useCallback(
     (yaml) => (yaml.trim() ? [] : ["Configuration cannot be empty"]),
-    []
-  );
+    []);
 
   const validateConfiguration = useCallback(async () => {
     setValidationError("");
@@ -303,73 +222,34 @@ export default function ConnectionModal({
     setIsValidating(true);
     try {
       if (!connectionType) throw new Error("Select connection type");
-      if (!topicFamily) throw new Error("Select topic family");
       if (!configuration.trim()) throw new Error("Enter YAML config");
       const errs = validateYAMLFormats(configuration);
       if (errs.length) throw new Error(errs.join("\n"));
 
-      const wrapped = wrapConfigForProtocol(connectionType, configuration);
-      const combined =
-        `topic_family: ${topicFamily}\n\n${wrapped}` +
-        (mqttConfig.trim() ? `\n\n${mqttConfig.trim()}` : "");
+      const adp_valid = await validateAdapterConfig(connectionType, configuration);
+      const streamer_valid = await validateStreamerConfig(streamerConfig);
+      const is_valid = adp_valid && streamer_valid;
 
-      const resp = await callConfig("/config/validate", {
-        text: combined,
-        topicFamily,
-      });
-
-      setDetectedAdapter(resp.detected_adapter || null);
-
-      if (resp.warnings?.length) setValidationWarnings(resp.warnings);
-      if (resp.errors?.length) {
-        setValidationError(resp.errors.join("\n"));
+      if (!is_valid) {
+        if (!adp_valid) {
+          const error_msg = "Data Adapter configuration validation error.\n";
+          setValidationError(error_msg);
+        }
+        if (!streamer_valid) {
+          const error_msg = "Streamer configuration validation error.\n";
+          setValidationError((prev) => prev + error_msg);
+        }
       }
 
-      return resp;
+      console.log("ADP VALID:", adp_valid, "STREAMER VALID:", streamer_valid);
+      return { valid: is_valid };
     } catch (e) {
-      setValidationError(parseServerError(e));
+      console.error("Validation error:", e);
       return { valid: false };
     } finally {
       setIsValidating(false);
     }
-  }, [
-    connectionType,
-    topicFamily,
-    configuration,
-    mqttConfig,
-    validateYAMLFormats,
-    wrapConfigForProtocol,
-  ]);
-
-  // Debounced validate on changes — but only when the combined payload actually changed
-  useEffect(() => {
-    if (!isOpen || !connectionType || !topicFamily || !configuration.trim()) {
-      setValidationError("");
-      return;
-    }
-
-    const id = setTimeout(() => {
-      const wrapped = wrapConfigForProtocol(connectionType, configuration);
-      const combined =
-        `topic_family: ${topicFamily}\n\n${wrapped}` +
-        (mqttConfig.trim() ? `\n\n${mqttConfig.trim()}` : "");
-
-      if (combined !== lastValidatedRef.current) {
-        lastValidatedRef.current = combined;
-        validateConfiguration();
-      }
-    }, 800);
-
-    return () => clearTimeout(id);
-  }, [
-    isOpen,
-    connectionType,
-    topicFamily,
-    configuration,
-    mqttConfig,
-    validateConfiguration,
-    wrapConfigForProtocol,
-  ]);
+  }, [connectionType, configuration, streamerConfig, validateYAMLFormats]);
 
   const handleSave = useCallback(async () => {
     if (isSubmitting) return;
@@ -383,23 +263,13 @@ export default function ConnectionModal({
         return;
       }
 
-      const wrapped = wrapConfigForProtocol(connectionType, configuration);
-      const combined =
-        `topic_family: ${topicFamily}\n\n${wrapped}` +
-        (mqttConfig.trim() ? `\n\n${mqttConfig.trim()}` : "");
-
-      const adapterKey = validation.detected_adapter || detectedAdapter || null;
-
       if (initialData.id) {
         // EDIT
         const updated = {
           ...initialData,
-          type: connectionType,
-          topicFamily,
-          configuration,
-          mqttConfig,
-          adapterKey,
-          yaml: combined,
+          adapter: connectionType,
+          adapterConfig: configuration,
+          streamerConfig: streamerConfig,
           updatedAt: new Date().toISOString(),
         };
         ConnectionManager.saveConnection(initialData.id, updated);
@@ -409,59 +279,92 @@ export default function ConnectionModal({
       }
 
       // NEW
-      const id = crypto.randomUUID();
+      const id = getConnCtr() + 1;
+      setConnCtr(id);
       setActiveConnectionId(id);
       setStep("Connecting to adapter...");
 
-      await callConfig(`/config/connect/${id}`, {
-        text: combined,
-        topicFamily,
-      });
+      console.log("HEYYO! Connecting adapter with ID:", id);
+
+      await connectConnection(
+        id,
+        connectionType,
+        configuration,
+        streamerConfig
+      );
 
       const saved = {
         id,
-        type: connectionType,
-        topicFamily,
-        configuration,
-        mqttConfig,
-        name: connectionType,
+        adapter: connectionType,
+        adapterConfig: configuration,
+        streamerConfig: streamerConfig,
         savedAt: new Date().toISOString(),
-        adapterKey,
-        yaml: combined,
       };
 
       ConnectionManager.saveConnection(id, saved);
       onSave(saved);
       onClose();
     } catch (e) {
-      setValidationError(parseServerError(e));
     } finally {
       setStep("");
       setIsSubmitting(false);
     }
-  }, [
-    isSubmitting,
-    validateConfiguration,
-    configuration,
-    connectionType,
-    topicFamily,
-    mqttConfig,
-    initialData,
-    onSave,
-    onClose,
-    detectedAdapter,
-    wrapConfigForProtocol,
-  ]);
+  }, [isSubmitting, validateConfiguration, configuration, connectionType, streamerConfig, initialData, onSave, onClose]);
 
   const canSave = Boolean(
     connectionType &&
-      topicFamily &&
-      configuration.trim() &&
-      !validationError &&
-      !isValidating
+    configuration.trim() &&
+    streamerConfig.trim() &&
+    !validationError &&
+    !isValidating
   );
   const helpData = configHelpMap[connectionType];
   const isEditMode = Boolean(initialData.id);
+
+  // Fetch adapter metadata
+  useEffect(() => {
+    fetchAdapters()
+      .then(data => { setAdapters(data); })
+      .catch(err => { console.error(err); });
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    console.log("Modal opened with initial data:", initialData);
+
+    setConnectionType(initialData.adapter || "");
+    setConfiguration(initialData.adapterConfig || "");
+    setStreamerConfig(initialData.streamerConfig || makeDefaultStreamerConfig());
+    setIsEditingStreamer(false);
+    setStep("");
+    setValidationError("");
+    setSelectedFile(null);
+    setIsSubmitting(false);
+    lastValidatedRef.current = ""; // reset on open
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, [isOpen, initialData]);
+
+  // Debounced validate on changes — but only when the combined payload actually changed
+  useEffect(() => {
+    if (!isOpen || !connectionType || !configuration.trim()) {
+      setValidationError("");
+      return;
+    }
+
+    const id = setTimeout(() => {
+      const combined =
+        `adapter: ${connectionType}\n\n${configuration}` +
+        (streamerConfig.trim() ? `\n\n${streamerConfig.trim()}` : "");
+
+      if (combined !== lastValidatedRef.current) {
+        lastValidatedRef.current = combined;
+        validateConfiguration();
+      }
+    }, 800);
+
+    return () => clearTimeout(id);
+  }, [isOpen, connectionType, configuration, streamerConfig, validateConfiguration]);
 
   return (
     <Modal
@@ -471,7 +374,7 @@ export default function ConnectionModal({
     >
       <div className="modal-content configuration-modal">
         <div className="form-group">
-          <label htmlFor="connection-type">Connection Type:</label>
+          <label htmlFor="connection-type">Data Adapter:</label>
           <select
             id="connection-type"
             value={connectionType}
@@ -486,26 +389,6 @@ export default function ConnectionModal({
               </option>
             ))}
           </select>
-        </div>
-
-        <div className="form-group">
-          <label>Topic Family:</label>
-          <div className="segmented-control">
-            {TOPIC_FAMILIES.map(({ label, value }) => (
-              <React.Fragment key={value}>
-                <input
-                  type="radio"
-                  id={`tf-${value}`}
-                  name="topicFamily"
-                  value={value}
-                  checked={topicFamily === value}
-                  onChange={handleTopicChange}
-                  disabled={isSubmitting}
-                />
-                <label htmlFor={`tf-${value}`}>{label}</label>
-              </React.Fragment>
-            ))}
-          </div>
         </div>
 
         <div className="form-group">
@@ -575,24 +458,24 @@ export default function ConnectionModal({
         </div>
 
         <div className="form-group">
-          <label htmlFor="mqtt-config">MQTT Broker Configuration:</label>
+          <label htmlFor="streamer-config">Streamer Configuration:</label>
           <textarea
-            id="mqtt-config"
+            id="streamer-config"
             rows={5}
-            className={`form-textarea ${!isEditingMqtt ? "disabled" : ""}`}
-            value={mqttConfig}
-            onChange={handleMqttConfigChange}
-            disabled={isSubmitting || !isEditingMqtt}
-            readOnly={!isEditingMqtt}
-            placeholder="MQTT broker configuration..."
+            className={`form-textarea ${!isEditingStreamer ? "disabled" : ""}`}
+            value={streamerConfig}
+            onChange={handleStreamerConfigChange}
+            disabled={isSubmitting || !isEditingStreamer}
+            readOnly={!isEditingStreamer}
+            placeholder="Streamer configuration..."
           />
           <button
             type="button"
-            className="edit-mqtt-button"
-            onClick={() => setIsEditingMqtt(!isEditingMqtt)}
+            className="edit-streamer-button"
+            onClick={() => setIsEditingStreamer(!isEditingStreamer)}
             disabled={isSubmitting}
           >
-            {isEditingMqtt ? "Done Editing" : "Edit Broker"}
+            {isEditingStreamer ? "Done Editing" : "Edit Broker"}
           </button>
         </div>
 

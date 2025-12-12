@@ -1,4 +1,11 @@
 // ConnectionManager.js - Adapter-agnostic, no protocol maps, preserves exact YAML
+/*--------------------------------------------------------------------------------
+TODO: Add stored data descriptions
+...
+
+--------------------------------------------------------------------------------*/
+import { fetchStreamingStatus } from "../api";
+
 export class ConnectionManager {
   static STORAGE_KEY = "adapter_connections";
   static STATE_KEY = "adapter_states";
@@ -10,14 +17,9 @@ export class ConnectionManager {
 
     connections[connectionId] = {
       id: connectionId,
-      name: connectionData.name || connectionData.type,
-      type: connectionData.type, // display label only
-      topicFamily: connectionData.topicFamily, // kv | blob | historian
-      configuration: connectionData.configuration, // inner text shown in UI
-      mqttConfig: connectionData.mqttConfig || "",
-      protocol: connectionData.protocol || null, // not used anymore
-      yaml: connectionData.yaml || null, // exact YAML posted to backend
-      adapterKey: connectionData.adapterKey || null, // backend-detected adapter key
+      adapter: connectionData.adapter,
+      adapterConfig: connectionData.adapterConfig,
+      streamerConfig: connectionData.streamerConfig || "",
       saved_at: connectionData.savedAt || new Date().toISOString(),
       updated_at: connectionData.updatedAt || null,
     };
@@ -40,6 +42,7 @@ export class ConnectionManager {
   }
 
   // Only save state when explicitly called by user actions
+  // WHY ONLY USER ACTIONS? HOW DO WE KNOW IT IS USER? IS IT DETERMINED IN THE ConnectionItem?
   static saveConnectionState(connectionId, state, source = "user") {
     const states = this.getConnectionStates();
 
@@ -58,12 +61,6 @@ export class ConnectionManager {
         `IGNORED state change for ${connectionId}: ${state} (source: ${source}) - only user actions are saved`
       );
     }
-  }
-
-  // Don't auto-save paused state on connection failures
-  static markConnectionAsFailedTemporarily(connectionId, reason) {
-    console.log(`Connection ${connectionId} temporarily failed: ${reason}`);
-    console.log("State will remain as saved in localStorage, not auto-paused");
   }
 
   static getConnectionState(connectionId) {
@@ -196,41 +193,14 @@ export class ConnectionManager {
 
   static async verifyConnections() {
     const connections = this.getSavedConnections();
-    const results = {};
-
-    for (const [id, conn] of Object.entries(connections)) {
-      try {
-        const response = await fetch(
-          `${
-            process.env.REACT_APP_API_URL || "http://localhost:8000"
-          }/config/streaming-status/${id}`
-        );
-        if (response.ok) {
-          const status = await response.json();
-          results[id] = {
-            name: conn.name,
-            connected: status.adapter_connected,
-            streaming: status.is_streaming,
-            status: status.status,
-          };
-        } else {
-          results[id] = {
-            name: conn.name,
-            connected: false,
-            streaming: false,
-            status: "not_found",
-          };
-        }
-      } catch (error) {
-        results[id] = {
-          name: conn.name,
-          connected: false,
-          streaming: false,
-          status: "error",
-          error: error.message,
-        };
-      }
-    }
+    const results = Object.fromEntries(
+      await Promise.all(
+        Object.entries(connections).map(async ([id]) => [
+          id,
+          await fetchStreamingStatus(id)
+        ])
+      )
+    );
 
     return results;
   }
@@ -286,61 +256,4 @@ export class ConnectionManager {
     return this.shouldRestoreOnStartup();
   }
 
-  // Get YAML config for restoration (adapter-agnostic)
-  static getYamlConfig(connectionId) {
-    console.log(`DEBUG: Getting YAML config for ${connectionId}`);
-
-    const connections = this.getSavedConnections();
-    const connection = connections[connectionId];
-
-    if (!connection) {
-      console.error(`DEBUG: No connection found for ${connectionId}`);
-      console.log(`DEBUG: Available connections:`, Object.keys(connections));
-      return null;
-    }
-
-    // 1) Preferred: exact YAML saved at connect time
-    if (connection.yaml && connection.yaml.trim()) {
-      return connection.yaml.trim();
-    }
-
-    console.log(
-      "DEBUG: No saved 'yaml', building from fields (legacy fallback).",
-      {
-        id: connection.id,
-        name: connection.name,
-        type: connection.type,
-        topicFamily: connection.topicFamily,
-        hasConfiguration: !!connection.configuration,
-        hasMqttConfig: !!connection.mqttConfig,
-        adapterKey: connection.adapterKey || null,
-      }
-    );
-
-    // 2) Adapter-agnostic fallback using backend-provided adapterKey, if present
-    let inner = (connection.configuration || "").trim();
-    const mqttPart =
-      connection.mqttConfig && connection.mqttConfig.trim()
-        ? `\n\n${connection.mqttConfig.trim()}`
-        : "";
-
-    const key = (connection.adapterKey || "").trim();
-    if (key && inner && !inner.startsWith(key + ":")) {
-      inner = `${key}:\n` + inner.replace(/^/gm, "  ");
-    }
-
-    if (!inner) {
-      console.warn(
-        `DEBUG: No configuration text to build YAML for ${connectionId}.`
-      );
-      return null;
-    }
-
-    const combined = `topic_family: ${connection.topicFamily}\n\n${inner}${mqttPart}`;
-    console.log(
-      "DEBUG: Generated YAML config (first 200 chars):",
-      combined.substring(0, 200)
-    );
-    return combined;
-  }
 }

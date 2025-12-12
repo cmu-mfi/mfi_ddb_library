@@ -4,8 +4,8 @@ import ConnectionModal from "./components/ConnectionModal";
 import { ConnectionManager } from "./components/ConnectionManager";
 import logoMfi from "./images/logo_mfi.png";
 import "./App.css";
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
+import { API_BASE_URL } from "./data/defaults";
+import { disconnectConnection, fetchStreamingStatus } from "./api";
 
 function App() {
   const [connections, setConnections] = useState([]);
@@ -17,20 +17,21 @@ function App() {
 
   // Check server health
   const checkServerHealth = useCallback(async () => {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
+    // try {
+    //   const controller = new AbortController();
+    //   const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-      const response = await fetch(`${API_BASE_URL}/config/health`, {
-        signal: controller.signal,
-      });
+    //   const response = await fetch(`${API_BASE_URL}`, {
+    //     signal: controller.signal,
+    //   });
 
-      clearTimeout(timeoutId);
-      return response.ok;
-    } catch (error) {
-      console.error("Health check failed:", error);
-      return false;
-    }
+    //   clearTimeout(timeoutId);
+    //   return response.ok;
+    // } catch (error) {
+    //   console.error("Health check failed:", error);
+    //   return false;
+    // }
+    return true;
   }, []);
 
   // Load connections for UI
@@ -38,11 +39,9 @@ function App() {
     const savedConnections = ConnectionManager.getSavedConnections();
     const connectionsList = Object.values(savedConnections).map((conn) => ({
       id: conn.id,
-      name: conn.name,
-      type: conn.type,
-      topicFamily: conn.topicFamily,
-      configuration: conn.configuration,
-      mqttConfig: conn.mqttConfig,
+      adapter: conn.adapter,
+      adapterConfig: conn.adapterConfig,
+      streamerConfig: conn.streamerConfig,
     }));
     setConnections(connectionsList);
     console.log(`DEBUG: Loaded ${connectionsList.length} connections for UI`);
@@ -78,10 +77,7 @@ function App() {
     console.log("DEBUG: Saved states:", savedStates);
 
     const connectionIds = Object.keys(savedConnections);
-    console.log(
-      `Found ${connectionIds.length} saved connections:`,
-      connectionIds
-    );
+    console.log(`Found ${connectionIds.length} saved connections:`, connectionIds);
 
     if (connectionIds.length === 0) {
       console.log("No saved connections to restore");
@@ -95,143 +91,91 @@ function App() {
     for (const connectionId of connectionIds) {
       const connectionData = savedConnections[connectionId];
       const savedState = savedStates[connectionId];
-      const targetState = savedState?.state || "streaming"; // Default to streaming if no saved state
+      let targetState = savedState?.state || "streaming"; // Default to streaming if no saved state
 
       console.log(`\n--- Processing connection ${connectionId} ---`);
-      console.log(`Name: ${connectionData.name}`);
-      console.log(`Type: ${connectionData.type}`);
+      console.log(`Name: ${connectionData.adapter}`);
+      console.log(`Target state: ${targetState} (source: ${savedState?.source || "default"})`);
+
+      // GET CURRENT STATUS FROM BACKEND
+      const statusResponse = await fetchStreamingStatus(connectionId);
+      let currentStatus;
+      if (statusResponse.status === "ok") {
+        currentStatus = statusResponse.is_streaming ? "streaming" : "paused";
+      } else {
+        currentStatus = statusResponse.status; // not_found or error
+      }
+      console.log(`Current backend status: ${currentStatus}`);
+
+      if (currentStatus === targetState) {
+        console.log(
+          `DEBUG: Connection ${connectionId} already in target state (${targetState}), skipping restoration`
+        );
+        successCount++;
+        continue;
+      }
+
       console.log(
-        `Target state: ${targetState} (source: ${
-          savedState?.source || "default"
-        })`
+        `DEBUG: Adapter config preview:`,
+        connectionData.adapterConfig.substring(0, 200)
+      );
+      console.log(
+        `DEBUG: Streamer config preview:`,
+        connectionData.streamerConfig.substring(0, 200)
       );
 
       try {
-        const yamlConfig = ConnectionManager.getYamlConfig(connectionId);
-        if (!yamlConfig) {
-          console.error(`ERROR: No YAML config found for ${connectionId}`);
-          errorCount++;
-          continue;
-        }
-
-        console.log(
-          `DEBUG: YAML config length: ${yamlConfig.length} characters`
-        );
-        console.log(
-          `DEBUG: YAML config preview:`,
-          yamlConfig.substring(0, 200)
-        );
-
-        // ONLY restore streaming connections automatically
-        if (targetState === "streaming") {
-          console.log(
-            `DEBUG: Auto-restoring STREAMING connection ${connectionId}...`
-          );
-
-          const formData = new FormData();
-          formData.append("text", yamlConfig);
-
-          console.log(
-            `DEBUG: Calling connect endpoint: ${API_BASE_URL}/config/connect/${connectionId}`
-          );
-
-          const connectResponse = await fetch(
-            `${API_BASE_URL}/config/connect/${connectionId}`,
-            {
-              method: "POST",
-              body: formData,
-            }
-          );
-
-          console.log(
-            `DEBUG: Connect response status: ${connectResponse.status}`
-          );
-
-          if (!connectResponse.ok) {
-            const errorText = await connectResponse.text();
-            console.error(
-              `ERROR: Failed to connect ${connectionId}:`,
-              errorText
+        if (targetState === "paused") {
+          if (currentStatus === "not_found") {
+            console.log(
+              `DEBUG: Connection ${connectionId} not found on backend, nothing to pause`
             );
+          } else {
+            console.log(`DEBUG: Changing saved state to streaming to allow manual pause...`);
+            ConnectionManager.saveConnectionState(connectionId, "streaming", "system");
+          }
+          successCount++;
+        } else { // DEFAULT: streaming
 
-            // FIXED: Don't auto-pause on connection failures
-            // Just mark as temporarily failed, keep original state
-            ConnectionManager.markConnectionAsFailedTemporarily(
+          console.log(`DEBUG: Auto-restoring STREAMING connection ${connectionId}...`);
+
+          if (currentStatus === "not_found") {
+            const connectResponse = await ConnectionManager.connectConnection(
               connectionId,
-              `Connection failed during restoration: ${errorText}`
+              connectionData.adapter,
+              connectionData.adapterConfig,
+              connectionData.streamerConfig
             );
+            console.log(`DEBUG: Connect response status: ${connectResponse.status}`);
 
-            // If it's a broker connection error, still count as "attempted" for UI purposes
-            if (
-              errorText.includes("broker unreachable") ||
-              errorText.includes("MQTT") ||
-              errorText.includes("Configuration error")
-            ) {
-              console.log(
-                `WARNING: Connection ${connectionId} failed due to broker/config error - will show in UI but remain as '${targetState}' in localStorage`
-              );
-              successCount++; // Count as success for restoration completion
+            if (!connectResponse.ok) {
+              const errorText = await connectResponse.text();
+              console.error(`ERROR: Failed to connect ${connectionId}:`, errorText);
+              errorCount++;
+              continue;
             } else {
+              const responseData = await connectResponse.json();
+              console.log(
+                `SUCCESS: Successfully auto-restored streaming connection ${connectionId}:`,
+                responseData
+              );
+              successCount++;
+            }
+          } else if (currentStatus === "paused") {
+            const resumeSuccess = await ConnectionManager.resumeConnection(connectionId);
+            if (resumeSuccess) {
+              console.log(
+                `SUCCESS: Successfully auto-resumed streaming connection ${connectionId}`
+              );
+              successCount++;
+            } else {
+              console.error(`ERROR: Failed to auto-resume ${connectionId}`);
               errorCount++;
             }
-            continue;
-          } else {
-            const responseData = await connectResponse.json();
-            console.log(
-              `SUCCESS: Successfully auto-restored streaming connection ${connectionId}:`,
-              responseData
-            );
-            successCount++;
-          }
-        } else if (targetState === "paused") {
-          console.log(
-            `DEBUG: Skipping PAUSED connection ${connectionId} - will remain paused until manually resumed`
-          );
-
-          // For paused connections, we DON'T restore them to the backend
-          // They stay paused and will only be restored when user clicks Resume
-          successCount++;
-        } else {
-          console.log(
-            `DEBUG: Unknown target state '${targetState}' for ${connectionId}, defaulting to streaming`
-          );
-
-          // Unknown state, treat as streaming
-          const formData = new FormData();
-          formData.append("text", yamlConfig);
-
-          const connectResponse = await fetch(
-            `${API_BASE_URL}/config/connect/${connectionId}`,
-            {
-              method: "POST",
-              body: formData,
-            }
-          );
-
-          if (connectResponse.ok) {
-            console.log(
-              `SUCCESS: Successfully restored connection ${connectionId} (unknown state -> streaming)`
-            );
-            successCount++;
-          } else {
-            console.error(
-              `ERROR: Failed to restore connection ${connectionId}`
-            );
-            // Don't auto-pause, just mark as failed
-            ConnectionManager.markConnectionAsFailedTemporarily(
-              connectionId,
-              "Failed to restore connection with unknown state"
-            );
-            errorCount++;
           }
         }
       } catch (error) {
         console.error(`ERROR: Exception restoring ${connectionId}:`, error);
-        // Don't auto-pause on exceptions
-        ConnectionManager.markConnectionAsFailedTemporarily(
-          connectionId,
-          `Exception during restoration: ${error.message}`
-        );
         errorCount++;
       }
     }
@@ -239,12 +183,6 @@ function App() {
     console.log(`\n=== RESTORE COMPLETE ===`);
     console.log(`SUCCESS: ${successCount}`);
     console.log(`ERROR: ${errorCount}`);
-    console.log(
-      `INFO: Only streaming connections were auto-restored. Paused connections remain paused until manually resumed.`
-    );
-    console.log(
-      `INFO: Failed connections keep their original state - no auto-pausing!`
-    );
 
     hasAutoRestoredRef.current = true;
     ConnectionManager.markRestorationComplete();
@@ -252,7 +190,7 @@ function App() {
 
     // Refresh connections list
     loadConnections();
-  }, [loadConnections]);
+  }, [loadConnections, isRestoring, serverStatus]);
 
   // Verify and restore connections periodically (permanent fix for server restarts)
   const verifyAndRestoreConnections = useCallback(async () => {
@@ -268,7 +206,7 @@ function App() {
           const savedState = savedStates[id]?.state || "streaming";
           return (
             savedState === "streaming" &&
-            (status.status === "not_found" || status.status === "error")
+            (status.status === "not_found" || status.status === "error" || !status.is_streaming)
           );
         }
       );
@@ -285,6 +223,59 @@ function App() {
       console.error("Error verifying connections:", error);
     }
   }, [serverStatus, performStartupRestore]);
+
+  // Enhanced manual restore function with permanent fix logic
+  const handleRestoreAdapter = useCallback(async () => {
+    console.log("DEBUG: Manual restore triggered");
+
+    // Reset restoration state to allow fresh restoration
+    ConnectionManager.resetRestorationState();
+    hasAutoRestoredRef.current = false;
+
+    await performStartupRestore();
+  }, [performStartupRestore]);
+
+  const handleSaveConnection = useCallback(
+    async (connectionData) => {
+      try {
+        loadConnections();
+        setIsModalOpen(false);
+        setEditingConnection(null);
+      } catch (error) {
+        console.error("Error saving connection:", error);
+      }
+    }, [loadConnections]);
+
+  const handleEditConnection = useCallback((connection) => {
+    setEditingConnection(connection);
+    setIsModalOpen(true);
+  }, []);
+
+  const handleTerminateConnection = useCallback(
+    async (connectionId) => {
+      const result = await disconnectConnection(connectionId);
+      if (!result) return;
+
+      // Remove from localStorage
+      ConnectionManager.removeConnection(connectionId);
+      loadConnections();
+    }, [loadConnections]);
+
+  // FIXED: Only save pause state when user explicitly pauses
+  const handlePauseConnection = useCallback((connectionId) => {
+    console.log(`DEBUG: User paused connection ${connectionId}`);
+    ConnectionManager.saveConnectionState(connectionId, "paused", "user");
+  }, []);
+
+  // FIXED: Only save streaming state when user explicitly resumes
+  const handleResumeConnection = useCallback((connectionId) => {
+    console.log(`DEBUG: User resumed connection ${connectionId}`);
+    ConnectionManager.saveConnectionState(connectionId, "streaming", "user");
+  }, []);
+
+  const handleNewConnection = useCallback(() => {
+    setIsModalOpen(true);
+  }, []);
 
   // Monitor server status
   useEffect(() => {
@@ -310,6 +301,7 @@ function App() {
     };
 
     monitorServer();
+    // return
     const interval = setInterval(monitorServer, 5000);
     return () => clearInterval(interval);
   }, [checkServerHealth, serverStatus]);
@@ -352,69 +344,6 @@ function App() {
     console.log("DEBUG: Loading connections on startup...");
     loadConnections();
   }, [loadConnections]);
-
-  // Enhanced manual restore function with permanent fix logic
-  const handleRestoreAdapter = useCallback(async () => {
-    console.log("DEBUG: Manual restore triggered");
-
-    // Reset restoration state to allow fresh restoration
-    ConnectionManager.resetRestorationState();
-    hasAutoRestoredRef.current = false;
-
-    await performStartupRestore();
-  }, [performStartupRestore]);
-
-  const handleSaveConnection = useCallback(
-    async (connectionData) => {
-      try {
-        loadConnections();
-        setIsModalOpen(false);
-        setEditingConnection(null);
-      } catch (error) {
-        console.error("Error saving connection:", error);
-      }
-    },
-    [loadConnections]
-  );
-
-  const handleEditConnection = useCallback((connection) => {
-    setEditingConnection(connection);
-    setIsModalOpen(true);
-  }, []);
-
-  const handleTerminateConnection = useCallback(
-    async (connectionId) => {
-      try {
-        // Disconnect from backend
-        await fetch(`${API_BASE_URL}/config/disconnect/${connectionId}`, {
-          method: "POST",
-        });
-      } catch (error) {
-        console.error("Failed to disconnect from backend:", error);
-      }
-
-      // Remove from localStorage
-      ConnectionManager.removeConnection(connectionId);
-      loadConnections();
-    },
-    [loadConnections]
-  );
-
-  // FIXED: Only save pause state when user explicitly pauses
-  const handlePauseConnection = useCallback((connectionId) => {
-    console.log(`DEBUG: User paused connection ${connectionId}`);
-    ConnectionManager.saveConnectionState(connectionId, "paused", "user");
-  }, []);
-
-  // FIXED: Only save streaming state when user explicitly resumes
-  const handleResumeConnection = useCallback((connectionId) => {
-    console.log(`DEBUG: User resumed connection ${connectionId}`);
-    ConnectionManager.saveConnectionState(connectionId, "streaming", "user");
-  }, []);
-
-  const handleNewConnection = useCallback(() => {
-    setIsModalOpen(true);
-  }, []);
 
   // DEBUG: Add window functions for manual testing and debugging
   useEffect(() => {

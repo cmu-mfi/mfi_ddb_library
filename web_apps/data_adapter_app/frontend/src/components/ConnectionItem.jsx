@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ConnectionManager } from "./ConnectionManager";
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
+import { pauseConnection, resumeConnection } from "../api";
+import { connectConnection, disconnectConnection } from "../api";
+import { fetchStreamingStatus } from "../api";
 
 export default function ConnectionItem({
   connection,
@@ -16,84 +17,59 @@ export default function ConnectionItem({
   const [autoReconnectAttempted, setAutoReconnectAttempted] = useState(false);
   const statusCheckIntervalRef = useRef(null);
 
-  // Load saved connection state from localStorage
-  useEffect(() => {
-    const savedState = ConnectionManager.getConnectionState(connection.id);
-    const initialState = savedState?.state || "streaming";
-    setLocalState(initialState);
-    console.log(`Loaded initial state for ${connection.id}: ${initialState}`);
-  }, [connection.id]);
-
-  // FIXED: Helper to pause connection on backend - DON'T save to localStorage (system action)
-  const pauseConnectionOnBackend = useCallback(async () => {
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/config/pause/${connection.id}`,
-        {
-          method: "POST",
-        }
-      );
-      if (response.ok) {
-        setLocalState("paused");
-        // FIXED: Don't save system-triggered pause to localStorage
-        console.log(
-          `System paused ${connection.id} on backend (not saved to localStorage)`
-        );
-      }
-    } catch (error) {
-      console.error(`Failed to pause ${connection.id} on backend:`, error);
-    }
-  }, [connection.id]);
-
   // Auto-reconnection logic
   const attemptAutoReconnect = useCallback(async () => {
     if (autoReconnectAttempted) return;
-    setAutoReconnectAttempted(true);
 
     const savedState = ConnectionManager.getConnectionState(connection.id);
     const targetState = savedState?.state || "streaming";
+
+    if (localState !== targetState) {
+      console.log(`No need to auto-reconnect ${connection.id} - already in ${localState}`);
+      return;
+    }
+    
     console.log(`Auto-reconnecting ${connection.id} to ${targetState} state`);
 
     try {
-      const yamlConfig = ConnectionManager.getYamlConfig(connection.id);
-      if (!yamlConfig) return;
-
-      const formData = new FormData();
-      formData.append("text", yamlConfig);
-
-      const connectResponse = await fetch(
-        `${API_BASE_URL}/config/connect/${connection.id}`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-      if (!connectResponse.ok) {
-        console.error(`Failed to auto-reconnect ${connection.id}`);
-        return;
-      }
-
-      if (targetState === "paused") {
-        const pauseResponse = await fetch(
-          `${API_BASE_URL}/config/pause/${connection.id}`,
-          {
-            method: "POST",
-          }
+      if (localState === "inactive") {
+        const connectResponse = await connectConnection(
+          connection.id,
+          connection.adapter,
+          connection.adapterConfig,
+          connection.streamerConfig
         );
 
-        if (pauseResponse.ok) {
+        if (!connectResponse.ok) {
+          console.error(`Failed to auto-reconnect ${connection.id}`);
+          return;
+        }
+      } else if (localState === "paused" && targetState === "streaming") {
+        const success = await resumeConnection(connection.id);
+        if (!success) {
+          console.error(`Failed to auto-resume ${connection.id}`);
+          return;
+        } else {
+          console.log(`Auto-resumed ${connection.id} after reconnection`);
+        }
+      } else if (localState === "streaming" && targetState === "paused") {
+        const is_paused = await pauseConnection(connection.id);
+        if (!is_paused) {
+          console.error(`Failed to auto-pause ${connection.id}`);
+          return;
+        } else {
           console.log(`Auto-paused ${connection.id} after reconnection`);
-          setLocalState("paused");
-          // FIXED: Don't save auto-pause to localStorage
         }
       } else {
-        setLocalState("streaming");
+        console.log(`Unknown state ${localState} for ${connection.id}, or ${targetState} target state`);
       }
+
     } catch (error) {
       console.error(`Auto-reconnect failed for ${connection.id}:`, error);
     }
-  }, [connection.id, autoReconnectAttempted]);
+
+    setAutoReconnectAttempted(true);
+  }, [connection, autoReconnectAttempted, localState]);
 
   // FIXED: Enhanced status checking - don't auto-save state changes
   const checkStatus = useCallback(async () => {
@@ -101,55 +77,22 @@ export default function ConnectionItem({
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/config/streaming-status/${connection.id}`,
-        {
-          signal: controller.signal,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+      const response = await fetchStreamingStatus(connection.id);
       clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        // If 404, connection doesn't exist on backend, try to restore it
-        if (response.status === 404 && !autoReconnectAttempted) {
-          console.log(
-            `Connection ${connection.id} not found on backend, attempting auto-reconnect`
-          );
-          await attemptAutoReconnect();
-          return;
-        }
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const status = await response.json();
-      setStreamingStatus(status);
+      
+      setStreamingStatus(response);
 
       // Reset auto-reconnect flag on successful status check
       setAutoReconnectAttempted(false);
 
-      // FIXED: Sync local state with backend state, but DON'T save to localStorage
-      const savedState = ConnectionManager.getConnectionState(connection.id);
-      const expectedState = savedState?.state || "streaming";
-
-      if (status.is_paused && expectedState === "streaming") {
-        // Backend says paused but user expects streaming - update local display only
-        setLocalState("paused");
-        console.log(
-          `System detected backend pause for ${connection.id} (not saved to localStorage)`
-        );
-      } else if (
-        !status.is_paused &&
-        status.status === "active" &&
-        expectedState === "paused"
-      ) {
-        // Backend is active but user wants paused - pause it
-        await pauseConnectionOnBackend();
-      } else if (status.is_paused) {
-        setLocalState("paused");
-      } else if (status.status === "active") {
+      if (!response.ok){
+        setLocalState("inactive");
+      } else if (response.is_streaming) {
         setLocalState("streaming");
+      } else {
+        setLocalState("paused");
       }
+
     } catch (error) {
       console.error(
         `Failed to check streaming status for ${connection.id}:`,
@@ -163,52 +106,23 @@ export default function ConnectionItem({
         reason: "Network error or server unreachable",
       });
     }
-  }, [
-    connection.id,
-    autoReconnectAttempted,
-    attemptAutoReconnect,
-    pauseConnectionOnBackend,
-  ]);
-
-  useEffect(() => {
-    checkStatus();
-    const intervalRef = setInterval(checkStatus, 5000);
-    statusCheckIntervalRef.current = intervalRef;
-
-    return () => {
-      if (statusCheckIntervalRef.current) {
-        clearInterval(statusCheckIntervalRef.current);
-      }
-    };
-  }, [checkStatus]);
+  }, [connection.id, autoReconnectAttempted, attemptAutoReconnect]);
 
   // FIXED: Pause handler - ONLY user action saves to localStorage
   const handlePause = async (e) => {
     e.stopPropagation();
     setIsProcessing(true);
 
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/config/pause/${connection.id}`,
-        {
-          method: "POST",
-        }
-      );
+    const is_paused = await pauseConnection(connection.id);
 
-      if (response.ok) {
-        setLocalState("paused");
-        // FIXED: Only save user-triggered pause
-        ConnectionManager.saveConnectionState(connection.id, "paused", "user");
-        if (onPause) onPause(connection.id);
-        console.log(`User successfully paused ${connection.id}`);
-      } else {
-        console.error(`Failed to pause connection ${connection.id}`);
-      }
-    } catch (error) {
-      console.error(`Error pausing connection ${connection.id}:`, error);
-    } finally {
-      setIsProcessing(false);
+    if (is_paused) {
+      setLocalState("paused");
+      // FIXED: Only save user-triggered pause
+      ConnectionManager.saveConnectionState(connection.id, "paused", "user");
+      if (onPause) onPause(connection.id);
+      console.log(`User successfully paused ${connection.id}`);
     }
+    setIsProcessing(false);
   };
 
   // FIXED: Resume handler - ONLY user action saves to localStorage
@@ -216,52 +130,16 @@ export default function ConnectionItem({
     e.stopPropagation();
     setIsProcessing(true);
 
-    try {
-      console.log(`User resuming paused connection ${connection.id}...`);
+    const is_resumed = await resumeConnection(connection.id);
 
-      // Get config from localStorage
-      const yamlConfig = ConnectionManager.getYamlConfig(connection.id);
-      if (!yamlConfig) {
-        throw new Error("No configuration found for this connection");
-      }
-
-      // Send config data to resume endpoint
-      const formData = new FormData();
-      formData.append("text", yamlConfig);
-
-      const resumeResponse = await fetch(
-        `${API_BASE_URL}/config/resume/${connection.id}`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-      if (resumeResponse.ok) {
-        setLocalState("streaming");
-        // FIXED: Only save user-triggered resume
-        ConnectionManager.saveConnectionState(
-          connection.id,
-          "streaming",
-          "user"
-        );
-        if (onResume) onResume(connection.id);
-        console.log(
-          `User successfully resumed ${connection.id} and started streaming`
-        );
-      } else {
-        const errorText = await resumeResponse.text();
-        console.error(`Resume failed for ${connection.id}:`, errorText);
-        throw new Error(`Resume failed: ${errorText}`);
-      }
-    } catch (error) {
-      console.error(`Error resuming connection ${connection.id}:`, error);
-      alert(
-        `Failed to resume connection: ${error.message}\n\nYou may need to edit and save the connection to fix configuration issues.`
-      );
-    } finally {
-      setIsProcessing(false);
+    if (is_resumed) {
+      setLocalState("streaming");
+      // FIXED: Only save user-triggered resume
+      ConnectionManager.saveConnectionState(connection.id, "streaming", "user");
+      if (onResume) onResume(connection.id);
+      console.log(`User successfully resumed ${connection.id}`);
     }
+    setIsProcessing(false);
   };
 
   // Terminate connection
@@ -275,15 +153,7 @@ export default function ConnectionItem({
         }"?`
       )
     ) {
-      try {
-        await fetch(`${API_BASE_URL}/config/disconnect/${connection.id}`, {
-          method: "POST",
-        });
-        console.log(`Successfully disconnected ${connection.id}`);
-      } catch (error) {
-        console.error(`Disconnect failed for ${connection.id}:`, error);
-      }
-
+      await disconnectConnection(connection.id);
       onTerminate(connection.id);
     }
   };
@@ -371,6 +241,28 @@ export default function ConnectionItem({
     !isPaused;
   const canPause = isActive && !isProcessing;
   const canResume = isPaused && !isProcessing;
+
+  // Load saved connection state from localStorage
+  useEffect(() => {
+    const savedState = ConnectionManager.getConnectionState(connection.id);
+    const initialState = savedState?.state || "streaming";
+    setLocalState(initialState);
+    console.log(`Loaded initial state for ${connection.id}: ${initialState}`);
+  }, [connection.id]);
+
+
+  useEffect(() => {
+    checkStatus();
+    const intervalRef = setInterval(checkStatus, 5000);
+    statusCheckIntervalRef.current = intervalRef;
+
+    return () => {
+      if (statusCheckIntervalRef.current) {
+        clearInterval(statusCheckIntervalRef.current);
+      }
+    };
+  }, [checkStatus]);
+
 
   return (
     <div className={`connection-item ${bannerStatus.color}`}>
