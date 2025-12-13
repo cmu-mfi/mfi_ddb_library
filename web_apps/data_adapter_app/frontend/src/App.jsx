@@ -17,21 +17,20 @@ function App() {
 
   // Check server health
   const checkServerHealth = useCallback(async () => {
-    // try {
-    //   const controller = new AbortController();
-    //   const timeoutId = setTimeout(() => controller.abort(), 3000);
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-    //   const response = await fetch(`${API_BASE_URL}`, {
-    //     signal: controller.signal,
-    //   });
+      const response = await fetch(`${API_BASE_URL}`, {
+        signal: controller.signal,
+      });
 
-    //   clearTimeout(timeoutId);
-    //   return response.ok;
-    // } catch (error) {
-    //   console.error("Health check failed:", error);
-    //   return false;
-    // }
-    return true;
+      clearTimeout(timeoutId);
+      return response.ok;
+    } catch (error) {
+      console.error("Health check failed:", error);
+      return false;
+    }
   }, []);
 
   // Load connections for UI
@@ -390,12 +389,14 @@ function App() {
     <div className="app">
       <div className="app-header">
         <div className="logo">
+          <a href="https://cmu-mfi.github.io/ddb/">
           <img
             src={logoMfi}
             className="app-logo"
             alt="Manufacturing Futures Institute Logo"
             width={200}
           />
+          </a>
         </div>
         <div className={`server-status ${serverStatus}`}>
           Server: {serverStatus}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ConnectionManager } from "./ConnectionManager";
 import { pauseConnection, resumeConnection } from "../api";
-import { connectConnection, disconnectConnection } from "../api";
+import { connectConnection } from "../api";
 import { fetchStreamingStatus } from "../api";
 
 export default function ConnectionItem({

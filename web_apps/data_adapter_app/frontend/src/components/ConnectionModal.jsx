@@ -284,8 +284,6 @@ export default function ConnectionModal({
       setActiveConnectionId(id);
       setStep("Connecting to adapter...");
 
-      console.log("HEYYO! Connecting adapter with ID:", id);
-
       await connectConnection(
         id,
         connectionType,
