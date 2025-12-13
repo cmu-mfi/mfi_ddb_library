@@ -158,7 +158,6 @@ export default function ConnectionItem({
     }
 
     const {
-      adapter_name,
       streaming_mode,
       is_connected,
       is_streaming
