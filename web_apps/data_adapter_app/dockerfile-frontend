@@ -1,0 +1,13 @@
+# Use reference: https://www.docker.com/blog/how-to-dockerize-react-app/
+
+FROM node:18-alpine AS build
+
+WORKDIR /app
+
+COPY ./frontend ./
+
+RUN npm install
+ENV NODE_OPTIONS=--openssl-legacy-provider
+
+EXPOSE 3000
+CMD ["npm", "start"]
