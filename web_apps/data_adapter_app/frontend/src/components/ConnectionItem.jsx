@@ -78,32 +78,25 @@ export default function ConnectionItem({
 
     try {
       const response = await fetchStreamingStatus(connection.id);
+      console.log(`Fetched streaming status for ${connection.id}:`, response);
       clearTimeout(timeoutId);
       
       setStreamingStatus(response);
 
       // Reset auto-reconnect flag on successful status check
       setAutoReconnectAttempted(false);
-
-      if (!response.ok){
-        setLocalState("inactive");
-      } else if (response.is_streaming) {
+      if (response.is_streaming) {
         setLocalState("streaming");
       } else {
         setLocalState("paused");
       }
 
     } catch (error) {
-      console.error(
-        `Failed to check streaming status for ${connection.id}:`,
-        error
-      );
+      console.error(`Failed to check streaming status for ${connection.id}:`);
       setStreamingStatus({
-        status: "inactive",
-        adapter_connected: false,
+        streaming_mode: "inactive",
+        is_connected: false,
         is_streaming: false,
-        network_error: true,
-        reason: "Network error or server unreachable",
       });
     }
   }, [connection.id, autoReconnectAttempted, attemptAutoReconnect]);
@@ -148,12 +141,9 @@ export default function ConnectionItem({
 
     if (
       window.confirm(
-        `Are you sure you want to remove "${
-          connection.name || connection.type
-        }"?`
+        `Are you sure you want to remove connection?\n${connection.id} - ${connection.adapter}`
       )
     ) {
-      await disconnectConnection(connection.id);
       onTerminate(connection.id);
     }
   };
@@ -161,83 +151,53 @@ export default function ConnectionItem({
   const getBannerStatus = () => {
     if (!streamingStatus) {
       return {
-        color: "checking",
+        color: "grey",
         text: "Checking status...",
         detail: "Initializing connection",
       };
     }
 
     const {
-      status,
-      reason,
-      network_error,
-      connection_error,
-      protocol,
-      is_paused,
-      adapter_connected,
+      adapter_name,
+      streaming_mode,
+      is_connected,
+      is_streaming
     } = streamingStatus;
 
-    if (network_error) {
-      return {
-        color: "red",
-        text: protocol || connection.type || "Server Unreachable",
-        detail: "Backend server is down or unreachable",
-      };
-    }
-
-    if (connection_error) {
-      return {
-        color: "red",
-        text: protocol || connection.type || "Connection Error",
-        detail: connection_error,
-      };
-    }
-
-    // Use local state as the primary source of truth for pause status
-    if (localState === "paused" || is_paused) {
-      return {
-        color: "yellow",
-        text: protocol || connection.type || "Paused",
-        detail: "Streaming paused - click resume to continue",
-      };
-    }
-
-    if (status === "active" && adapter_connected) {
+    if(is_connected && is_streaming) {
       return {
         color: "green",
-        text: protocol || connection.type || "Connected",
-        detail: reason || "Active streaming",
+        text: `Connection ${connection.id} - ${connection.adapter}`,
+        detail: `Streaming in ${streaming_mode} mode`,
       };
     }
-
-    if (status === "inactive") {
+    else if(is_connected && !is_streaming) {
+      return {
+        color: "yellow",
+        text: `Connection ${connection.id} - ${connection.adapter}`,
+        detail: `Connected but not streaming`,
+      };
+    }
+    else if (!is_connected && streaming_mode !== "inactive") {
       return {
         color: "red",
-        text: protocol || connection.type || "Inactive",
-        detail: reason || "Not streaming",
+        text: `Connection ${connection.id} - ${connection.adapter}`,
+        detail: `Not connected`,
       };
-    }
-
-    if (status === "starting") {
+    } else {
       return {
-        color: "blue",
-        text: protocol || connection.type || "Starting",
-        detail: reason || "Initializing stream",
+        color: "checking",
+        text: `Connection ${connection.id} - ${connection.adapter}`,
+        detail: "Status unknown. Trying ...",
       };
     }
-
-    return {
-      color: "orange",
-      text: protocol || connection.type || "Unknown",
-      detail: reason || "Status unknown",
-    };
   };
 
   const bannerStatus = getBannerStatus();
   const isPaused = localState === "paused";
   const isActive =
-    streamingStatus?.status === "active" &&
-    streamingStatus?.adapter_connected &&
+    streamingStatus?.is_streaming &&
+    streamingStatus?.is_connected &&
     !isPaused;
   const canPause = isActive && !isProcessing;
   const canResume = isPaused && !isProcessing;

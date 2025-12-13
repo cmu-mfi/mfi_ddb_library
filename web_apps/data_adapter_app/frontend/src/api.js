@@ -92,8 +92,17 @@ export async function disconnectConnection(connectionId) {
     return false;
   }
   console.log(`DEBUG: Connection ${connectionId} disconnected successfully`);
-
-  return (await response.json()).disconnected;
+  
+  if (response.status === 404) {
+    console.error(`Connection ${connectionId} not found on backend.`);
+    return true;
+  } else if (response.ok) {
+    const data = await response.json();
+    return data.disconnected;
+  } else {
+    console.error(`Failed to disconnect ${connectionId} on backend.`);
+    return false;
+  }
 }
 
 export async function fetchStreamingStatus(connectionId) {

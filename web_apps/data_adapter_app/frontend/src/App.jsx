@@ -256,7 +256,6 @@ function App() {
       const result = await disconnectConnection(connectionId);
       if (!result) return;
 
-      // Remove from localStorage
       ConnectionManager.removeConnection(connectionId);
       loadConnections();
     }, [loadConnections]);
