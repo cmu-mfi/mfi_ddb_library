@@ -394,7 +394,7 @@ export default function ConnectionModal({
           <div className="textarea-container">
             <textarea
               id="configuration"
-              rows={10}
+              rows={8}
               className="form-textarea"
               value={configuration}
               onChange={handleConfigurationChange}
@@ -459,22 +459,21 @@ export default function ConnectionModal({
           <label htmlFor="streamer-config">Streamer Configuration:</label>
           <textarea
             id="streamer-config"
-            rows={5}
-            className={`form-textarea ${!isEditingStreamer ? "disabled" : ""}`}
+            rows={7}
+            className={"form-textarea"}
             value={streamerConfig}
             onChange={handleStreamerConfigChange}
-            disabled={isSubmitting || !isEditingStreamer}
-            readOnly={!isEditingStreamer}
+            disabled={isSubmitting}
             placeholder="Streamer configuration..."
           />
-          <button
+          {/* <button
             type="button"
             className="edit-streamer-button"
             onClick={() => setIsEditingStreamer(!isEditingStreamer)}
             disabled={isSubmitting}
           >
             {isEditingStreamer ? "Done Editing" : "Edit Broker"}
-          </button>
+          </button> */}
         </div>
 
         {isValidating && (
