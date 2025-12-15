@@ -66,3 +66,28 @@ pip install .
 | **POST** | `/pause/{conn_id}` | Suspends data streaming for a specific connection while keeping the adapter instance active in memory. |
 | **POST** | `/disconnect/{conn_id}` | Stops streaming, closes the adapter connection, and removes the instance from the active registry. |
 | **GET** | `/streaming-status/{conn_id}` | Provides real-time connectivity and streaming state details for a specific connection ID. |
+
+## Pytest Unit Tests
+
+There are unit tests available for the API endpoints in the `tests/test_api.py` file. To run the tests:
+
+* Create a virtual environment and activate it.
+* Install the required packages.
+* Install mfi_ddb library.
+* Use either of the following commands to execute the tests:
+
+```bash
+pytest -v
+```
+or
+```bash
+PYTHONPATH=. python tests/test_api.py
+```
+
+### Tests
+
+* TEST 1: Get Available Data Adapters
+* TEST 2: Validate Data Adapter Configurations
+* TEST 3: Validate Streamer Configuration
+* TEST 4: Test Data Adapter Connections
+* TEST 5: Test Multiple Data Adapter Connections
