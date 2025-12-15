@@ -88,8 +88,8 @@ class _SCHEMA:
     class _MQTT(BaseModel):
         broker_address: str = Field(..., description="Address of the MQTT broker")
         broker_port: Optional[int] = Field(1883, description="Port of the MQTT broker (default: 1883)")
-        username: Optional[str] = Field(..., description="Username for MQTT broker authentication")
-        password: Optional[str] = Field(..., description="Password for MQTT broker authentication")
+        username: Optional[str] = Field("", description="Username for MQTT broker authentication")
+        password: Optional[str] = Field("", description="Password for MQTT broker authentication")
         tls_enabled: Optional[bool] = Field(False, description="Enable TLS for MQTT connection (default: False)")
         debug: Optional[bool] = Field(False, description="Enable debug mode for MQTT client (default: False)")
         timeout: Optional[int] = Field(5, description="Timeout in seconds for connecting to the MQTT broker (default: 5)")
