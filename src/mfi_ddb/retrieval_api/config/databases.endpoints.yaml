@@ -1,0 +1,29 @@
+"""
+Example retrieval API configuration (endpoints only).
+
+Copy this file to a location of your choice, edit the values for your
+environment, and set:
+
+    export MFI_RETRIEVAL_CONFIG=/path/to/databases.endpoints.yaml
+
+All fields are required unless otherwise noted.
+
+NOTE: the Retrieval API now talks ONLY to per-database REST services.
+Each service runs its own FastAPI app near the actual database and
+exposes a small HTTP API. The retrieval layer does not connect to
+databases directly.
+"""
+
+metadata_service:
+  base_url: "http://localhost:8001"  # mfi_ddb.databases.metadata_service
+
+kv_service:
+  base_url: "http://localhost:8002"  # mfi_ddb.databases.kv_service
+
+historian_service:
+  base_url: "http://localhost:8004"  # mfi_ddb.databases.historian_service
+
+cfs_service:
+  base_url: "http://localhost:8003"  # mfi_ddb.databases.cfs_service
+
+
