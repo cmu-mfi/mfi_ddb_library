@@ -44,13 +44,13 @@ class _Mqtt:
         mqtt_port = int(mqtt_cfg['broker_port']) if 'broker_port' in mqtt_cfg.keys() else 1883
         mqtt_user = mqtt_cfg['username'] if 'username' in mqtt_cfg.keys() else None
         mqtt_pass = mqtt_cfg['password'] if 'password' in mqtt_cfg.keys() else None
-        if 'password' in mqtt_cfg.keys():
-            del self.mqtt_cfg['password']
+
         mqtt_tls_enabled = mqtt_cfg['tls_enabled'] if 'tls_enabled' in mqtt_cfg.keys() else False
         debug = mqtt_cfg['debug'] if 'debug' in mqtt_cfg.keys() else False
         timeout = mqtt_cfg['timeout'] if 'timeout' in mqtt_cfg.keys() else 5.
         
         self.client = mqtt.Client()
+        print("DEBUG auth user=", mqtt_user, "pass_is_none=", mqtt_pass is None)
         self.client.username_pw_set(mqtt_user, mqtt_pass)
         self.client.on_connect = self.__on_connect
         self.client.connect(mqtt_host, mqtt_port, 60)

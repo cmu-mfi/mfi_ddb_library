@@ -42,8 +42,6 @@ class MqttSpb:
         mqtt_port = int(mqtt_cfg['broker_port']) if 'broker_port' in mqtt_cfg.keys() else 1883
         mqtt_user = mqtt_cfg['username'] if 'username' in mqtt_cfg.keys() else None
         mqtt_pass = mqtt_cfg['password'] if 'password' in mqtt_cfg.keys() else None
-        if 'password' in mqtt_cfg.keys():
-            del self.cfg['mqtt']['password']  # Remove password from config for security reasons
                     
         mqtt_tls_enabled = mqtt_cfg['tls_enabled'] if 'tls_enabled' in mqtt_cfg.keys() else False
         debug = mqtt_cfg['debug'] if 'debug' in mqtt_cfg.keys() else False

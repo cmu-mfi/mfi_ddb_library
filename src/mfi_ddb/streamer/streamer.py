@@ -44,14 +44,18 @@ class Streamer(Observer):
         # 1. initialize the data adapter and respective topic family client
         # `````````````````````````````````````````````````````````````````````````
         self.cfg = copy.deepcopy(config)
-        if 'topic_family' in config:
-            topic_family_name = config['topic_family']
-        else:
+        self.cfg_public = redact_cfg(self.cfg)
+        topic_family_name = None
+        
+        #Set Topic family from config if available, else if not set as NOT_PROVIDED
+        topic_family_name = config['topic_family'] if 'topic_family' in config.keys() else "__NOT_PROVIDED__"
+
+        if topic_family_name == "__NOT_PROVIDED__":
+            print("WARNING: topic_family not in config. Using default:", data_adp.RECOMMENDED_TOPIC_FAMILY)
             topic_family_name = data_adp.RECOMMENDED_TOPIC_FAMILY
-        
-        
-        if topic_family_name not in TOPIC_CLIENTS:
-            raise ConfigError(f"Invalid topic family: {topic_family_name}")
+        elif topic_family_name not in TOPIC_CLIENTS:
+            print("WARNING: Invalid topic_family:", topic_family_name," using default:", data_adp.RECOMMENDED_TOPIC_FAMILY)
+            topic_family_name = data_adp.RECOMMENDED_TOPIC_FAMILY
         
         topic_family = globals()[TOPIC_CLIENTS[topic_family_name][1]]()
         self.__client = globals()[TOPIC_CLIENTS[topic_family_name][0]](self.cfg, topic_family)
@@ -150,7 +154,7 @@ class Streamer(Observer):
                 "attributes": self.__data_adp.attributes,
                 "sample_data": sample_data,
             },
-            "broker": self.__client.cfg            
+            "broker": self.cfg_public['mqtt']            
         }         
         
         return payload
