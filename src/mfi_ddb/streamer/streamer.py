@@ -44,7 +44,7 @@ class Streamer(Observer):
         # 1. initialize the data adapter and respective topic family client
         # `````````````````````````````````````````````````````````````````````````
         self.cfg = copy.deepcopy(config)
-        self.cfg_public = redact_cfg(self.cfg)
+        self.__cfg = copy.deepcopy(config) # Private copy for internal use in reset_stream.
         topic_family_name = None
         
         #Set Topic family from config if available, else if not set as NOT_PROVIDED
@@ -154,7 +154,7 @@ class Streamer(Observer):
                 "attributes": self.__data_adp.attributes,
                 "sample_data": sample_data,
             },
-            "broker": self.cfg_public['mqtt']            
+            "broker": self.cfg['mqtt']            
         }         
         
         return payload
@@ -209,8 +209,8 @@ class Streamer(Observer):
         trial_id = str(self.__data_adp.cfg.get('trial_id', None))
         kv_topic_family = globals()[TOPIC_CLIENTS['kv'][1]]()
         blob_topic_family = globals()[TOPIC_CLIENTS['blob'][1]]()
-        kv_client = globals()[TOPIC_CLIENTS['kv'][0]](copy.deepcopy(self.cfg), kv_topic_family)
-        blob_client = globals()[TOPIC_CLIENTS['blob'][0]](copy.deepcopy(self.cfg), blob_topic_family)
+        kv_client = globals()[TOPIC_CLIENTS['kv'][0]](copy.deepcopy(self.__cfg), kv_topic_family)
+        blob_client = globals()[TOPIC_CLIENTS['blob'][0]](copy.deepcopy(self.__cfg), blob_topic_family)
 
         kv_payload = self.__generate_birth_kv_payload()
         blob_birth_payload = get_blob_json_payload_from_dict(data = kv_payload,
