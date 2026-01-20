@@ -5,7 +5,7 @@
 - [Overview](#overview)
 - [Compatible Database Nodes](#compatible-database-nodes)
 - [Node specifications](#node-specifications)
-    - [Web Service Endpoints](#web-service-endpoints)
+    - [Web Service - gRPC](#web-service---grpc)
     - [Connector Configuration](#connector-configuration)
 
 ## Overview
@@ -70,8 +70,8 @@ The following database nodes are currently compatible with the MFI-DDB framework
 ## Node specifications
 Each database node has specific requirements and specifications for its components. Below are the general specifications for each component.
 
-### Web Service Endpoints
-Each database node exposes a web service with endpoints for data retrieval. The endpoints are as follows:
+### Web Service - gRPC
+Each database node exposes a gRPC web service for data retrieval.
 
 TODO
 
