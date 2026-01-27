@@ -1,0 +1,58 @@
+name: CI Checks
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+
+jobs:
+  # JOB 1: Installation across multiple OSes
+  installation-check:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras --dev
+
+  # JOB 2: Run data adapter streaming tests with EMQX broker
+  streaming-check:
+    needs: installation-check
+    runs-on: ubuntu-latest
+
+    services:
+      emqx:
+        image: emqx/emqx:5.10.2
+        ports:
+          - 1883:1883
+          - 18083:18083
+        options: >-
+          --health-cmd "curl --fail http://localhost:18083/api/v5/status || exit 1"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras --dev
+
+      - name: Run tests for LocalFilesDataAdapter
+        run: uv run pytest tests/data_adapters/test_local_files_adapter.py -v --tb=short
+
+      - name: Run tests for MQTTDataAdapter
+        run: uv run pytest tests/data_adapters/test_mqtt_adapter.py -v --tb=short
