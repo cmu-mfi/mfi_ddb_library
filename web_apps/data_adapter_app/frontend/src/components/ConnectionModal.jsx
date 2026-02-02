@@ -11,7 +11,40 @@ import { makeDefaultStreamerConfig } from "../data/defaults";
 import { getConnCtr, setConnCtr } from "../state/conn_ctr";
 import { connectConnection, disconnectConnection, fetchAdapters } from "../api";
 import { validateAdapterConfig, validateStreamerConfig } from "../api";
+/** -------------------------------
+ *  YAML helpers (top-level scalars)
+ *  ------------------------------- */
+const upsertYamlKey = (yaml, key, value) => {
+  const lines = (yaml || "").split("\n");
+  const re = new RegExp(`^\\s*${key}\\s*:\\s*.*$`);
+  const idx = lines.findIndex((l) => re.test(l));
+  const newLine = `${key}: ${value}`;
 
+  if (idx >= 0) {
+    lines[idx] = newLine;
+    return lines.join("\n");
+  }
+
+  const trimmed = (yaml || "").trimEnd();
+  return trimmed ? `${trimmed}\n${newLine}\n` : `${newLine}\n`;
+};
+
+const readYamlScalar = (yaml, key) => {
+  const re = new RegExp(`^\\s*${key}\\s*:\\s*(.+)\\s*$`, "m");
+  const m = (yaml || "").match(re);
+  return m?.[1]?.trim() ?? null;
+};
+
+/**
+ * Ensure streamer YAML has reasonable defaults (streamer-only).
+ * NOTE: Polling/callback mode is NOT stored in streamer YAML anymore.
+ */
+const ensureStreamerDefaults = (yaml) => {
+  let next = yaml || "";
+  // Keep this function for streamer-only defaults you actually want.
+  // Example: ensure polling_rate_hz is NOT here anymore.
+  return next;
+};
 
 const generateNestedHelpText = (helpData, indentLevel = 0) => {
   if (!helpData || typeof helpData !== "string") return null;
@@ -107,11 +140,21 @@ export default function ConnectionModal({
   const fileInputRef = useRef(null);
   const [showHelp, setShowHelp] = useState(false);
   const [activeConnectionId, setActiveConnectionId] = useState(null);
+  const [isPolling, setIsPolling] = useState(true); // true = polling, false = callback
+  const [pollingRateHz, setPollingRateHz] = useState("1");
 
   // Track the last payload we validated to avoid re-validating identical text
   const lastValidatedRef = useRef("");
 
   const connectionTypes = adapters.map((a) => a.name);
+
+  const selectedAdapter = useMemo(
+    () => adapters.find((a) => a.name === connectionType),
+    [adapters, connectionType]
+  );
+
+  // If selfUpdate is true => callback supported
+  const supportsCallback = Boolean(selectedAdapter?.selfUpdate);
 
   const configHelpMap = useMemo(
     () =>
@@ -175,6 +218,11 @@ export default function ConnectionModal({
       setConnectionType(t);
       setConfiguration(exampleConfigMap[t] || "");
       setStreamerConfig(makeDefaultStreamerConfig());
+
+      // mode defaults: if callback unsupported => polling forced
+      setIsPolling(true);
+      setPollingRateHz("1");
+
       setValidationError("");
       lastValidatedRef.current = ""; // force a fresh validate on type change
     }, [exampleConfigMap]);
@@ -263,6 +311,10 @@ export default function ConnectionModal({
         return;
       }
 
+      // Determine runtime mode + hz
+      const effectiveIsPolling = supportsCallback ? isPolling : true;
+      const hzInt = Math.max(1, parseInt((pollingRateHz || "1").trim(), 10) || 1);
+
       if (initialData.id) {
         // EDIT
         const updated = {
@@ -288,7 +340,9 @@ export default function ConnectionModal({
         id,
         connectionType,
         configuration,
-        streamerConfig
+        streamerConfig,
+        effectiveIsPolling,
+        hzInt
       );
 
       const saved = {
@@ -296,6 +350,8 @@ export default function ConnectionModal({
         adapter: connectionType,
         adapterConfig: configuration,
         streamerConfig: streamerConfig,
+        isPolling: effectiveIsPolling,
+        pollingRateHz: hzInt,
         savedAt: new Date().toISOString(),
       };
 
@@ -303,18 +359,19 @@ export default function ConnectionModal({
       onSave(saved);
       onClose();
     } catch (e) {
+      console.error(e);
     } finally {
       setStep("");
       setIsSubmitting(false);
     }
-  }, [isSubmitting, validateConfiguration, configuration, connectionType, streamerConfig, initialData, onSave, onClose]);
+  }, [isSubmitting, validateConfiguration, configuration, connectionType, streamerConfig, initialData, onSave, onClose, supportsCallback, isPolling, pollingRateHz]);
 
   const canSave = Boolean(
     connectionType &&
-    configuration.trim() &&
-    streamerConfig.trim() &&
-    !validationError &&
-    !isValidating
+      configuration.trim() &&
+      streamerConfig.trim() &&
+      !validationError &&
+      !isValidating
   );
   const helpData = configHelpMap[connectionType];
   const isEditMode = Boolean(initialData.id);
@@ -334,6 +391,16 @@ export default function ConnectionModal({
     setConnectionType(initialData.adapter || "");
     setConfiguration(initialData.adapterConfig || "");
     setStreamerConfig(initialData.streamerConfig || makeDefaultStreamerConfig());
+
+    // Restore runtime preferences if present, else default
+    const initIsPolling =
+      typeof initialData.isPolling === "boolean" ? initialData.isPolling : true;
+    const initHz =
+      initialData.pollingRateHz != null ? String(initialData.pollingRateHz) : "1";
+
+    setIsPolling(initIsPolling);
+    setPollingRateHz(initHz);
+
     setIsEditingStreamer(false);
     setStep("");
     setValidationError("");
@@ -475,6 +542,55 @@ export default function ConnectionModal({
             {isEditingStreamer ? "Done Editing" : "Edit Broker"}
           </button> */}
         </div>
+        
+        {/* Update Mode: Polling vs Callback (toggle slider) */}
+<div className="form-group">
+  <label>Streaming Mode:</label>
+
+  <div className="mode-toggle-row">
+    <div className="mode-toggle-label">
+      <span className="mode-pill">{isPolling ? "Polling" : "Callback"}</span>
+    </div>
+
+    <label className={`toggle ${(!supportsCallback || isSubmitting) ? "toggle--disabled" : ""}`}>
+      {/* checked=true means Callback */}
+      <input
+        type="checkbox"
+        checked={!isPolling}
+        disabled={!supportsCallback || isSubmitting}
+        onChange={(e) => {
+          const callbackSelected = e.target.checked;
+          setIsPolling(!callbackSelected);
+        }}
+      />
+      <span className="toggle__slider" />
+    </label>
+  </div>
+
+  {!supportsCallback && (
+    <div className="help-text" style={{ marginTop: 6 }}>
+      This adapter does not support callbacks. Polling is required.
+    </div>
+  )}
+</div>
+
+{/* Polling rate only matters in polling mode */}
+{isPolling && (
+  <div className="form-group">
+    <label htmlFor="polling-hz">Polling Rate (Hz):</label>
+    <input
+      id="polling-hz"
+      type="number"
+      min="1"
+      step="1"
+      className="form-input"
+      value={pollingRateHz}
+      disabled={isSubmitting}
+      onChange={(e) => setPollingRateHz(e.target.value)}
+    />
+  </div>
+)}
+
 
         {isValidating && (
           <div className="info-message">Validating configuration...</div>

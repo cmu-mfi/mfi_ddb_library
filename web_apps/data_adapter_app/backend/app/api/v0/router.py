@@ -88,6 +88,7 @@ async def list_adapters() -> List[Dict]:
                 "configExample": {"configuration": example_yaml, "raw": config_example},
                 "recommendedTopicFamily": recommended_topic_family,
                 "configSchema": adapter_cls.SCHEMA.model_json_schema(),
+                "selfUpdate": getattr(adapter_cls, "SELF_UPDATE", False),
             }
         )
 
@@ -226,6 +227,19 @@ async def connect_endpoint(
     else:
         adapter_cfg = utils.load_config(adapter_file, adapter_text)
         streamer_cfg = utils.load_config(streamer_file, streamer_text)
+        
+        if is_polling:
+            try:
+                polling_rate_hz = int(polling_rate_hz)
+            except Exception:
+                polling_rate_hz = 1
+            if polling_rate_hz <= 0:
+                polling_rate_hz = 1
+        else:
+            # Callback mode: hz irrelevant; keep safe placeholder
+            polling_rate_hz = 1
+        
+        
         connection = AdapterFactory(
             adp_name=adapter_name,
             adp_cfg=adapter_cfg,

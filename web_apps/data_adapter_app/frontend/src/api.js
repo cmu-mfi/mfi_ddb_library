@@ -61,21 +61,25 @@ export async function connectConnection(
   connectionId,
   adapter_name,
   adapter_cfg,
-  streamer_cfg) {
-
+  streamer_cfg,
+  is_polling,
+  polling_rate_hz
+) {
   const form = new FormData();
   form.append("adapter_name", adapter_name);
   form.append("adapter_text", adapter_cfg);
   form.append("streamer_text", streamer_cfg);
+  form.append("is_polling", String(is_polling));
+  form.append("polling_rate_hz", String(polling_rate_hz));
 
   console.log(
-    `DEBUG: Calling connection endpoint ${API_BASE_URL}/config/connect/${connectionId}`
+    `DEBUG: Calling connection endpoint ${API_BASE_URL}/connections/connect/${connectionId}`
   );
   const response = await fetch(
     `${API_BASE_URL}/connections/connect/${connectionId}`, {
-    method: "POST",
-    body: form,
-  });
+      method: "POST",
+      body: form,
+    });
 
   return response;
 }
@@ -85,14 +89,14 @@ export async function disconnectConnection(connectionId) {
   try {
     response = await fetch(
       `${API_BASE_URL}/connections/disconnect/${connectionId}`, {
-      method: "POST",
-    });
+        method: "POST",
+      });
   } catch (error) {
     console.error(`Failed to disconnect ${connectionId} on backend:`, error);
     return false;
   }
   console.log(`DEBUG: Connection ${connectionId} disconnected successfully`);
-  
+
   if (response.status === 404) {
     console.error(`Connection ${connectionId} not found on backend.`);
     return true;
@@ -117,7 +121,7 @@ export async function fetchStreamingStatus(connectionId) {
   } catch (error) {
     throw new Error(`Failed to fetch streaming status for ${connectionId}: ${error.message}`);
   }
-
+  
 }
 
 export async function fetchAdapters() {
@@ -132,15 +136,15 @@ export async function fetchAdapters() {
 }
 
 export async function validateAdapterConfig(adapter_name, adapter_cfg) {
-  
+
   try {
     const adp_form = new FormData();
     adp_form.append("adapter_name", adapter_name);
     adp_form.append("text", adapter_cfg);
     const adp_resp = await fetch(`${API_BASE_URL}/connections/validate/adapter`, {
-      method: "POST",
-      body: adp_form,
-    });
+        method: "POST",
+        body: adp_form,
+      });
     const adp_data = await adp_resp.json();
     return adp_data.is_valid;
   } catch (error) {
@@ -154,9 +158,9 @@ export async function validateStreamerConfig(streamer_cfg) {
     const streamer_form = new FormData();
     streamer_form.append("text", streamer_cfg);
     const streamer_resp = await fetch(`${API_BASE_URL}/connections/validate/streamer`, {
-      method: "POST",
-      body: streamer_form
-    });
+        method: "POST",
+        body: streamer_form
+      });
     const streamer_data = await streamer_resp.json();
     return streamer_data.is_valid;
   } catch (error) {
