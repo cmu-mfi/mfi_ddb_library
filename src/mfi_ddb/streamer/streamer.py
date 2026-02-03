@@ -168,6 +168,16 @@ class Streamer(Observer):
     
     def poll_and_stream_data(self, polling_rate_hz: int = 1):
         
+        try:
+            polling_rate_hz = int(polling_rate_hz)
+        except Exception:
+            print(f"WARNING: Invalid polling rate = {polling_rate_hz}. Using 1Hz.")
+            polling_rate_hz = 1
+        
+        if polling_rate_hz <= 0:
+            print(f"WARNING: Invalid polling rate = {polling_rate_hz}. Using 1Hz.")
+            polling_rate_hz = 1
+        
         while (time.time() - self.__last_poll_update) < 1/polling_rate_hz:
             time.sleep(0.1)            
         
