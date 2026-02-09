@@ -82,6 +82,7 @@ class Streamer(Observer):
         # 1. initialize the data adapter and respective topic family client
         # `````````````````````````````````````````````````````````````````````````
         self.cfg = copy.deepcopy(config)
+        self.__cfg = copy.deepcopy(config) # Private copy for internal use in reset_stream.
                 
         if "topic_family" not in config:
             topic_family_name = data_adp.RECOMMENDED_TOPIC_FAMILY
