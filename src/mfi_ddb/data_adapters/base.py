@@ -21,7 +21,7 @@ class BaseDataAdapter:
         """
         pass
 
-    def __init__(self, config: dict = None) -> None:
+    def __init__(self, config: dict = {}) -> None:
         self.component_ids = []
         # component_ids is a list of identifiers for the components that are part of the data object.
         # e.g.: self.component_ids = ["robot-arm-1", "machine-a"]
@@ -52,6 +52,10 @@ class BaseDataAdapter:
         
         self.cfg = config
         # cfg is a dictionary that contains the configuration of the data object.
+        # Note on trial_id:
+        #   * cfg needs to have a key `trial_id` that will be the default trial_id for the data object.
+        #   * if the config file doesn't have a key `trial_id`, use the data adapter class constructor to set it.
+        #   * default trial_id will be None if not set.
 
         self._observers = []  # List of observers (listeners)
 
@@ -64,7 +68,7 @@ class BaseDataAdapter:
         self._cb_data.clear()
         self.last_updated.clear()
         self.attributes.clear()
-        self.cfg = None
+        self.cfg = {}
         self._observers.clear()
 
     @property
