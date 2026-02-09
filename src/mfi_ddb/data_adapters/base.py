@@ -8,10 +8,10 @@ class BaseDataAdapter:
     Base class for data adapters. Use as a super class for the data adapters that will be used in the PullStreamToMqtt(Spb) and PushStreamToMqtt(Spb) classes.
     """
 
-    NAME = None
-    CONFIG_EXAMPLE = None
-    CONFIG_HELP = None
-    RECOMMENDED_TOPIC_FAMILY = None
+    NAME = "Base"
+    CONFIG_EXAMPLE = {}
+    CONFIG_HELP = {}
+    RECOMMENDED_TOPIC_FAMILY = ""
     SELF_UPDATE = False  # If True, the data adapter will update the data by itself in a separate thread.
 
     class SCHEMA(BaseModel):

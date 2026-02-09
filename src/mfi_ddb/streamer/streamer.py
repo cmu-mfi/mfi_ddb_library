@@ -29,15 +29,17 @@ TOPIC_CLIENTS = {
 class _SCHEMA:
     class _MQTT(BaseModel):
         broker_address: str = Field(..., description="Address of the MQTT broker")
-        broker_port: Optional[int] = Field(1883, description="Port of the MQTT broker (default: 1883)")
-        username: Optional[str] = Field(..., description="Username for MQTT broker authentication")
-        password: Optional[str] = Field(..., description="Password for MQTT broker authentication")
-        tls_enabled: Optional[bool] = Field(False, description="Enable TLS for MQTT connection (default: False)")
-        debug: Optional[bool] = Field(False, description="Enable debug mode for MQTT client (default: False)")
-        timeout: Optional[int] = Field(5, description="Timeout in seconds for connecting to the MQTT broker (default: 5)")    
+        broker_port: int = Field(1883, description="Port of the MQTT broker (default: 1883)")
+        username: str = Field("", description="Username for MQTT broker authentication")
+        password: str = Field("", description="Password for MQTT broker authentication")
+        tls_enabled: bool = Field(False, description="Enable TLS for MQTT connection (default: False)")
+        debug: bool = Field(False, description="Enable debug mode for MQTT client (default: False)")
+        timeout: int = Field(5, description="Timeout in seconds for connecting to the MQTT broker (default: 5)")    
+        enterprise: str = Field(..., description="Enterprise name for MQTT connection")
+        site: str = Field("", description="Site name for MQTT connection")
     
     class SCHEMA(BaseModel):
-        topic_family: str = Field(..., description="Topic family to use (e.g., 'historian', 'kv', 'blob')")
+        topic_family: str = Field("", description="Topic family to use (e.g., 'historian', 'kv', 'blob')")
         mqtt: "_MQTT" = Field(..., description="MQTT configuration parameters")
 
 class Streamer(Observer):
@@ -80,19 +82,15 @@ class Streamer(Observer):
         # 1. initialize the data adapter and respective topic family client
         # `````````````````````````````````````````````````````````````````````````
         self.cfg = copy.deepcopy(config)
-        self.__cfg = copy.deepcopy(config) # Private copy for internal use in reset_stream.
-        topic_family_name = None
-        
-        #Set Topic family from config if available, else if not set as NOT_PROVIDED
-        topic_family_name = config['topic_family'] if 'topic_family' in config.keys() else "__NOT_PROVIDED__"
-
-        if topic_family_name == "__NOT_PROVIDED__":
-            print("WARNING: topic_family not in config. Using default:", data_adp.RECOMMENDED_TOPIC_FAMILY)
+                
+        if "topic_family" not in config:
             topic_family_name = data_adp.RECOMMENDED_TOPIC_FAMILY
-        elif topic_family_name not in TOPIC_CLIENTS:
-            print("WARNING: Invalid topic_family:", topic_family_name," using default:", data_adp.RECOMMENDED_TOPIC_FAMILY)
+        elif config['topic_family'] not in TOPIC_CLIENTS:
+            print(f"WARNING: Topic family '{config['topic_family']}' not recognized. Using recommended topic family '{data_adp.RECOMMENDED_TOPIC_FAMILY}' instead.")
             topic_family_name = data_adp.RECOMMENDED_TOPIC_FAMILY
-        
+        else:
+            topic_family_name = config['topic_family']
+            
         topic_family = globals()[TOPIC_CLIENTS[topic_family_name][1]]()
         self.__client = globals()[TOPIC_CLIENTS[topic_family_name][0]](self.cfg, topic_family)
         self.__data_adp = data_adp        
@@ -138,6 +136,16 @@ class Streamer(Observer):
         self.__init__(config, data_adp)
     
     def poll_and_stream_data(self, polling_rate_hz: int = 1):
+        
+        try:
+            polling_rate_hz = int(polling_rate_hz)
+        except Exception:
+            print(f"WARNING: Invalid polling rate = {polling_rate_hz}. Using 1Hz.")
+            polling_rate_hz = 1
+        
+        if polling_rate_hz <= 0:
+            print(f"WARNING: Invalid polling rate = {polling_rate_hz}. Using 1Hz.")
+            polling_rate_hz = 1
         
         while (time.time() - self.__last_poll_update) < 1/polling_rate_hz:
             time.sleep(0.1)            
