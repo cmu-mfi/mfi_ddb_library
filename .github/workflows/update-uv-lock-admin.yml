@@ -1,9 +1,6 @@
-name: Update uv.lock
+name: Update uv.lock (main branch)
 
 on:
-  pull_request:
-    paths:
-      - 'pyproject.toml'
   workflow_dispatch:
   
 
@@ -17,7 +14,7 @@ jobs:
       - name: 1. checkout repository
         uses: actions/checkout@v5
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.SHOBHITAGG_PAT }}
           ref: ${{ github.head_ref || github.ref_name }}        
 
       - name: 2. Install uv
