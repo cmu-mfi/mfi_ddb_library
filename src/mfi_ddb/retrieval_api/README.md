@@ -37,7 +37,7 @@ flowchart BT
     F --> User
 
     classDef highlight fill:#094d57
-    class ModuleY highlight    
+    class ModuleY highlight;    
 ```
 
 > [!Note]
