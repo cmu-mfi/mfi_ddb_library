@@ -71,9 +71,13 @@ The following database nodes are currently compatible with the MFI-DDB framework
 Each database node has specific requirements and specifications for its components. Below are the general specifications for each component.
 
 ### Database Web Service (DWS)
-Each database node exposes a gRPC web service for data retrieval.
+Each database node exposes a [gRPC](https://grpc.io/docs/what-is-grpc/core-concepts/) web service for data retrieval. The following services are made available:
 
-TODO
+| Method | Type | Description | Use Case |
+| :--- | :--- | :--- | :--- |
+| **`GetDataPoint`** | Unary | Retrieves a **single** datapoint for a specific topic at an exact timestamp. | Auditing specific events or checking system state at a past moment. |
+| **`GetDataRange`** | Unary | Retrieves a list of datapoints between a `start_time` and `end_time`. Supports **pagination** via tokens. | Generating historical charts, trend analysis, or bulk data export. |
+| **`StreamData`** | Server Stream | Opens a persistent connection. The server pushes new datapoints to the client in **real-time** as they occur. | Live dashboards, active monitoring, and immediate alerting. |
 
 ### Connector Configuration
 Each database node requires specific configuration settings for the connector to interface with the MFI-DDB broker. The configuration parameters are as follows:

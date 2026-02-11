@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package dws.service;
+
+import "google/protobuf/timestamp.proto";
+import "models.proto";
+
+// The Data Retrieval Service definition
+service DataService {
+  
+  // 1. Single Datapoint: Topic + Timestamp -> Datapoint
+  rpc GetDataPoint(GetDataPointRequest) returns (GetDataPointResponse);
+
+  // 2. Range of Datapoints: Topic + Start + End -> List of Datapoints
+  rpc GetDataRange(GetDataRangeRequest) returns (GetDataRangeResponse);
+
+  // 3. Live Stream: Topic -> Stream of Datapoints
+  rpc StreamData(StreamDataRequest) returns (stream StreamDataResponse);
+}
+
+// --- Request/Response Definitions ---
+
+message GetDataPointRequest {
+  string topic = 1;
+  google.protobuf.Timestamp timestamp = 2;
+}
+
+message GetDataPointResponse {
+  dws.models.Datapoint datapoint = 1;
+}
+
+message GetDataRangeRequest {
+  string topic = 1;
+  google.protobuf.Timestamp start_time = 2;
+  google.protobuf.Timestamp end_time = 3;
+  
+  // Pagination for range requests to avoid memory overflow
+  // Reference: https://google.aip.dev/158
+  int32 page_size = 4;
+  string page_token = 5;
+}
+
+message GetDataRangeResponse {
+  repeated dws.models.Datapoint datapoints = 1;
+  
+  // Pagination token for the next set of results
+  // Reference: https://google.aip.dev/158
+  string next_page_token = 2;
+}
+
+message StreamDataRequest {
+  string topic = 1;
+  
+  // Optional: Start streaming from a specific point in the past?
+  // If nil, implies "start from now"
+  google.protobuf.Timestamp start_from = 2; 
+}
+
+message StreamDataResponse {
+  dws.models.Datapoint datapoint = 1;
+}
