@@ -83,3 +83,5 @@ Each database node exposes a [gRPC](https://grpc.io/docs/what-is-grpc/core-conce
 Each database node requires specific configuration settings for the connector to interface with the MFI-DDB broker. The configuration parameters are as follows:
 
 TODO
+
+> But not all database systems may necessarily use the same type of config input. Does that mean this configuration is essential for Retrieval API? Or does this govern conceptually the configuration one should need to setup a database node?
