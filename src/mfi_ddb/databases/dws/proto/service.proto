@@ -22,7 +22,8 @@ service DataService {
 
 message GetDataPointRequest {
   string topic = 1;
-  google.protobuf.Timestamp timestamp = 2;
+  string user_id = 2; 
+  google.protobuf.Timestamp timestamp = 3;
 }
 
 message GetDataPointResponse {
@@ -31,13 +32,14 @@ message GetDataPointResponse {
 
 message GetDataRangeRequest {
   string topic = 1;
-  google.protobuf.Timestamp start_time = 2;
-  google.protobuf.Timestamp end_time = 3;
+  string user_id = 2;
+  google.protobuf.Timestamp start_time = 3;
+  google.protobuf.Timestamp end_time = 4;
   
   // Pagination for range requests to avoid memory overflow
   // Reference: https://google.aip.dev/158
-  int32 page_size = 4;
-  string page_token = 5;
+  int32 page_size = 5;
+  string page_token = 6;
 }
 
 message GetDataRangeResponse {
@@ -50,10 +52,11 @@ message GetDataRangeResponse {
 
 message StreamDataRequest {
   string topic = 1;
+  string user_id = 2;
   
   // Optional: Start streaming from a specific point in the past?
   // If nil, implies "start from now"
-  google.protobuf.Timestamp start_from = 2; 
+  google.protobuf.Timestamp start_from = 3; 
 }
 
 message StreamDataResponse {
