@@ -7,15 +7,16 @@ import "google/protobuf/struct.proto";
 
 message Datapoint {
   string topic = 1;
-  google.protobuf.Timestamp timestamp = 2;
+  string user_id = 2;
+  google.protobuf.Timestamp timestamp = 3;
 
   oneof value {
-    int64 int_value = 3;
-    double float_value = 4;
-    string string_value = 5;
-    google.protobuf.Struct json_value = 6;
+    int64 int_value = 4;
+    double float_value = 5;
+    string string_value = 6;
+    google.protobuf.Struct json_value = 7;
         
-    bytes file_value = 7;
+    bytes file_value = 8;
   }
 }
 
