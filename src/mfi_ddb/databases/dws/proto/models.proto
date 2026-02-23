@@ -7,7 +7,8 @@ import "google/protobuf/struct.proto";
 
 message Datapoint {
   string topic = 1;
-  string user_id = 2;
+  // TODO: is the user_id necessary?? Discuss.
+  // string user_id = 2;
   google.protobuf.Timestamp timestamp = 3;
 
   oneof value {
@@ -20,16 +21,20 @@ message Datapoint {
   }
 }
 
-message ServiceError {
-  ErrorCode code = 1;
-  string message = 2;
-  string topic_context = 3; // return the topic that caused the error
-}
 
-enum ErrorCode {
-  ERROR_CODE_UNSPECIFIED = 0;
-  ERROR_CODE_TOPIC_NOT_FOUND = 1;
-  ERROR_CODE_INVALID_TIMESTAMP_RANGE = 2;
-  ERROR_CODE_DATA_CORRUPTION = 3;
-  ERROR_CODE_EMPTY_RESULT = 4;
-}
+// USE GRPC STATUS CODES INSTEAD OF BELOW
+// REF: https://grpc.github.io/grpc/core/md_doc_statuscodes.html
+
+// message ServiceStatus {
+//   StatusCode code = 1;
+//   optional string message = 2;
+//   optional string topic_context = 3; // return the topic that caused the error
+// }
+
+// enum StatusCode {
+//   SUCCESS = 0;
+//   ERROR_UNSPECIFIED = 1;
+//   ERROR_TOPIC_NOT_FOUND = 2;
+//   ERROR_EMPTY_RESULT = 3;
+//   ERROR_NOT_IMPLEMENTED = 4;
+// }
