@@ -22,8 +22,9 @@ service DataService {
 
 message GetDataPointRequest {
   string topic = 1;
-  string user_id = 2; 
-  google.protobuf.Timestamp timestamp = 3;
+  // TODO: is the user_id necessary?? Discuss.
+  // string user_id = 2; 
+  google.protobuf.Timestamp timestamp = 2;
 }
 
 message GetDataPointResponse {
@@ -32,14 +33,16 @@ message GetDataPointResponse {
 
 message GetDataRangeRequest {
   string topic = 1;
-  string user_id = 2;
-  google.protobuf.Timestamp start_time = 3;
-  google.protobuf.Timestamp end_time = 4;
+  // TODO: is the user_id necessary?? Discuss.
+  // string user_id = 2;
+  google.protobuf.Timestamp start_time = 2;
+  google.protobuf.Timestamp end_time = 3;
   
   // Pagination for range requests to avoid memory overflow
   // Reference: https://google.aip.dev/158
-  int32 page_size = 5;
-  string page_token = 6;
+  // Assuming a default page size of 1000 if not specified, but allowing clients to set it as needed.
+  int32 page_size = 4 [default = 1000];
+  string page_token = 5;
 }
 
 message GetDataRangeResponse {
@@ -52,11 +55,12 @@ message GetDataRangeResponse {
 
 message StreamDataRequest {
   string topic = 1;
-  string user_id = 2;
+  // TODO: is the user_id necessary?? Discuss.
+  // string user_id = 2;
   
   // Optional: Start streaming from a specific point in the past?
   // If nil, implies "start from now"
-  google.protobuf.Timestamp start_from = 3; 
+  google.protobuf.Timestamp start_from = 2; 
 }
 
 message StreamDataResponse {
