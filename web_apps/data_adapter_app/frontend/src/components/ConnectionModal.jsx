@@ -543,29 +543,41 @@ export default function ConnectionModal({
           </button> */}
         </div>
         
-        {/* Update Mode: Polling vs Callback (toggle slider) */}
 <div className="form-group">
   <label>Streaming Mode:</label>
 
-  <div className="mode-toggle-row">
-    <div className="mode-toggle-label">
-      <span className="mode-pill">{isPolling ? "Polling" : "Callback"}</span>
-    </div>
+  <div className={`mode-segmented ${isSubmitting ? "mode-segmented--disabled" : ""}`}>
+    <span
+      className="mode-segmented__indicator"
+      style={{ transform: `translateX(${isPolling ? "0%" : "100%"})` }}
+    />
 
-    <label className={`toggle ${(!supportsCallback || isSubmitting) ? "toggle--disabled" : ""}`}>
-      {/* checked=true means Callback */}
-      <input
-        type="checkbox"
-        checked={!isPolling}
-        disabled={!supportsCallback || isSubmitting}
-        onChange={(e) => {
-          const callbackSelected = e.target.checked;
-          setIsPolling(!callbackSelected);
-        }}
-      />
-      <span className="toggle__slider" />
-    </label>
+    <button
+      type="button"
+      className={`mode-segmented__btn ${isPolling ? "is-active" : ""}`}
+      disabled={isSubmitting}
+      onClick={() => setIsPolling(true)}
+    >
+      Polling
+    </button>
+
+    <button
+      type="button"
+      className={`mode-segmented__btn ${!isPolling ? "is-active" : ""}`}
+      disabled={!supportsCallback || isSubmitting}
+      onClick={() => setIsPolling(false)}
+      title={!supportsCallback ? "Callback not supported" : undefined}
+    >
+      Callback
+    </button>
   </div>
+
+  {!supportsCallback && (
+    <div className="help-text" style={{ marginTop: 6 }}>
+      This adapter does not support callbacks. Polling is required.
+    </div>
+  )}
+</div>
 
   {!supportsCallback && (
     <div className="help-text" style={{ marginTop: 6 }}>
