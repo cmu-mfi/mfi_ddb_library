@@ -579,13 +579,6 @@ export default function ConnectionModal({
   )}
 </div>
 
-  {!supportsCallback && (
-    <div className="help-text" style={{ marginTop: 6 }}>
-      This adapter does not support callbacks. Polling is required.
-    </div>
-  )}
-</div>
-
 {/* Polling rate only matters in polling mode */}
 {isPolling && (
   <div className="form-group">
@@ -602,6 +595,7 @@ export default function ConnectionModal({
     />
   </div>
 )}
+
 
 
         {isValidating && (
