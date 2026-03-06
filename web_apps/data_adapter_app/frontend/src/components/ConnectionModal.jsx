@@ -9,7 +9,8 @@ import Modal from "./Modal";
 import { ConnectionManager } from "./ConnectionManager";
 import { makeDefaultStreamerConfig } from "../data/defaults";
 import { getConnCtr, setConnCtr } from "../state/conn_ctr";
-import { connectConnection, disconnectConnection, fetchAdapters } from "../api";
+import {connectConnection, disconnectConnection, fetchAdapters, fetchStreamingStatus,} from "../api";
+// import { connectConnection, disconnectConnection, fetchAdapters } from "../api";
 import { validateAdapterConfig, validateStreamerConfig } from "../api";
 /** -------------------------------
  *  YAML helpers (top-level scalars)
@@ -260,6 +261,39 @@ export default function ConnectionModal({
     onClose();
   }, [isSubmitting, activeConnectionId, onClose]);
 
+  const waitForStreamingStatus = useCallback(
+    async (connectionId, maxAttempts = 10, delayMs = 300) => {
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const status = await fetchStreamingStatus(connectionId);
+          console.log(
+            `Streaming status ready for ${connectionId} on attempt ${attempt}:`,
+            status
+          );
+          return status;
+        } catch (error) {
+          const message = error?.message || "";
+          const is404 =
+            error?.status === 404 ||
+            message.includes("status: 404") ||
+            message.includes("404 Not Found");
+
+          if (!is404) {
+            throw error;
+          }
+
+          if (attempt === maxAttempts) {
+            throw new Error(
+              `Streaming status not ready for connection ${connectionId} after ${maxAttempts} attempts`
+            );
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+      }
+    },
+    []
+  );
   const validateYAMLFormats = useCallback(
     (yaml) => (yaml.trim() ? [] : ["Configuration cannot be empty"]),
     []);
@@ -299,7 +333,73 @@ export default function ConnectionModal({
     }
   }, [connectionType, configuration, streamerConfig, validateYAMLFormats]);
 
-  const handleSave = useCallback(async () => {
+  // const handleSave = useCallback(async () => {
+  //   if (isSubmitting) return;
+  //   setIsSubmitting(true);
+  //   setValidationError("");
+
+  //   try {
+  //     const validation = await validateConfiguration();
+  //     if (!validation?.valid) {
+  //       setIsSubmitting(false);
+  //       return;
+  //     }
+
+  //     // Determine runtime mode + hz
+  //     const effectiveIsPolling = supportsCallback ? isPolling : true;
+  //     const hzInt = Math.max(1, parseInt((pollingRateHz || "1").trim(), 10) || 1);
+
+  //     if (initialData.id) {
+  //       // EDIT
+  //       const updated = {
+  //         ...initialData,
+  //         adapter: connectionType,
+  //         adapterConfig: configuration,
+  //         streamerConfig: streamerConfig,
+  //         updatedAt: new Date().toISOString(),
+  //       };
+  //       ConnectionManager.saveConnection(initialData.id, updated);
+  //       onSave(updated);
+  //       onClose();
+  //       return;
+  //     }
+
+  //     // NEW
+  //     const id = getConnCtr() + 1;
+  //     setConnCtr(id);
+  //     setActiveConnectionId(id);
+  //     setStep("Connecting to adapter...");
+
+  //     await connectConnection(
+  //       id,
+  //       connectionType,
+  //       configuration,
+  //       streamerConfig,
+  //       effectiveIsPolling,
+  //       hzInt
+  //     );
+
+  //     const saved = {
+  //       id,
+  //       adapter: connectionType,
+  //       adapterConfig: configuration,
+  //       streamerConfig: streamerConfig,
+  //       isPolling: effectiveIsPolling,
+  //       pollingRateHz: hzInt,
+  //       savedAt: new Date().toISOString(),
+  //     };
+
+  //     ConnectionManager.saveConnection(id, saved);
+  //     onSave(saved);
+  //     onClose();
+  //   } catch (e) {
+  //     console.error(e);
+  //   } finally {
+  //     setStep("");
+  //     setIsSubmitting(false);
+  //   }
+  // }, [isSubmitting, validateConfiguration, configuration, connectionType, streamerConfig, initialData, onSave, onClose, supportsCallback, isPolling, pollingRateHz]);
+    const handleSave = useCallback(async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     setValidationError("");
@@ -322,6 +422,8 @@ export default function ConnectionModal({
           adapter: connectionType,
           adapterConfig: configuration,
           streamerConfig: streamerConfig,
+          isPolling: effectiveIsPolling,
+          pollingRateHz: hzInt,
           updatedAt: new Date().toISOString(),
         };
         ConnectionManager.saveConnection(initialData.id, updated);
@@ -336,7 +438,7 @@ export default function ConnectionModal({
       setActiveConnectionId(id);
       setStep("Connecting to adapter...");
 
-      await connectConnection(
+      const connectResponse = await connectConnection(
         id,
         connectionType,
         configuration,
@@ -345,6 +447,12 @@ export default function ConnectionModal({
         hzInt
       );
 
+      console.log(`Connect response for ${id}:`, connectResponse);
+
+      setStep("Waiting for backend status...");
+
+      const initialStatus = await waitForStreamingStatus(id);
+
       const saved = {
         id,
         adapter: connectionType,
@@ -352,6 +460,7 @@ export default function ConnectionModal({
         streamerConfig: streamerConfig,
         isPolling: effectiveIsPolling,
         pollingRateHz: hzInt,
+        initialStatus,
         savedAt: new Date().toISOString(),
       };
 
@@ -359,13 +468,27 @@ export default function ConnectionModal({
       onSave(saved);
       onClose();
     } catch (e) {
-      console.error(e);
+      console.error("Error creating connection:", e);
+      setValidationError(e?.message || "Failed to create connection");
     } finally {
       setStep("");
       setIsSubmitting(false);
     }
-  }, [isSubmitting, validateConfiguration, configuration, connectionType, streamerConfig, initialData, onSave, onClose, supportsCallback, isPolling, pollingRateHz]);
-
+  }, [
+    isSubmitting,
+    validateConfiguration,
+    configuration,
+    connectionType,
+    streamerConfig,
+    initialData,
+    onSave,
+    onClose,
+    supportsCallback,
+    isPolling,
+    pollingRateHz,
+    waitForStreamingStatus,
+  ]);
+  
   const canSave = Boolean(
     connectionType &&
       configuration.trim() &&
