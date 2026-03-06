@@ -10,42 +10,7 @@ import { ConnectionManager } from "./ConnectionManager";
 import { makeDefaultStreamerConfig } from "../data/defaults";
 import { getConnCtr, setConnCtr } from "../state/conn_ctr";
 import {connectConnection, disconnectConnection, fetchAdapters, fetchStreamingStatus,} from "../api";
-// import { connectConnection, disconnectConnection, fetchAdapters } from "../api";
 import { validateAdapterConfig, validateStreamerConfig } from "../api";
-/** -------------------------------
- *  YAML helpers (top-level scalars)
- *  ------------------------------- */
-const upsertYamlKey = (yaml, key, value) => {
-  const lines = (yaml || "").split("\n");
-  const re = new RegExp(`^\\s*${key}\\s*:\\s*.*$`);
-  const idx = lines.findIndex((l) => re.test(l));
-  const newLine = `${key}: ${value}`;
-
-  if (idx >= 0) {
-    lines[idx] = newLine;
-    return lines.join("\n");
-  }
-
-  const trimmed = (yaml || "").trimEnd();
-  return trimmed ? `${trimmed}\n${newLine}\n` : `${newLine}\n`;
-};
-
-const readYamlScalar = (yaml, key) => {
-  const re = new RegExp(`^\\s*${key}\\s*:\\s*(.+)\\s*$`, "m");
-  const m = (yaml || "").match(re);
-  return m?.[1]?.trim() ?? null;
-};
-
-/**
- * Ensure streamer YAML has reasonable defaults (streamer-only).
- * NOTE: Polling/callback mode is NOT stored in streamer YAML anymore.
- */
-const ensureStreamerDefaults = (yaml) => {
-  let next = yaml || "";
-  // Keep this function for streamer-only defaults you actually want.
-  // Example: ensure polling_rate_hz is NOT here anymore.
-  return next;
-};
 
 const generateNestedHelpText = (helpData, indentLevel = 0) => {
   if (!helpData || typeof helpData !== "string") return null;
