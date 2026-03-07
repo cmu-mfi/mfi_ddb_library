@@ -1,0 +1,9 @@
+[project]
+name = "metadata-store-pg"
+version = "0.1.0"
+description = "A PostgreSQL implementation of the Metadata Store for the Retrieval API."
+readme = "README.md"
+requires-python = ">=3.8, <3.13"
+dependencies = [
+    "psycopg2>=2.9.10",
+]
