@@ -3,10 +3,10 @@ from pg_config import load_config
 
 def check_tables():
     tables = [
-        "user_detail",
-        "project_detail",
+        "user",
+        "project",
         "user_project_role_linking",
-        "trial_detail",
+        "trial",
         "graph_edges"
     ]
     
