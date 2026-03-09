@@ -22,3 +22,8 @@ class KeyValueTopicFamily(BaseTopicFamily):
         else:
             data = json.dumps(data)
             return data        
+        
+    @staticmethod
+    def process_message(message):
+        # TODO: ...
+        ...
