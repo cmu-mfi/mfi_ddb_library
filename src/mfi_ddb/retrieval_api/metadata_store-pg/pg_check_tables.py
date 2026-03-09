@@ -1,5 +1,5 @@
 import psycopg2
-from config import load_config
+from pg_config import load_config
 
 def check_tables():
     tables = [
