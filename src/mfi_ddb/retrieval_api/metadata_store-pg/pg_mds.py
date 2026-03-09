@@ -49,6 +49,11 @@ class MdsConnector:
                 f"Error occurred while creating connection pool: {error}. \n Config used: {config}"
             )
             raise error
+        
+    def __del__(self):
+        if self.__conn_pool:
+            self.__conn_pool.closeall()
+            logger.info("Database connection pool closed")
 
     def _validate_table(self, table: str):
         if table not in _ALLOWED_TABLES:
