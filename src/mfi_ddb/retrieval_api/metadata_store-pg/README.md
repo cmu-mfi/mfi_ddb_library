@@ -2,7 +2,7 @@
 
 ```mermaid
 erDiagram
-    USER_DETAIL {
+    USER {
         VARCHAR(50) user_id PK
         VARCHAR(50) domain PK
         VARCHAR(50) created_by_user_id FK
@@ -13,7 +13,7 @@ erDiagram
         TIMESTAMPTZ updated_at
     }
 
-    PROJECT_DETAIL {
+    PROJECT {
         UUID project_id PK
         VARCHAR(50) name
         TIMESTAMPTZ created_at
@@ -33,7 +33,7 @@ erDiagram
         TIMESTAMPTZ updated_at
     }
 
-    TRIAL_DETAIL {
+    TRIAL {
         UUID id PK
         VARCHAR(255) trial_name
         VARCHAR(50) user_id FK
@@ -55,13 +55,13 @@ erDiagram
     }
 
     %% Relationships
-    %% USER_DETAIL ||--o{ USER_DETAIL : "created_by (self-referencing)"
-    USER_DETAIL ||--o{ PROJECT_DETAIL : "creates"
-    USER_DETAIL ||--o{ USER_PROJECT_ROLE_LINKING : "has_role_in"
-    PROJECT_DETAIL ||--o{ USER_PROJECT_ROLE_LINKING : "assigned_to"
-    USER_DETAIL ||--o{ TRIAL_DETAIL : "runs"
-    PROJECT_DETAIL ||--o{ TRIAL_DETAIL : "contains"
-    TRIAL_DETAIL ||--o{ GRAPH_EDGES : "is_source_for"
+    %% USER ||--o{ USER : "created_by (self-referencing)"
+    USER ||--o{ PROJECT : "creates"
+    USER ||--o{ USER_PROJECT_ROLE_LINKING : "has_role_in"
+    PROJECT ||--o{ USER_PROJECT_ROLE_LINKING : "assigned_to"
+    USER ||--o{ TRIAL : "runs"
+    PROJECT ||--o{ TRIAL : "contains"
+    TRIAL ||--o{ GRAPH_EDGES : "is_source_for"
 ```
 
 We use psycopg2 in our python code to interact with PostgreSQL. [Tutorial reference](https://neon.com/postgresql/postgresql-python/create-tables)
