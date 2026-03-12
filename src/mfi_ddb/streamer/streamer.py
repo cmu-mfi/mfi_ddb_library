@@ -79,12 +79,15 @@ class Streamer(Observer):
         pass
         
     def __init__(self, config: dict, data_adp: BaseDataAdapter, stream_on_update:bool = False) -> None:
+        print("STREAMER INIT START")
+        print("Streamer config keys: %s", list(config.keys()) if isinstance(config, dict) else config)
         logger.debug("STREAMER INIT START")
         logger.debug("Streamer config keys: %s", list(config.keys()) if isinstance(config, dict) else config)
 
         super().__init__()
         
         logger.debug("Returned from Observer.__init__()")
+        print("Returned from Observer.__init__()")
         # 1. initialize the data adapter and respective topic family client
         # ```````````````````````````````````````````````````````````````````````
         self.cfg = copy.deepcopy(config)
@@ -92,6 +95,9 @@ class Streamer(Observer):
 
         logger.debug("Streamer config initialized")
         logger.debug("cfg keys: %s", list(self.cfg.keys()))
+        print("Streamer config initialized")
+        print("cfg keys: %s", list(self.cfg.keys()))
+        
 
         if "topic_family" not in config:
             topic_family_name = data_adp.RECOMMENDED_TOPIC_FAMILY
