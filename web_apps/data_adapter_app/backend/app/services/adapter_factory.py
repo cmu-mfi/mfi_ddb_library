@@ -99,11 +99,34 @@ class AdapterFactory:
             return
         print(f"ADAPTER_FACTORY configs validated successfully for adapter={self.adp_name}")
         self.logger.debug("ADAPTER_FACTORY configs validated successfully for adapter=%s", self.adp_name)
-        self.data_adapter = self.adp_class(self.adp_cfg)
+        # self.data_adapter = self.adp_class(self.adp_cfg)
         
-        self.streamer = self.streamer_class(
-            self.streamer_cfg, self.data_adapter, stream_on_update=not self.is_polling
-        )
+        # self.streamer = self.streamer_class(
+        #     self.streamer_cfg, self.data_adapter, stream_on_update=not self.is_polling
+        # )
+        try:
+            print("ADAPTER_FACTORY about to instantiate data adapter")
+            self.logger.debug("ADAPTER_FACTORY about to instantiate data adapter")
+            self.data_adapter = self.adp_class(self.adp_cfg)
+            print("ADAPTER_FACTORY data adapter instantiated successfully")
+            self.logger.debug("ADAPTER_FACTORY data adapter instantiated successfully")
+        except Exception as e:
+            print(f"ADAPTER_FACTORY data adapter instantiation FAILED: {repr(e)}")
+            self.logger.exception("ADAPTER_FACTORY data adapter instantiation FAILED")
+            raise
+
+        try:
+            print("ADAPTER_FACTORY about to instantiate streamer")
+            self.logger.debug("ADAPTER_FACTORY about to instantiate streamer")
+            self.streamer = self.streamer_class(
+                self.streamer_cfg, self.data_adapter, stream_on_update=not self.is_polling
+            )
+            print("ADAPTER_FACTORY streamer instantiated successfully")
+            self.logger.debug("ADAPTER_FACTORY streamer instantiated successfully")
+        except Exception as e:
+            print(f"ADAPTER_FACTORY streamer instantiation FAILED: {repr(e)}")
+            self.logger.exception("ADAPTER_FACTORY streamer instantiation FAILED")
+            raise
         
         self.is_connected = True
         self.poll_streaming.set()
