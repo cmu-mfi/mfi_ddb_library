@@ -89,11 +89,16 @@ class AdapterFactory:
         return (self.validate_data_adapter_config() and self.validate_streamer_config())
 
     def connect_and_stream(self) -> None:
+        print(f"ADAPTER_FACTORY connect_and_stream START adapter={self.adp_name}")
+        self.logger.debug("ADAPTER_FACTORY connect_and_stream START adapter=%s", self.adp_name)
+        print(f"ADAPTER_FACTORY streamer_class={self.streamer_class}")
+        self.logger.debug("ADAPTER_FACTORY streamer_class=%s", self.streamer_class)
         if not self.validate_configs():
             self.logger.error("Configuration validation failed. Aborting connection.")
             print("ABORT ABORT ABORT")
             return
-
+        print(f"ADAPTER_FACTORY configs validated successfully for adapter={self.adp_name}")
+        self.logger.debug("ADAPTER_FACTORY configs validated successfully for adapter=%s", self.adp_name)
         self.data_adapter = self.adp_class(self.adp_cfg)
         
         self.streamer = self.streamer_class(
