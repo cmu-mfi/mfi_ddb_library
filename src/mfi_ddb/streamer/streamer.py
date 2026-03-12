@@ -5,6 +5,7 @@ import platform
 import socket
 import sys
 import time
+import logging
 from datetime import datetime
 from typing import Optional
 
@@ -19,6 +20,8 @@ from mfi_ddb.utils.script_utils import *
 from ._mqtt import Mqtt
 from ._mqtt_spb import MqttSpb
 from .observer import Observer
+
+logger = logging.getLogger(__name__)
 
 TOPIC_CLIENTS = {
     "historian": ("MqttSpb", "HistorianTopicFamily"),
@@ -76,14 +79,20 @@ class Streamer(Observer):
         pass
         
     def __init__(self, config: dict, data_adp: BaseDataAdapter, stream_on_update:bool = False) -> None:
+        logger.debug("STREAMER INIT START")
+        logger.debug("Streamer config keys: %s", list(config.keys()) if isinstance(config, dict) else config)
+
         super().__init__()
         
-        
+        logger.debug("Returned from Observer.__init__()")
         # 1. initialize the data adapter and respective topic family client
-        # `````````````````````````````````````````````````````````````````````````
+        # ```````````````````````````````````````````````````````````````````````
         self.cfg = copy.deepcopy(config)
         self.__cfg = copy.deepcopy(config) # Private copy for internal use in reset_stream.
-                
+
+        logger.debug("Streamer config initialized")
+        logger.debug("cfg keys: %s", list(self.cfg.keys()))
+
         if "topic_family" not in config:
             topic_family_name = data_adp.RECOMMENDED_TOPIC_FAMILY
         elif config['topic_family'] not in TOPIC_CLIENTS:
@@ -91,21 +100,32 @@ class Streamer(Observer):
             topic_family_name = data_adp.RECOMMENDED_TOPIC_FAMILY
         else:
             topic_family_name = config['topic_family']
+
+        logger.debug("Selected topic family: %s", topic_family_name)
             
         topic_family = globals()[TOPIC_CLIENTS[topic_family_name][1]]()
         self.__client = globals()[TOPIC_CLIENTS[topic_family_name][0]](self.cfg, topic_family)
+        
+        logger.debug("MQTT client created using topic family: %s", topic_family_name)
+        
         self.__data_adp = data_adp        
-
+        
+        logger.debug("Data adapter instance attached: %s", type(self.__data_adp).__name__)
+        
         self.__data_adp.get_data()
         print("WARNING: Waiting for birth data to be populated in the data adapter for all components...")
+        logger.debug("WARNING: Waiting for birth data to be populated in the data adapter for all components...")
         while any(not bool(value) for value in self.__data_adp.data.values()):
             time.sleep(0.1)
+            logger.debug("Waiting for adapter birth data...")
             self.__data_adp.get_data()
         
         self.__birth_data = copy.deepcopy(self.__data_adp.data)
         
         print("Birth data populated in the data adapter for all components.")
+        logger.debug("Birth data populated in the data adapter for all components.")
 
+        logger.debug("Calling __reset_stream()")
         self.__reset_stream()
         
         self.__last_poll_update = 0
@@ -115,7 +135,7 @@ class Streamer(Observer):
                 self.__data_adp.add_observer(self)
             else:
                 raise Exception("Data adapter does not support self update notifications.")
-
+        logger.debug("STREAMER INIT COMPLETE")
     def disconnect(self):
         try:
             self.__client.disconnect()
@@ -244,9 +264,15 @@ class Streamer(Observer):
     
     def __reset_stream(self):
         print("Resetting the stream with updated birth data...")
+        logger.debug("Resetting the stream with updated birth data...")
+        
+        if not hasattr(self, "_Streamer__cfg"):
+            logger.error("Streamer missing __cfg attribute! self.__dict__ = %s", self.__dict__)
+            raise RuntimeError("Streamer reset invoked before __cfg was initialized")
         # 1. reconnect existing clients
         # `````````````````````````````````````````````````````````````````````````
         self.__client.disconnect()
+        logger.debug("Connecting MQTT client for components: %s", self.__data_adp.component_ids)
         self.__client.connect(self.__data_adp.component_ids)
 
         # 2. initialize the key-value metadata and respective topic family client

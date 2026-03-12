@@ -403,7 +403,7 @@ export default function ConnectionModal({
       setActiveConnectionId(id);
       setStep("Connecting to adapter...");
 
-      const connectResponse = await connectConnection(
+            const connectResponse = await connectConnection(
         id,
         connectionType,
         configuration,
@@ -413,6 +413,15 @@ export default function ConnectionModal({
       );
 
       console.log(`Connect response for ${id}:`, connectResponse);
+
+      if (!connectResponse.ok) {
+        const errorText = await connectResponse.text();
+        throw new Error(
+          `Connect failed for ${id}: ${connectResponse.status} ${connectResponse.statusText}${
+            errorText ? ` - ${errorText}` : ""
+          }`
+        );
+      }
 
       setStep("Waiting for backend status...");
 

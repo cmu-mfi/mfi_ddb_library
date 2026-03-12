@@ -15,12 +15,18 @@ Key Features:
 
 import os
 import uvicorn
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 # Import configuration router and application lifespan manager
 from app.api.v0.router import router
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
 
 # FastAPI application instance with metadata and lifecycle management
 app = FastAPI(
