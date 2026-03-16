@@ -216,59 +216,24 @@ async def connect_endpoint(
     Raises:
         HTTPException: 502 if connection or streaming setup fails
     """
-    print(f"CONNECT ENDPOINT HIT PRINT conn_id={conn_id} adapter={adapter_name}")
-    logger.debug(
-        "CONNECT ENDPOINT HIT DEBUG conn_id=%s adapter=%s is_polling=%s polling_rate_hz=%s",
-        conn_id,
-        adapter_name,
-        is_polling,
-        polling_rate_hz,
-    )
 
     if conn_id in active_connections:
         connection = active_connections[conn_id]
-        logger.debug(
-            "Existing connection found for conn_id=%s adapter=%s connected=%s streaming=%s",
-            conn_id,
-            connection.adp_name,
-            connection.is_connected,
-            connection.is_streaming,
-        )
         if connection.adp_name != adapter_name:
             raise HTTPException(
                 status_code=400,
                 detail=f"Connection ID '{conn_id}' already exists with a different adapter '{connection.adp_name}'.",
             )
     else:
-        logger.debug("Loading adapter and streamer configs for conn_id=%s", conn_id)
         adapter_cfg = utils.load_config(adapter_file, adapter_text)
         streamer_cfg = utils.load_config(streamer_file, streamer_text)
         
-        print(f"ADAPTER CFG LOADED FOR {conn_id}: {adapter_cfg}")
-        print(f"STREAMER CFG LOADED FOR {conn_id}: {streamer_cfg}")
-
-        logger.debug("Adapter config keys for conn_id=%s: %s", conn_id, list(adapter_cfg.keys()) if isinstance(adapter_cfg, dict) else adapter_cfg)
-        logger.debug("Streamer config keys for conn_id=%s: %s", conn_id, list(streamer_cfg.keys()) if isinstance(streamer_cfg, dict) else streamer_cfg)
-
-
         connection = AdapterFactory(
             adp_name=adapter_name,
             adp_cfg=adapter_cfg,
             streamer_cfg=streamer_cfg,
             is_polling=is_polling,
             polling_rate_hz=polling_rate_hz,
-        )
-
-        print(f"ADAPTER FACTORY CREATED FOR {conn_id}: {connection}")
-        print(f"STREAMER CLASS FOR {conn_id}: {connection.streamer_class}")
-        print(f"STREAMER MODULE FOR {conn_id}: {connection.streamer_class.__module__}")
-
-        logger.debug("AdapterFactory created for conn_id=%s", conn_id)
-        logger.debug(
-            "Streamer class for conn_id=%s: %s (module=%s)",
-            conn_id,
-            connection.streamer_class,
-            connection.streamer_class.__module__,
         )
 
     if not connection.is_connected:
