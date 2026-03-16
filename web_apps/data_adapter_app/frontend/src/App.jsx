@@ -97,16 +97,6 @@ function App() {
       console.log(`Target state: ${targetState} (source: ${savedState?.source || "default"})`);
 
       // GET CURRENT STATUS FROM BACKEND
-      // const statusResponse = await fetchStreamingStatus(connectionId);
-      // let currentStatus;
-      // if (statusResponse.status === "ok") {
-      //   currentStatus = statusResponse.is_streaming ? "streaming" : "paused";
-      // } else {
-      //   currentStatus = statusResponse.status; // not_found or error
-      // }
-      // console.log(`Current backend status: ${currentStatus}`);
-      
-      // GET CURRENT STATUS FROM BACKEND
       let currentStatus = "not_found";
 
       try {
