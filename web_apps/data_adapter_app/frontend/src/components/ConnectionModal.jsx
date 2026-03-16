@@ -298,73 +298,7 @@ export default function ConnectionModal({
     }
   }, [connectionType, configuration, streamerConfig, validateYAMLFormats]);
 
-  // const handleSave = useCallback(async () => {
-  //   if (isSubmitting) return;
-  //   setIsSubmitting(true);
-  //   setValidationError("");
-
-  //   try {
-  //     const validation = await validateConfiguration();
-  //     if (!validation?.valid) {
-  //       setIsSubmitting(false);
-  //       return;
-  //     }
-
-  //     // Determine runtime mode + hz
-  //     const effectiveIsPolling = supportsCallback ? isPolling : true;
-  //     const hzInt = Math.max(1, parseInt((pollingRateHz || "1").trim(), 10) || 1);
-
-  //     if (initialData.id) {
-  //       // EDIT
-  //       const updated = {
-  //         ...initialData,
-  //         adapter: connectionType,
-  //         adapterConfig: configuration,
-  //         streamerConfig: streamerConfig,
-  //         updatedAt: new Date().toISOString(),
-  //       };
-  //       ConnectionManager.saveConnection(initialData.id, updated);
-  //       onSave(updated);
-  //       onClose();
-  //       return;
-  //     }
-
-  //     // NEW
-  //     const id = getConnCtr() + 1;
-  //     setConnCtr(id);
-  //     setActiveConnectionId(id);
-  //     setStep("Connecting to adapter...");
-
-  //     await connectConnection(
-  //       id,
-  //       connectionType,
-  //       configuration,
-  //       streamerConfig,
-  //       effectiveIsPolling,
-  //       hzInt
-  //     );
-
-  //     const saved = {
-  //       id,
-  //       adapter: connectionType,
-  //       adapterConfig: configuration,
-  //       streamerConfig: streamerConfig,
-  //       isPolling: effectiveIsPolling,
-  //       pollingRateHz: hzInt,
-  //       savedAt: new Date().toISOString(),
-  //     };
-
-  //     ConnectionManager.saveConnection(id, saved);
-  //     onSave(saved);
-  //     onClose();
-  //   } catch (e) {
-  //     console.error(e);
-  //   } finally {
-  //     setStep("");
-  //     setIsSubmitting(false);
-  //   }
-  // }, [isSubmitting, validateConfiguration, configuration, connectionType, streamerConfig, initialData, onSave, onClose, supportsCallback, isPolling, pollingRateHz]);
-    const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     setValidationError("");
