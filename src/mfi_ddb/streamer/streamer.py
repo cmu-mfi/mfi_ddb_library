@@ -29,23 +29,28 @@ TOPIC_CLIENTS = {
 class _SCHEMA:
     class _MQTT(BaseModel):
         broker_address: str = Field(..., description="Address of the MQTT broker")
-        broker_port: Optional[int] = Field(1883, description="Port of the MQTT broker (default: 1883)")
-        username: Optional[str] = Field(..., description="Username for MQTT broker authentication")
-        password: Optional[str] = Field(..., description="Password for MQTT broker authentication")
-        tls_enabled: Optional[bool] = Field(False, description="Enable TLS for MQTT connection (default: False)")
-        debug: Optional[bool] = Field(False, description="Enable debug mode for MQTT client (default: False)")
-        timeout: Optional[int] = Field(5, description="Timeout in seconds for connecting to the MQTT broker (default: 5)")    
+        broker_port: int = Field(1883, description="Port of the MQTT broker (default: 1883)")
+        username: str = Field(..., description="Username for MQTT broker authentication")
+        password: str = Field(..., description="Password for MQTT broker authentication")
+        tls_enabled: bool = Field(False, description="Enable TLS for MQTT connection (default: False)")
+        debug: bool = Field(False, description="Enable debug mode for MQTT client (default: False)")
+        timeout: int = Field(5, description="Timeout in seconds for connecting to the MQTT broker (default: 5)")    
     
     class _USER(BaseModel):
         user_id: str = Field(..., description="User ID associated with the data")
-        domain: Optional[str] = Field(..., description="Domain of the user")
-        email: Optional[str] = Field(None, description="Email of the user")
-        name: Optional[str] = Field(None, description="Name of the user")
+        domain: str = Field(..., description="Domain of the user")
+        email: str = Field("", description="Email of the user")
+        name: str = Field("", description="Name of the user")
+
+    class _PROJECT(BaseModel):
+        project_id: str = Field("", description="Project ID associated with the data")
+        project_name: str = Field("", description="Name of the project")
 
     class SCHEMA(BaseModel):
         topic_family: str = Field(..., description="Topic family to use (e.g., 'historian', 'kv', 'blob')")
         user: "_USER" = Field(..., description="User information for the data")
         mqtt: "_MQTT" = Field(..., description="MQTT configuration parameters")
+        project: "_PROJECT" = Field(None, description="Project information for the data")
 
 class Streamer(Observer):
 
@@ -99,6 +104,12 @@ class Streamer(Observer):
         # 1. initialize the data adapter and respective topic family client
         # `````````````````````````````````````````````````````````````````````````
         self.cfg = copy.deepcopy(config)
+        try:
+            self.config = Streamer.SCHEMA(**config)
+            self.cfg = self.config.dict()
+        except Exception as e:
+            raise ConfigError(f"Invalid configuration: {e}")
+        
         topic_family_name = config['topic_family']
         
         if topic_family_name not in TOPIC_CLIENTS:
@@ -230,6 +241,12 @@ class Streamer(Observer):
             "time": {
                 "birth": datetime.now().isoformat()
                 },
+            "user": {
+                "user_id": self.cfg["user"]["user_id"],
+                "domain": self.cfg["user"]["domain"],
+                "email": self.cfg["user"]["email"],
+                "name": self.cfg["user"]["name"]
+            },
             "source": {
                 "os": platform.system(),
                 "hostname": socket.gethostname(),
@@ -241,7 +258,7 @@ class Streamer(Observer):
                 "attributes": self.__data_adp.attributes,
                 "sample_data": sample_data,
             },
-            "streamer": self.cfg            
+            "broker": self.cfg["mqtt"]
         }         
         
         return payload

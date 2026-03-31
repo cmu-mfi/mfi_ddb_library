@@ -110,26 +110,32 @@
                         },
                         "required": ["birth"]
                     },
+                    "user":
+                    {
+                        "type": "object",
+                        "properties": {
+                            "user_id": {"type": "string"},
+                            "domain": {"type": "string"},
+                            "email": {"type": "string", "format": "email"},
+                            "name": {"type": "string"}
+                        },
+                        "required": ["user_id", "domain"]
+                    },
+                    "project":
+                    {
+                        "type": "object",
+                        "properties": {
+                            "project_id": {"type": "string"},
+                            "project_name": {"type": "string"}
+                        }
+                    },
                     "source": {"type": "object"},
                     "adapter": {"type": "object"},
                     "broker": {"type": "object"}
                 },
-                "required": ["time","source", "adapter", "streamer"]
+                "required": ["time", "user", "source", "adapter", "broker"]
             }
-        },
-        {
-            "if": {
-                "properties": { "msg_type": { "const": "death" } }
-            },
-            "then": {
-                "properties": {
-                    "time": {
-                        "type": "object",
-                        "required": ["death"]
-                    }
-                }
-            }
-        }                
+        }              
 
     ],
     "additionalProperties": true
