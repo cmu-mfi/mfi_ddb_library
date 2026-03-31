@@ -18,7 +18,7 @@ Requires: psycopg2
 from typing import Optional, Tuple, Dict, Any, List
 import logging
 from datetime import datetime
-import psycopg2
+import psycopg2.pool
 from psycopg2 import sql
 import psycopg2.extras
 from pg_config import load_config
@@ -37,10 +37,9 @@ logger = logging.getLogger(__name__)
 
 class MdsConnector:
     def __init__(self):
-        self.__conn_pool = None
         try:
             config = load_config()
-            self.__conn_pool = psycopg2.ThreadedConnectionPool(
+            self.__conn_pool = psycopg2.pool.ThreadedConnectionPool(
                 minconn=1,
                 maxconn=10,
                 **config
