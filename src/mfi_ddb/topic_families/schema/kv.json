@@ -38,9 +38,9 @@
             "then": {
                 "properties": {
                     "user_id": {"type": "string"},
-                    "domain": {"type": "string"},
+                    "domain": {"type": "string", "default": ""},
                     "created_by_user_id": {"type": "string"},
-                    "created_by_domain": {"type": "string"},
+                    "created_by_domain": {"type": "string", "default": ""},
                     "email": {"type": "string", "format": "email"},
                     "name": {"type": "string"},
                     "timestamp": {"type": "string", "format": "date-time"}
@@ -57,7 +57,7 @@
                     "project_id": {"type": "string"},
                     "project_name": {"type": "string"},
                     "created_by_user_id": {"type": "string"},
-                    "created_by_domain": {"type": "string"},
+                    "created_by_domain": {"type": "string", "default": ""},
                     "timestamp": {"type": "string", "format": "date-time"}
                 },
                 "required": ["created_by_user_id", "created_by_domain", "timestamp"],
@@ -78,9 +78,9 @@
                     "time_start": {"type": "string", "format": "date-time"},
                     "time_end": {"type": "string", "format": "date-time"},
                     "trial_user_id": {"type": "string"},
-                    "trial_user_domain": {"type": "string"},
+                    "trial_user_domain": {"type": "string", "default": ""},
                     "created_by_user_id": {"type": "string"},
-                    "created_by_domain": {"type": "string"},
+                    "created_by_domain": {"type": "string", "default": ""},
                     "timestamp": {"type": "string", "format": "date-time"}
                 },
                 "required": [
@@ -115,7 +115,7 @@
                         "type": "object",
                         "properties": {
                             "user_id": {"type": "string"},
-                            "domain": {"type": "string"},
+                            "domain": {"type": "string", "default": ""},
                             "email": {"type": "string", "format": "email"},
                             "name": {"type": "string"}
                         },
