@@ -21,8 +21,7 @@
                 "anyOf": [
                     {"properties": {"msg_type": {"const": "birth"}}},
                     {"properties": {"msg_type": {"const": "death"}}},
-                    {"properties": {"msg_type": {"const": "tp-tag"}}},
-                    {"properties": {"msg_type": {"const": "data"}}}
+                    {"properties": {"msg_type": {"const": "tp-tag"}}}
                 ]
             },
             "then": {
@@ -115,7 +114,7 @@
                     "adapter": {"type": "object"},
                     "broker": {"type": "object"}
                 },
-                "required": ["time","source", "adapter", "broker"]
+                "required": ["time","source", "adapter", "streamer"]
             }
         },
         {

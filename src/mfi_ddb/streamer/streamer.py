@@ -36,14 +36,27 @@ class _SCHEMA:
         debug: Optional[bool] = Field(False, description="Enable debug mode for MQTT client (default: False)")
         timeout: Optional[int] = Field(5, description="Timeout in seconds for connecting to the MQTT broker (default: 5)")    
     
+    class _USER(BaseModel):
+        user_id: str = Field(..., description="User ID associated with the data")
+        domain: Optional[str] = Field(..., description="Domain of the user")
+        email: Optional[str] = Field(None, description="Email of the user")
+        name: Optional[str] = Field(None, description="Name of the user")
+
     class SCHEMA(BaseModel):
         topic_family: str = Field(..., description="Topic family to use (e.g., 'historian', 'kv', 'blob')")
+        user: "_USER" = Field(..., description="User information for the data")
         mqtt: "_MQTT" = Field(..., description="MQTT configuration parameters")
 
 class Streamer(Observer):
 
     CONFIG_EXAMPLE = {
         "topic_family": "blob",
+        "user": {
+            "user_id": "user123",
+            "domain": "ANDREW",
+            "email": "user123@example.com",
+            "name": "User 123"
+        },
         "mqtt": {
             "broker_address": "test.mosquitto.org",
             "broker_port": 1883,
@@ -57,6 +70,12 @@ class Streamer(Observer):
     }
     CONFIG_HELP = {
         "topic_family": "Topic family to use (e.g., 'historian', 'kv', 'blob')",
+        "user": {
+            "user_id": "User ID associated with the data",
+            "domain": "Domain of the user",
+            "email": "Email of the user",
+            "name": "Name of the user"
+        },
         "mqtt": {
             "broker_address": "Address of the MQTT broker",
             "broker_port": "Port of the MQTT broker (default: 1883)",
@@ -222,7 +241,7 @@ class Streamer(Observer):
                 "attributes": self.__data_adp.attributes,
                 "sample_data": sample_data,
             },
-            "broker": self.__client.cfg            
+            "streamer": self.cfg            
         }         
         
         return payload
