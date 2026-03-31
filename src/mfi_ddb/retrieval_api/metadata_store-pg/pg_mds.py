@@ -16,7 +16,8 @@ Requires: psycopg2
 """
 
 from typing import Optional, Tuple, Dict, Any, List
-import os
+import logging
+from datetime import datetime
 import psycopg2
 from psycopg2 import sql
 import psycopg2.extras
@@ -30,8 +31,9 @@ _ALLOWED_TABLES = {
     "graph_edges",
 }
 
-logger = logging.getLogger(__name__)
+DEFAULT_USER = ("superadmin", "superadmin")
 
+logger = logging.getLogger(__name__)
 
 class MdsConnector:
     def __init__(self):
@@ -70,11 +72,21 @@ class MdsConnector:
         """
         self._validate_table(table)
 
+        # Prefer explicit timestamp for created_at/updated_at when provided.
+        # "timestamp" is not a real table column and must not be inserted directly.
+        timestamp_value = values.pop("timestamp", None)
+        if isinstance(timestamp_value, str):
+            try:
+                timestamp_value = datetime.fromisoformat(timestamp_value)
+            except ValueError:
+                # If not ISO-parsable, keep as raw string and let psycopg2/Postgres attempt conversion.
+                pass
+
         # Filter out None values so DB defaults apply
         cols = [k for k, v in values.items() if v is not None]
         vals = [values[k] for k in cols]
 
-        if not cols:
+        if not cols and timestamp_value is None:
             raise ValueError("No columns to insert")
 
         # Convert python dict/list to JSON wrapper for psycopg2
@@ -87,19 +99,28 @@ class MdsConnector:
 
         placeholders = [sql.Placeholder() for _ in cols]
 
+        # created_at and updated_at may use explicit timestamp value or CURRENT_TIMESTAMP otherwise.
+        created_at_clause = sql.Placeholder() if timestamp_value is not None else sql.SQL("CURRENT_TIMESTAMP")
+        updated_at_clause = sql.Placeholder() if timestamp_value is not None else sql.SQL("CURRENT_TIMESTAMP")
+        if timestamp_value is not None:
+            processed_vals.append(timestamp_value)
+            processed_vals.append(timestamp_value)
+
         query = sql.SQL(
             "INSERT INTO {table} \
-            ({fields}) VALUES ({values}) \
+            ({fields}, created_at) VALUES ({values}, {created_at}) \
             ON CONFLICT ON CONSTRAINT pk_{table} \
-            DO UPDATE SET {updates} \
+            DO UPDATE SET {updates}, updated_at = {updated_at} \
             RETURNING *;"
         ).format(
             table=sql.Identifier(table),
             fields=sql.SQL(", ").join(map(sql.Identifier, cols)),
             values=sql.SQL(", ").join(placeholders),
+            created_at=created_at_clause,
+            updated_at=updated_at_clause,
             updates=sql.SQL(", ").join(
                 sql.SQL("{} = EXCLUDED.{}").format(sql.Identifier(c), sql.Identifier(c)) for c in cols
-            )
+            ),
         )
 
         try:
@@ -113,8 +134,61 @@ class MdsConnector:
         finally:
             self.__conn_pool.putconn(conn)
 
-    def _lookup(self, table: str, conditions: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Generic lookup helper that returns rows matching the conditions."""
+    def _lookup(self, table: str, conditions: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
+        """
+        Generic lookup helper that returns rows matching the given conditions.
+
+        This method builds a parameterized SQL SELECT query for a PostgreSQL table
+        using the provided conditions. It supports both simple equality and a set
+        of comparison operators.
+
+        Args:
+            table (str):
+                Name of the table to query. Must pass internal validation.
+
+            conditions (Dict[str, Any]):
+                Mapping of column names to condition values. Each value can be:
+
+                1. Direct value (equality):
+                    {"status": "active"}
+                    → WHERE status = %s
+
+                2. Tuple with comparison operator:
+                    {
+                        "age": (">", 18),
+                        "score": ("<=", 100)
+                    }
+                    → WHERE age > %s AND score <= %s
+
+                    Supported operators:
+                        ">", "<", ">=", "<="
+
+                3. Between range (inclusive):
+                    {
+                        "timestamp": ("between", start_time, end_time)
+                    }
+                    → WHERE timestamp BETWEEN %s AND %s
+
+                    Note: BETWEEN is inclusive:
+                        start_time <= column <= end_time
+
+        Returns:
+            List[Dict[str, Any]]:
+                A list of rows as dictionaries. Returns an empty list if no rows match.
+
+        Raises:
+            ValueError:
+                - If conditions is empty
+                - If an unsupported operator is provided
+                - If a "between" condition does not include exactly two values
+
+        Notes:
+            - All queries are safely parameterized using psycopg2 to prevent SQL injection.
+            - Column names are safely escaped using psycopg2.sql.Identifier.
+            - For time-based queries, consider using:
+                (">=", start) and ("<", end)
+            instead of "between" to avoid overlapping intervals.
+        """
         self._validate_table(table)
 
         if not conditions:
@@ -122,9 +196,45 @@ class MdsConnector:
 
         where_clauses = []
         values = []
+
         for k, v in conditions.items():
-            where_clauses.append(sql.SQL("{} = {}").format(sql.Identifier(k), sql.Placeholder()))
-            values.append(v)
+            col = sql.Identifier(k)
+
+            # Operator-based conditions
+            if isinstance(v, tuple):
+                op = v[0].lower()
+
+                if op in (">", "<", ">=", "<="):
+                    where_clauses.append(
+                        sql.SQL("{} {} {}").format(
+                            col,
+                            sql.SQL(op),
+                            sql.Placeholder()
+                        )
+                    )
+                    values.append(v[1])
+
+                elif op == "between":
+                    if len(v) != 3:
+                        raise ValueError(f"'between' requires exactly 2 values for {k}")
+                    where_clauses.append(
+                        sql.SQL("{} BETWEEN {} AND {}").format(
+                            col,
+                            sql.Placeholder(),
+                            sql.Placeholder()
+                        )
+                    )
+                    values.extend([v[1], v[2]])
+
+                else:
+                    raise ValueError(f"Unsupported operator '{op}' for column '{k}'")
+
+            # Default equality
+            else:
+                where_clauses.append(
+                    sql.SQL("{} = {}").format(col, sql.Placeholder())
+                )
+                values.append(v)
 
         query = sql.SQL(
             "SELECT * FROM {table} WHERE {where};"
@@ -142,121 +252,131 @@ class MdsConnector:
         finally:
             self.__conn_pool.putconn(conn)
 
-    def _update_trial_end(
-        self, trial_name: str, death_timestamp: int, clean_exit: bool = True
-    ) -> Dict[str, Any]:
-        """Update an existing trial row with end-of-life fields.
-
-        Returns the updated row as a dict. No-op (empty dict) if no row matched.
-        """
-        self._validate_table("trial")
-        query = sql.SQL(
-            """
-            UPDATE {table}
-            SET death_timestamp = %s,
-                clean_exit = %s
-            WHERE trial_name = %s
-            RETURNING *;
-            """
-        ).format(table=sql.Identifier("trial"))
-
-        conn = self.__conn_pool.getconn()
-        try:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute(query, [death_timestamp, clean_exit, trial_name])
-                row = cur.fetchone()
-                conn.commit()
-                logger.info(f"Updated trial: {row}")
-                return dict(row) if row is not None else {}
-        finally:
-            self.__conn_pool.putconn(conn)
-
     def insert_user(
         self,
-        user_id: str,
-        domain: str,
-        email: Optional[str] = None,
-        name: Optional[str] = None,
+        user: Tuple[str, str],
+        timestamp: str,
         created_by: Optional[Tuple[str, str]] = None,
+        email: Optional[str] = None,
+        name: Optional[str] = None,        
     ) -> Dict[str, Any]:
         data: Dict[str, Any] = {
-            "user_id": user_id,
-            "domain": domain,
+            "user_id": user[0],
+            "domain": user[1],
+            "created_by_user_id": created_by[0] if created_by else DEFAULT_USER[0],
+            "created_by_domain": created_by[1] if created_by else DEFAULT_USER[1],
             "email": email,
             "name": name,
+            "timestamp": timestamp,
         }
-        if created_by:
-            data["created_by_user_id"] = created_by[0]
-            data["created_by_domain"] = created_by[1]
-        else:
-            data["created_by_user_id"] = "superadmin"
-            data["created_by_domain"] = "superadmin"
-
-        return self._upsert("user", data)
+        try:
+            return self._upsert("user", data)
+        except Exception as e:
+            logger.error(f"Error inserting user {user}: {e}")
+            return {}
 
     def insert_project(
         self,
+        timestamp: str,
         project_id: Optional[str] = None,
-        name: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
+        project_name: Optional[str] = None,
         created_by: Optional[Tuple[str, str]] = None,
+        details: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         data: Dict[str, Any] = {
             "project_id": project_id,
-            "name": name,
+            "name": project_name,
+            "created_by_user_id": created_by[0] if created_by else DEFAULT_USER[0],
+            "created_by_domain": created_by[1] if created_by else DEFAULT_USER[1],
             "details": details,
+            "timestamp": timestamp,
         }
-        if created_by:
-            data["created_by_user_id"] = created_by[0]
-            data["created_by_domain"] = created_by[1]
-        else:
-            data["created_by_user_id"] = "superadmin"
-            data["created_by_domain"] = "superadmin"
-
-        return self._upsert("project", data)
+        try:
+            return self._upsert("project", data)
+        except Exception as e:
+            logger.error(f"Error inserting project {project_id}: {e}")
+            return {}
 
     def insert_trial(
         self,
-        trial_name: str,
-        user_id: str,
-        user_domain: str,
-        birth_timestamp,
+        trial_id: str,
+        user: Tuple[str, str],
+        birth_timestamp: str,
         project_id: Optional[str] = None,
-        death_timestamp=None,
+        death_timestamp: Optional[str] = None,
         clean_exit: Optional[bool] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        timestamp: Optional[str] = None,
     ) -> Dict[str, Any]:
         data: Dict[str, Any] = {
-            "trial_name": trial_name,
-            "user_id": user_id,
-            "user_domain": user_domain,
+            "trial_name": trial_id,
+            "user_id": user[0],
+            "user_domain": user[1],
             "project_id": project_id,
             "birth_timestamp": birth_timestamp,
             "death_timestamp": death_timestamp,
             "clean_exit": clean_exit,
             "metadata": metadata,
+            "timestamp": timestamp,
         }
-        return self._upsert("trial", data)
+        try:
+             return self._upsert("trial", data)
+        except Exception as e:
+            logger.error(f"Error inserting trial {trial_id}: {e}")
+            return {}
 
-    def update_trial_end(
+    def update_trial(
         self,
-        trial_name: str,
-        user_id: str,
-        user_domain: str,
-        death_timestamp=None,
-        clean_exit: Optional[bool] = None,
+        trial_id: str,
+        user: Tuple[str, str],
+        birth_timestamp: Optional[str] = None,
         project_id: Optional[str] = None,
-    ) -> Dict[str, Any]: ...
-
-    def update_trial_project(
-        self,
-        trial_name: str,
-        user_id: str,
-        user_domain: str,
-        project_id: Optional[str],
-        time_start: int,
-        time_end: int,
-    ) -> Dict[str, Any]: ...
+        death_timestamp: Optional[str] = None,
+        clean_exit: Optional[bool] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        timestamp: Optional[str] = None,
+        time_start: Optional[str] = None,
+        time_end: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        data: Dict[str, Any] = {
+            "trial_name": trial_id,
+            "user_id": user[0],
+            "user_domain": user[1],
+            "project_id": project_id,
+            "birth_timestamp": birth_timestamp,
+            "death_timestamp": death_timestamp,
+            "clean_exit": clean_exit,
+            "metadata": metadata,
+            "timestamp": timestamp,
+        }
+        
+        selected_trials = self._lookup("trial", {
+            "trial_name": trial_id, 
+            "user_id": user[0], 
+            "user_domain": user[1],
+            "birth_timestamp": ('between', time_start, time_end) if time_start and time_end else None,
+            "death_timestamp": ('between', time_start, time_end) if time_start and time_end else None
+        })
+        
+        if not selected_trials:
+            logger.warning(f"No trial found for update with trial_id={trial_id}, user={user}, time range=({time_start}, {time_end}). Skipping update.")
+            return {}
+        elif len(selected_trials) == 0:
+            logger.warning(f"No trial found for update with trial_id={trial_id}, user={user}, time range=({time_start}, {time_end}). Skipping update.")
+            return {}
+        elif len(selected_trials) > 1:
+            logger.warning(f"Multiple trials found for update with trial_id={trial_id}, user={user}, time range=({time_start}, {time_end}). \
+                This should not happen. Update may affect multiple rows. Skipping update.")
+            return {}
+        
+        # Use the primary key 'id' for the upsert to target the correct row
+        data["id"] = selected_trials[0]["id"]
+        
+        try:
+            return self._upsert("trial", data)
+        except Exception as e:
+            logger.error(f"Error inserting trial {trial_id}: {e}")
+            return {}
 
     def insert_user_project_role_linking(
         self,

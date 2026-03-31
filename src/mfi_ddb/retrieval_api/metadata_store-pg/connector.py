@@ -38,13 +38,13 @@ def callback(config, topic, message):
         metadata_exclude_keys = ["schema_version", "msg_type", "time", "trial_id"]
         mds.insert_trial(
             trial_id=data["trial_id"],
-            user_id=data["user"]["user_id"],
-            user_domain=data["user"]["domain"],
+            user=(data["user"]["user_id"], data["user"]["domain"]),
             project_id=data.get("project", {}).get("project_id", None),
             # TODO: project_name can be used to get project_id if project_id is not provided. 
             # This requires an additional query to the project table in the MDS.
             birth_timestamp=data["time"]["birth"],
             metadata={k: v for k, v in data.items() if k not in metadata_exclude_keys},
+            timestamp=data["time"]["birth"]
         )
     elif msg_type == "death":
         if "death" not in data["time"]:
@@ -56,18 +56,19 @@ def callback(config, topic, message):
         metadata_exclude_keys = ["schema_version", "msg_type", "time", "trial_id"]
         mds.update_trial(
             trial_id=data["trial_id"],
+            user=(data["user"]["user_id"], data["user"]["domain"]),
+            project_id=data.get("project", {}).get("project_id", None),
             death_timestamp=death_timestamp,
             clean_exit=clean_exit,
             metadata={k: v for k, v in data.items() if k not in metadata_exclude_keys},
+            timestamp=death_timestamp
         )
     elif msg_type == "user":
         mds.insert_user(
-            user_id=data["user_id"],
-            domain=data["domain"],
+            user=(data["user_id"], data["domain"]),
+            created_by=(data["created_by_user_id"], data["created_by_domain"]),
             email=data["email"] if "email" in data else "",
             name=data["name"] if "name" in data else "",
-            created_by_user_id=data["created_by_user_id"],
-            created_by_domain=data["created_by_domain"],
             timestamp=data["timestamp"]
         )
     elif msg_type == "project":
@@ -81,25 +82,21 @@ def callback(config, topic, message):
             "timestamp"
         ]
         mds.insert_project(
-            project_id=data["project_id"] if "project_id" in data else "",
-            name=data["project_name"] if "project_name" in data else "",
-            created_by_user_id=data["created_by_user_id"],
-            created_by_domain=data["created_by_domain"],
+            project_id=data["project_id"] if "project_id" in data else None,
+            project_name=data["project_name"] if "project_name" in data else None,
+            created_by=(data["created_by_user_id"], data["created_by_domain"]),
             timestamp=data["timestamp"],
             details={k: v for k, v in data.items() if k not in exclude_keys}
         )
     elif msg_type == "tp-tag":
-        mds.update_trial_project(
+        mds.update_trial(
             trial_id=data["trial_id"],
-            user_id=data["trial_user_id"],
-            user_domain=data["trial_user_domain"],
+            user=(data["trial_user_id"], data["trial_user_domain"]),
             project_id=data["project_id"],
             # TODO: project_name can be used to get project_id if project_id is not provided. 
             # This requires an additional query to the project table in the MDS.            
             time_start=data["time_start"],
             time_end=data["time_end"],
-            created_by_user_id=data["created_by_user_id"],
-            created_by_domain=data["created_by_domain"],
             timestamp=data["timestamp"]
         )
     elif msg_type == "data":
@@ -119,7 +116,7 @@ def main():
     # SUBSCRIBE TO TOPIC AND SET A CALLBACK
     topic_config = load_config(config_file, section="topic")
     topic = get_topic_from_config(topic_config)
-    mqtt_sub.create_message_callback_with_topic(
+    mqtt_sub.create_message_callback(
         topic, lambda full_topic, message: callback(mqtt_config, full_topic, message)
     )
 
