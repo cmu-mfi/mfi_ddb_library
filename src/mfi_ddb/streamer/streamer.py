@@ -5,7 +5,7 @@ import platform
 import socket
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 import paho.mqtt.client as paho_mqtt
@@ -173,6 +173,8 @@ class Streamer(Observer):
 
     def disconnect(self):
         try:
+            trial_id = str(self.__data_adp.cfg.get('trial_id', None))
+            kv_birth_payload = self.__generate_birth_kv_payload(self.__data_adp)
             kv_death_payload = self.__generate_death_kv_payload(kv_birth_payload)
             blob_death_payload = get_blob_json_payload_from_dict(
                 data = kv_death_payload,
