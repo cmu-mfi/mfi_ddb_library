@@ -5,7 +5,6 @@ build/
 dist/
 wheels/
 *.egg-info
-
+secrets_local.yaml
 # Virtual environments
 .venv
-.env
