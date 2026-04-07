@@ -8,4 +8,3 @@ wheels/
 secrets_local.yaml
 # Virtual environments
 .venv
-
