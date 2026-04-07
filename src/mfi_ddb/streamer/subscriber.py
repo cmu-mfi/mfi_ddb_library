@@ -1,4 +1,3 @@
-import time
 from ._mqtt import Mqtt
 
 

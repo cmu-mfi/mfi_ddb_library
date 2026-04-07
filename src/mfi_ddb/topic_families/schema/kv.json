@@ -1,0 +1,142 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+        "schema_version": {
+            "type": "string",
+            "default": "mfi-v1.0"
+        },
+        "msg_type": {
+            "enum": ["birth", "death", "user", "project", "tp-tag", "data"],
+            "default": "data"
+        }
+    },
+    "required": [
+        "schema_version",
+        "msg_type"
+    ],
+    "allOf": [
+        {
+            "if": {
+                "anyOf": [
+                    {"properties": {"msg_type": {"const": "birth"}}},
+                    {"properties": {"msg_type": {"const": "death"}}},
+                    {"properties": {"msg_type": {"const": "tp-tag"}}}
+                ]
+            },
+            "then": {
+                "properties": {
+                    "trial_id": {"type": "string"}
+                },
+                "required": ["trial_id"]
+            }
+        },
+        {
+            "if": {
+                "properties": {"msg_type": {"const": "user"}}
+            },
+            "then": {
+                "properties": {
+                    "user_id": {"type": "string"},
+                    "domain": {"type": "string", "default": ""},
+                    "created_by_user_id": {"type": "string"},
+                    "created_by_domain": {"type": "string", "default": ""},
+                    "email": {"type": "string", "format": "email"},
+                    "name": {"type": "string"},
+                    "timestamp": {"type": "string", "format": "date-time"}
+                },
+                "required": ["user_id", "domain", "created_by_user_id", "created_by_domain", "timestamp"]
+            }
+        },
+        {
+            "if": {
+                "properties": {"msg_type": {"const": "project"}}
+            },
+            "then": {
+                "properties": {
+                    "project_id": {"type": "string"},
+                    "project_name": {"type": "string"},
+                    "created_by_user_id": {"type": "string"},
+                    "created_by_domain": {"type": "string", "default": ""},
+                    "timestamp": {"type": "string", "format": "date-time"}
+                },
+                "required": ["created_by_user_id", "created_by_domain", "timestamp"],
+                "anyOf": [
+                    {"required": ["project_id"]},
+                    {"required": ["project_name"]}
+                ]
+            }
+        },
+        {
+            "if": {
+                "properties": {"msg_type": {"const": "tp-tag"}}
+            },
+            "then": {
+                "properties": {
+                    "project_id": {"type": "string"},
+                    "project_name": {"type": "string"},
+                    "time_start": {"type": "string", "format": "date-time"},
+                    "time_end": {"type": "string", "format": "date-time"},
+                    "trial_user_id": {"type": "string"},
+                    "trial_user_domain": {"type": "string", "default": ""},
+                    "created_by_user_id": {"type": "string"},
+                    "created_by_domain": {"type": "string", "default": ""},
+                    "timestamp": {"type": "string", "format": "date-time"}
+                },
+                "required": [
+                    "time_start", "time_end", "trial_user_id", "trial_user_domain", "created_by_user_id", "created_by_domain", "timestamp" 
+                ],
+                "anyOf": [
+                    {"required": ["project_id"]},
+                    {"required": ["project_name"]}
+                ]                
+            }
+        },
+        {
+            "if": {
+                "anyOf": [
+                    {"properties": {"msg_type": {"const": "birth"}}},
+                    {"properties": {"msg_type": {"const": "death"}}}
+                ]
+            },
+            "then": {
+                "properties": {
+                    "time":
+                    {
+                        "type": "object",
+                        "properties": {
+                            "birth": {"type": "string", "format": "date-time"},
+                            "death": {"type": "string", "format": "date-time"}
+                        },
+                        "required": ["birth"]
+                    },
+                    "user":
+                    {
+                        "type": "object",
+                        "properties": {
+                            "user_id": {"type": "string"},
+                            "domain": {"type": "string", "default": ""},
+                            "email": {"type": "string", "format": "email"},
+                            "name": {"type": "string"}
+                        },
+                        "required": ["user_id", "domain"]
+                    },
+                    "project":
+                    {
+                        "type": "object",
+                        "properties": {
+                            "project_id": {"type": "string"},
+                            "project_name": {"type": "string"}
+                        }
+                    },
+                    "source": {"type": "object"},
+                    "adapter": {"type": "object"},
+                    "broker": {"type": "object"}
+                },
+                "required": ["time", "user", "source", "adapter", "broker"]
+            }
+        }              
+
+    ],
+    "additionalProperties": true
+}

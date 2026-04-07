@@ -1,0 +1,8 @@
+server_address: Network Address of the gRPC server (string)
+server_port: Port of the gRPC server (int)
+certificate_path: Full path to the gRPC server certificate file (optional, string)
+protobufs_dir: Full path to the directory containing .proto files (string)
+compiled_protos_dir: Full path to the compiled protobuf stubs (optional, string)
+trial_id: Trial ID for the gRPC device. No spaces or special characters allowed. (string)
+components: 'List of gRPC components to monitor (list of dicts with keys: component_id,
+  attributes (optional), proto_path, stub_class, request_class, request)'

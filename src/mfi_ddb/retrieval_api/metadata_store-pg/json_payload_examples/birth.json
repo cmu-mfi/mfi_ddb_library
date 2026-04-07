@@ -1,0 +1,18 @@
+{
+  "schema_version": "mfi-v1.0",
+  "msg_type": "birth",
+  "trial_id": "trial-abc-123",
+  "time": {
+    "birth": "2026-03-31T23:34:00Z"
+  },
+  "user": {
+    "user_id": "user_01",
+    "domain": "internal"
+  },
+  "project": {
+    "project_id": "proj-99"
+  },
+  "source": {},
+  "adapter": {},
+  "broker": {}
+}

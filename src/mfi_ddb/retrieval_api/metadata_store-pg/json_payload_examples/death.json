@@ -1,0 +1,16 @@
+{
+  "schema_version": "mfi-v1.0",
+  "msg_type": "death",
+  "trial_id": "trial-abc-123",
+  "time": {
+    "birth": "2026-03-31T20:00:00Z",
+    "death": "2026-03-31T23:34:00Z"
+  },
+  "user": {
+    "user_id": "user_01",
+    "domain": "internal"
+  },
+  "source": {},
+  "adapter": {},
+  "broker": {}
+}
