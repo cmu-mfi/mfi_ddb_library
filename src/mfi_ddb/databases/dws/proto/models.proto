@@ -5,6 +5,13 @@ package dws.models;
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 
+message file_value {
+  string filename = 1;
+  string filetype = 2;
+  bytes content = 3;
+  optional string sha256 = 4; // For integrity verification
+}
+
 message Datapoint {
   string topic = 1;
   // TODO: is the user_id necessary?? Discuss.
@@ -17,7 +24,7 @@ message Datapoint {
     string string_value = 6;
     google.protobuf.Struct json_value = 7;
         
-    bytes file_value = 8;
+    file_value file_value = 8;
   }
 }
 
