@@ -92,7 +92,7 @@ export default function ConnectionItem({
       }
 
     } catch (error) {
-      console.error(`Failed to check streaming status for ${connection.id}:`);
+      console.error(`Failed to check streaming status for ${connection.id}:`, error);
       setStreamingStatus({
         streaming_mode: "inactive",
         is_connected: false,

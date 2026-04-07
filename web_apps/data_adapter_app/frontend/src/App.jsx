@@ -97,15 +97,32 @@ function App() {
       console.log(`Target state: ${targetState} (source: ${savedState?.source || "default"})`);
 
       // GET CURRENT STATUS FROM BACKEND
-      const statusResponse = await fetchStreamingStatus(connectionId);
-      let currentStatus;
-      if (statusResponse.status === "ok") {
-        currentStatus = statusResponse.is_streaming ? "streaming" : "paused";
-      } else {
-        currentStatus = statusResponse.status; // not_found or error
-      }
-      console.log(`Current backend status: ${currentStatus}`);
+      let currentStatus = "not_found";
 
+      try {
+        const statusResponse = await fetchStreamingStatus(connectionId);
+
+        if (statusResponse.status === "ok") {
+          currentStatus = statusResponse.is_streaming ? "streaming" : "paused";
+        } else {
+          currentStatus = statusResponse.status || "not_found";
+        }
+      } catch (error) {
+        const message = error?.message || "";
+        const is404 =
+          error?.status === 404 ||
+          message.includes("status: 404") ||
+          message.includes("404 Not Found");
+
+        if (!is404) {
+          throw error;
+        }
+
+        currentStatus = "not_found";
+      }
+
+      console.log(`Current backend status: ${currentStatus}`);
+      
       if (currentStatus === targetState) {
         console.log(
           `DEBUG: Connection ${connectionId} already in target state (${targetState}), skipping restoration`

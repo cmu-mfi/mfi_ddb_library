@@ -1472,3 +1472,64 @@ body {
 .toggle--disabled .toggle__slider {
   cursor: not-allowed;
 }
+
+
+.mode-segmented {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+
+  padding: 4px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  width: 240px; /* tweak as you like */
+  user-select: none;
+}
+
+.mode-segmented__indicator {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+
+  width: calc(50% - 4px);
+  height: calc(100% - 8px);
+  border-radius: 999px;
+
+  
+  background: #C41230;
+  transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+  z-index: 0;
+}
+
+.mode-segmented__btn {
+  position: relative;
+  z-index: 1;
+
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 8px 12px;
+
+  font-size: 0.85rem;
+  font-weight: 600;
+
+  color: #374151;
+  cursor: pointer;
+  transition: color 180ms ease, opacity 180ms ease;
+}
+
+.mode-segmented__btn.is-active {
+  color: #ffffff;
+}
+
+.mode-segmented__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mode-segmented--disabled {
+  opacity: 0.8;
+  pointer-events: none;
+}

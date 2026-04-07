@@ -9,42 +9,8 @@ import Modal from "./Modal";
 import { ConnectionManager } from "./ConnectionManager";
 import { makeDefaultStreamerConfig } from "../data/defaults";
 import { getConnCtr, setConnCtr } from "../state/conn_ctr";
-import { connectConnection, disconnectConnection, fetchAdapters } from "../api";
+import {connectConnection, disconnectConnection, fetchAdapters, fetchStreamingStatus,} from "../api";
 import { validateAdapterConfig, validateStreamerConfig } from "../api";
-/** -------------------------------
- *  YAML helpers (top-level scalars)
- *  ------------------------------- */
-const upsertYamlKey = (yaml, key, value) => {
-  const lines = (yaml || "").split("\n");
-  const re = new RegExp(`^\\s*${key}\\s*:\\s*.*$`);
-  const idx = lines.findIndex((l) => re.test(l));
-  const newLine = `${key}: ${value}`;
-
-  if (idx >= 0) {
-    lines[idx] = newLine;
-    return lines.join("\n");
-  }
-
-  const trimmed = (yaml || "").trimEnd();
-  return trimmed ? `${trimmed}\n${newLine}\n` : `${newLine}\n`;
-};
-
-const readYamlScalar = (yaml, key) => {
-  const re = new RegExp(`^\\s*${key}\\s*:\\s*(.+)\\s*$`, "m");
-  const m = (yaml || "").match(re);
-  return m?.[1]?.trim() ?? null;
-};
-
-/**
- * Ensure streamer YAML has reasonable defaults (streamer-only).
- * NOTE: Polling/callback mode is NOT stored in streamer YAML anymore.
- */
-const ensureStreamerDefaults = (yaml) => {
-  let next = yaml || "";
-  // Keep this function for streamer-only defaults you actually want.
-  // Example: ensure polling_rate_hz is NOT here anymore.
-  return next;
-};
 
 const generateNestedHelpText = (helpData, indentLevel = 0) => {
   if (!helpData || typeof helpData !== "string") return null;
@@ -260,6 +226,39 @@ export default function ConnectionModal({
     onClose();
   }, [isSubmitting, activeConnectionId, onClose]);
 
+  const waitForStreamingStatus = useCallback(
+    async (connectionId, maxAttempts = 10, delayMs = 300) => {
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const status = await fetchStreamingStatus(connectionId);
+          console.log(
+            `Streaming status ready for ${connectionId} on attempt ${attempt}:`,
+            status
+          );
+          return status;
+        } catch (error) {
+          const message = error?.message || "";
+          const is404 =
+            error?.status === 404 ||
+            message.includes("status: 404") ||
+            message.includes("404 Not Found");
+
+          if (!is404) {
+            throw error;
+          }
+
+          if (attempt === maxAttempts) {
+            throw new Error(
+              `Streaming status not ready for connection ${connectionId} after ${maxAttempts} attempts`
+            );
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+      }
+    },
+    []
+  );
   const validateYAMLFormats = useCallback(
     (yaml) => (yaml.trim() ? [] : ["Configuration cannot be empty"]),
     []);
@@ -322,6 +321,8 @@ export default function ConnectionModal({
           adapter: connectionType,
           adapterConfig: configuration,
           streamerConfig: streamerConfig,
+          isPolling: effectiveIsPolling,
+          pollingRateHz: hzInt,
           updatedAt: new Date().toISOString(),
         };
         ConnectionManager.saveConnection(initialData.id, updated);
@@ -336,7 +337,7 @@ export default function ConnectionModal({
       setActiveConnectionId(id);
       setStep("Connecting to adapter...");
 
-      await connectConnection(
+            const connectResponse = await connectConnection(
         id,
         connectionType,
         configuration,
@@ -345,6 +346,21 @@ export default function ConnectionModal({
         hzInt
       );
 
+      console.log(`Connect response for ${id}:`, connectResponse);
+
+      if (!connectResponse.ok) {
+        const errorText = await connectResponse.text();
+        throw new Error(
+          `Connect failed for ${id}: ${connectResponse.status} ${connectResponse.statusText}${
+            errorText ? ` - ${errorText}` : ""
+          }`
+        );
+      }
+
+      setStep("Waiting for backend status...");
+
+      const initialStatus = await waitForStreamingStatus(id);
+
       const saved = {
         id,
         adapter: connectionType,
@@ -352,6 +368,7 @@ export default function ConnectionModal({
         streamerConfig: streamerConfig,
         isPolling: effectiveIsPolling,
         pollingRateHz: hzInt,
+        initialStatus,
         savedAt: new Date().toISOString(),
       };
 
@@ -359,13 +376,27 @@ export default function ConnectionModal({
       onSave(saved);
       onClose();
     } catch (e) {
-      console.error(e);
+      console.error("Error creating connection:", e);
+      setValidationError(e?.message || "Failed to create connection");
     } finally {
       setStep("");
       setIsSubmitting(false);
     }
-  }, [isSubmitting, validateConfiguration, configuration, connectionType, streamerConfig, initialData, onSave, onClose, supportsCallback, isPolling, pollingRateHz]);
-
+  }, [
+    isSubmitting,
+    validateConfiguration,
+    configuration,
+    connectionType,
+    streamerConfig,
+    initialData,
+    onSave,
+    onClose,
+    supportsCallback,
+    isPolling,
+    pollingRateHz,
+    waitForStreamingStatus,
+  ]);
+  
   const canSave = Boolean(
     connectionType &&
       configuration.trim() &&
@@ -543,28 +574,33 @@ export default function ConnectionModal({
           </button> */}
         </div>
         
-        {/* Update Mode: Polling vs Callback (toggle slider) */}
 <div className="form-group">
   <label>Streaming Mode:</label>
 
-  <div className="mode-toggle-row">
-    <div className="mode-toggle-label">
-      <span className="mode-pill">{isPolling ? "Polling" : "Callback"}</span>
-    </div>
+  <div className={`mode-segmented ${isSubmitting ? "mode-segmented--disabled" : ""}`}>
+    <span
+      className="mode-segmented__indicator"
+      style={{ transform: `translateX(${isPolling ? "0%" : "100%"})` }}
+    />
 
-    <label className={`toggle ${(!supportsCallback || isSubmitting) ? "toggle--disabled" : ""}`}>
-      {/* checked=true means Callback */}
-      <input
-        type="checkbox"
-        checked={!isPolling}
-        disabled={!supportsCallback || isSubmitting}
-        onChange={(e) => {
-          const callbackSelected = e.target.checked;
-          setIsPolling(!callbackSelected);
-        }}
-      />
-      <span className="toggle__slider" />
-    </label>
+    <button
+      type="button"
+      className={`mode-segmented__btn ${isPolling ? "is-active" : ""}`}
+      disabled={isSubmitting}
+      onClick={() => setIsPolling(true)}
+    >
+      Polling
+    </button>
+
+    <button
+      type="button"
+      className={`mode-segmented__btn ${!isPolling ? "is-active" : ""}`}
+      disabled={!supportsCallback || isSubmitting}
+      onClick={() => setIsPolling(false)}
+      title={!supportsCallback ? "Callback not supported" : undefined}
+    >
+      Callback
+    </button>
   </div>
 
   {!supportsCallback && (
@@ -590,6 +626,7 @@ export default function ConnectionModal({
     />
   </div>
 )}
+
 
 
         {isValidating && (
