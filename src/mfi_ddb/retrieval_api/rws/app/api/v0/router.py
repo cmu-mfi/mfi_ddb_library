@@ -19,269 +19,80 @@ import inspect
 import logging
 import pkgutil
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import app.utils.utils as utils
-import yaml
-from app.services.adapter_factory import AdapterFactory
+import app.schema.schema as schema
+from app.services.pg_mds import MdsReader
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi import Path as FastAPIPath
 
 logger = logging.getLogger(__name__)
 
-# FastAPI router and adapter factory initialization
+# FastAPI router
 router = APIRouter()
 
-# Connection: conn_id -> AdapterFactory instance
-active_connections: Dict[str, AdapterFactory] = {}
+# psql initialization
+metadata_reader = MdsReader()
 
 
-@router.get("/type0")
-async def list_endpoints() -> List[Dict]:
+@router.get(
+    "/type0",
+    description=Path("../../docs/type0.md").read_text(),
+    summary="Type 0: Get Endpoints Info",
+    response_model=schema.Type0Response,
+)
+async def list_endpoints():
+    """
+    List all available endpoints.
+    """
+
     ...
 
-@router.get("/health")
-async def health_check() -> Dict:
+
+@router.post(
+    "/type1",
+    description=Path("../../docs/type1.md").read_text(),
+    summary="Type 1: Search Trials",
+    response_model=schema.Type1Response,
+)
+async def search_trials(request: schema.Type1Request):
     """
-    Service health check endpoint.
+    Search for trials based on provided criteria.
 
-    Provides basic health status and metrics for monitoring and load balancing.
-    Returns current timestamp and connection counts for operational visibility.
-
-    Returns:
-        Dictionary with health status, timestamp, and connection metrics
-    """
-    
-    active_streamers = 0
-    for connection in active_connections.values():
-        if connection.is_streaming:
-            active_streamers += 1
-    
-    return {
-        "status": "healthy",
-        "timestamp": datetime.datetime.now().isoformat(),
-        "active_connections": len(active_connections),
-        "streaming_connections": active_streamers,
-    }
-
-
-@router.post("/validate/adapter")
-async def validate_adapter(
-    adapter_name: str = Form(...),
-    file: UploadFile = File(None),
-    text: str = Form(None),
-) -> Dict:
-    """
-    Validate adapter configuration against schema.
-
-    Accepts YAML configuration via file upload or text input, automatically detects
-    the adapter type, and validates against the appropriate schema. Used by UI for
-    real-time validation feedback during configuration editing.
-
-    Args:
-        adapter_name: Adapter type identifier
-        file: Optional YAML configuration file upload
-        text: Optional raw YAML configuration text
-
-    Returns:
-        Dictionary with validation result:
-        - is_valid: True if config is valid, False otherwise
-
-    Raises:
-        HTTPException: 400 if validation fails or no configuration provided
-    """
-    try:
-        config_dict = utils.load_config(file, text)
-        temporary_instance = AdapterFactory(adp_name=adapter_name, adp_cfg=config_dict)
-
-        is_valid = temporary_instance.validate_data_adapter_config()
-
-        return {"is_valid": is_valid}
-
-    except Exception as e:
-        raise HTTPException(400, f"Validation failed: {str(e)}")
-
-
-@router.post("/validate/streamer")
-async def validate_streamer(
-    file: UploadFile = File(None),
-    text: str = Form(None),
-) -> Dict:
-    """
-    Validate streamer configuration against schema.
-
-    Accepts YAML configuration via file upload or text input, automatically detects
-    the adapter type, and validates against the appropriate schema. Used by UI for
-    real-time validation feedback during configuration editing.
-
-    Args:
-        file: Optional YAML configuration file upload
-        text: Optional raw YAML configuration text
-
-    Returns:
-        Dictionary with validation result:
-        - is_valid: True if config is valid, False otherwise
-
-    Raises:
-        HTTPException: 400 if validation fails or no configuration provided
-    """
-    try:
-        config_dict = utils.load_config(file, text)
-        temporary_instance = AdapterFactory(streamer_cfg=config_dict)
-
-    
-        is_valid = temporary_instance.validate_streamer_config()
-
-        return {"is_valid": is_valid}
-
-    except Exception as e:
-        raise HTTPException(400, f"Validation failed: {str(e)}")
-
-
-@router.post("/connect/{conn_id}")
-async def connect_endpoint(
-    conn_id: str = FastAPIPath(...),
-    adapter_name: str = Form(...),
-    adapter_file: UploadFile = File(None),
-    adapter_text: str = Form(None),
-    streamer_file: UploadFile = File(None),
-    streamer_text: str = Form(None),
-    is_polling: bool = Form(True),
-    polling_rate_hz: int = Form(1),
-) -> dict:
-    """
-    Connect adapter and start data streaming.
-
-    Creates adapter instance from configuration, establishes Streamer connection if configured,
-    Maintains connection state for monitoring and management.
-
-    Returns:
-        Connection result with streaming mode and broker status
-
-    Raises:
-        HTTPException: 502 if connection or streaming setup fails
+    - **request**: A JSON object containing search criteria for trials.
     """
 
-    if conn_id in active_connections:
-        connection = active_connections[conn_id]
-        if connection.adp_name != adapter_name:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Connection ID '{conn_id}' already exists with a different adapter '{connection.adp_name}'.",
-            )
-    else:
-        adapter_cfg = utils.load_config(adapter_file, adapter_text)
-        streamer_cfg = utils.load_config(streamer_file, streamer_text)
-        
-        connection = AdapterFactory(
-            adp_name=adapter_name,
-            adp_cfg=adapter_cfg,
-            streamer_cfg=streamer_cfg,
-            is_polling=is_polling,
-            polling_rate_hz=polling_rate_hz,
-        )
-
-    if not connection.is_connected:
-        try:
-            connection.connect_and_stream()
-            active_connections[conn_id] = connection
-        except Exception as err:
-            raise HTTPException(status_code=502, detail=f"Connection failed: {err}")
-
-    elif not connection.is_streaming:
-        try:
-            connection.resume_streaming()
-        except Exception as err:
-            raise HTTPException(
-                status_code=502, detail=f"Streaming resume failed: {err}"
-            )
-
-    return {
-        "is_connected": connection.is_connected,
-        "is_streaming": connection.is_streaming,
-        "mode": "polling" if connection.is_polling else "callback",
-    }
+    ...
 
 
-@router.post("/resume/{conn_id}")
-async def resume_endpoint(
-    conn_id: str = FastAPIPath(...),
-) -> dict:
+@router.post(
+    "/type2",
+    description=Path("../../docs/type2.md").read_text(),
+    summary="Type 2: Get Trial Data",
+    response_model=schema.Type2Response,
+)
+async def get_trial_details(request: schema.Type2Request):
+    """
+    Retrieve detailed data for a specific trial.
 
-    if conn_id not in active_connections:
-        raise HTTPException(status_code=404, detail="Connection not found")
-    
-    connection = active_connections[conn_id]
-    try:
-        connection.resume_streaming()
-    except Exception as err:
-        raise HTTPException(
-            status_code=502, detail=f"Streaming resume failed: {err}"
-        )
-        
-    return {
-        "is_connected": connection.is_connected,
-        "is_streaming": connection.is_streaming,
-        "mode": "polling" if connection.is_polling else "callback",
-    }      
+    - **request**: A JSON object containing the trial UUID and other optional parameters for data retrieval.
+    """
+
+    ...
 
 
-@router.post("/pause/{conn_id}")
-async def pause_endpoint(
-    conn_id: str = FastAPIPath(...)
-) -> dict:
-    """Pause streaming but keep adapter instance alive."""
-    if conn_id not in active_connections:
-        raise HTTPException(status_code=404, detail="Connection not found")
+@router.post(
+    "/type3",
+    description=Path("../../docs/type3.md").read_text(),
+    summary="Type 3: Search Trials and Get Data",
+    response_model=schema.Type3Response,
+)
+async def search_trials_and_get_data(request: schema.Type3Request):
+    """
+    Search for trials based on provided criteria and retrieve detailed data for matching trials.
 
-    connection = active_connections[conn_id]
-    try:
-        connection.pause_streaming()
-    except Exception as err:
-        raise HTTPException(status_code=502, detail=f"Streaming pause failed: {err}")
+    - **request**: A JSON object containing search criteria for trials and parameters for data retrieval.
+    """
 
-    return {
-        "is_connected": connection.is_connected,
-        "is_streaming": connection.is_streaming,
-        "mode": "polling" if connection.is_polling else "callback",
-    }
-
-
-@router.post("/disconnect/{conn_id}")
-async def disconnect_endpoint(
-    conn_id: str = FastAPIPath(...)
-) -> dict:
-    """Fully disconnect and clear state."""
-
-    if conn_id not in active_connections:
-        raise HTTPException(status_code=404, detail="Connection not found")
-    
-    connection = active_connections[conn_id]    
-    try:
-        connection.disconnect()
-    except Exception as err:
-        raise HTTPException(status_code=502, detail=f"Disconnection failed: {err}")
-    
-    if connection.is_connected:
-        raise HTTPException(status_code=502, detail="Disconnection failed: still connected")
-    else:
-        del active_connections[conn_id]
-        
-    return {"disconnected": True}
-
-
-@router.get("/streaming-status/{conn_id}")
-async def streaming_status_endpoint(conn_id: str = FastAPIPath(...)) -> dict:
-    """Structured status for UI polling."""
-    if conn_id not in active_connections:
-        raise HTTPException(status_code=404, detail="Connection not found")
-
-    connection = active_connections[conn_id]
-
-    return {
-        "adapter_name": connection.adp_name,
-        "streaming_mode": "polling" if connection.is_polling else "callback",
-        "is_connected": connection.is_connected,
-        "is_streaming": connection.is_streaming,
-        "timestamp": datetime.datetime.now().isoformat(),
-    }
+    ...
