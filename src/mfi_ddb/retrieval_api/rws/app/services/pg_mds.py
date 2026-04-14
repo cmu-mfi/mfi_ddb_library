@@ -25,7 +25,6 @@ _ALLOWED_TABLES = {
 DEFAULT_USER = ("superadmin", "superadmin")
 
 logger = logging.getLogger(__name__)
-_UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
 class MdsReader:
     def __init__(self):
@@ -122,10 +121,6 @@ class MdsReader:
         finally:
             self.__conn_pool.putconn(conn)
 
-    @staticmethod
-    def _is_uuid_like(value: str) -> bool:
-        return bool(_UUID_RE.match(value))
-
     def get_trial_by_uuid(self, trial_uuid: str) -> Optional[Dict[str, Any]]:
         self._validate_table("trial")
 
@@ -175,10 +170,7 @@ class MdsReader:
             values.append(project_id)
 
         if trial_id is not None:
-            if self._is_uuid_like(trial_id):
-                where_clauses.append(sql.SQL("trial.id = %s"))
-            else:
-                where_clauses.append(sql.SQL("trial.trial_name = %s"))
+            where_clauses.append(sql.SQL("trial.trial_name = %s"))
             values.append(trial_id)
 
         if enterprise_id is not None:
