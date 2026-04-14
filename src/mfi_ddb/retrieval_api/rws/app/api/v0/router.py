@@ -5,6 +5,7 @@ Configuration Router for MFI DDB Retrieval API
 """
 
 import datetime
+from dateutil import parser
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -28,15 +29,9 @@ dws_agent = None  # Placeholder for DWS agent initialization
 def _parse_time_value(value: Optional[str], field_name: str) -> Optional[datetime.datetime]:
     if value is None:
         return None
-
-    normalized = value.strip().lower()
-    if normalized == "now":
-        return datetime.datetime.utcnow()
-    if normalized == "birth":
-        return datetime.datetime(1, 1, 1)
-
     try:
-        return datetime.datetime.fromisoformat(value)
+        time_iso = parser.parse(value).isoformat()        
+        return datetime.datetime.fromisoformat(time_iso)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid {field_name}: {value}")
 
@@ -48,7 +43,7 @@ def _build_trial_payload(trial_row: Dict[str, Any], request: schema.Type2Request
     if start_ts is None:
         start_ts = trial_row.get("birth_timestamp") or datetime.datetime(1, 1, 1)
     if end_ts is None:
-        end_ts = datetime.datetime.utcnow()
+        end_ts = datetime.datetime.now()
 
     if isinstance(start_ts, datetime.datetime):
         start_value = start_ts.isoformat()
@@ -60,19 +55,24 @@ def _build_trial_payload(trial_row: Dict[str, Any], request: schema.Type2Request
     else:
         end_value = str(end_ts)
 
-    return {
+    metadata = {
         "trial_uuid": trial_row.get("id"),
         "trial_name": trial_row.get("trial_name"),
         "metadata": trial_row.get("metadata") or {},
-        "user_id": request.user_id,
-        "user_domain": request.user_domain,
+        "request_user": (request.user_id, request.user_domain),
         "time_start": start_value,
         "time_end": end_value,
         "frequency": request.frequency,
         "data_format": request.data_format,
-        "retrieved_at": datetime.datetime.utcnow().isoformat() + "Z",
-        "source": "dws_placeholder",
-        "note": "This payload is generated from trial metadata and a placeholder DWS retrieval flow.",
+        "retrieved_at": datetime.datetime.now().isoformat() + "Z",
+    }
+    
+    # TODO: USE THE METADATA TO GET DATA USING DWS AGENT
+    ...
+    
+    return {
+        "metadata": metadata,
+        "data": {},  # Placeholder for actual data retrieved using DWS agent
     }
 
 
@@ -217,7 +217,7 @@ async def search_trials_and_get_data(request: schema.Type3Request):
     )
 
     if len(trials) == 1:
-        data = _build_trial_payload(trials[0], request)
+        data = _build_trial_payload(trials[0], request) # type: ignore
         return schema.Type2Response(
             status="success",
             message="Unique trial found and data retrieved.",

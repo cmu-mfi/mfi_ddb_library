@@ -1,2 +1,3 @@
 FastAPI[all]
 psycopg2-binary
+dateutils
