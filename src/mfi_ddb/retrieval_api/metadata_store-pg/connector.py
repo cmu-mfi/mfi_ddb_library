@@ -3,6 +3,7 @@ import os
 from configparser import ConfigParser
 import logging
 from datetime import datetime
+from typing import Optional, Dict, List, Any
 
 from mfi_ddb import KeyValueTopicFamily, Subscriber
 from mfi_ddb.utils.script_utils import get_topic_from_config
@@ -33,17 +34,37 @@ def callback(config, topic, message):
     # 2. UPDATE MDS TABLES BASED ON MESSAGE TYPE
     # ===========================================================================
     # populate function parameters based on the message content.
+    
+    # Retrieve project information if available in the message, otherwise set to None
+    project = data["project"] if "project" in data else {}
+    
+    if "project_id" in data or "project_name" in data:
+        project["id"] = data.get("project_id", None)
+        project["name"] = data.get("project_name", None)
+    
+    if project["id"] is None and project["name"] is not None:
+        project_row: Optional[List[Dict]] = mds._lookup(
+            table="project", 
+            conditions={"name": project["name"]},)
+        if project_row is not None and len(project_row) == 1:
+            project["id"] = project_row[0]["project_id"]     
+    elif project["id"] is not None:
+        project_row: Optional[List[Dict]] = mds._lookup(
+            table="project", 
+            conditions={"project_id": project["id"]},)
+        if project_row is not None and len(project_row) == 1:
+            project["name"] = project_row[0]["name"]
 
     if msg_type == "birth":
         metadata_exclude_keys = ["schema_version", "msg_type", "time", "trial_id"]
+                    
         mds.insert_trial(
             trial_id=data["trial_id"],
             user=(data["user"]["user_id"], data["user"]["domain"]),
-            project_id=data.get("project", {}).get("project_id", None),
-            # TODO: project_name can be used to get project_id if project_id is not provided. 
-            # This requires an additional query to the project table in the MDS.
+            project_id= project["id"] if project else None,
             birth_timestamp=data["time"]["birth"],
             metadata={k: v for k, v in data.items() if k not in metadata_exclude_keys},
+            data_topics=data["data_topics"] if "data_topics" in data else None,
             timestamp=data["time"]["birth"]
         )
     elif msg_type == "death":
@@ -52,15 +73,16 @@ def callback(config, topic, message):
             clean_exit = False  # Assume unclean exit if death timestamp is not provided
         else:
             death_timestamp = data["time"]["death"]
-            clean_exit = True
+            clean_exit = True           
+            
         metadata_exclude_keys = ["schema_version", "msg_type", "time", "trial_id"]
+        
         mds.update_trial(
             trial_id=data["trial_id"],
             user=(data["user"]["user_id"], data["user"]["domain"]),
-            project_id=data.get("project", {}).get("project_id", None),
+            project_id=project["id"] if project else None,
             death_timestamp=death_timestamp,
             clean_exit=clean_exit,
-            metadata={k: v for k, v in data.items() if k not in metadata_exclude_keys},
             timestamp=death_timestamp
         )
     elif msg_type == "user":
@@ -92,9 +114,7 @@ def callback(config, topic, message):
         mds.update_trial(
             trial_id=data["trial_id"],
             user=(data["trial_user_id"], data["trial_user_domain"]),
-            project_id=data["project_id"],
-            # TODO: project_name can be used to get project_id if project_id is not provided. 
-            # This requires an additional query to the project table in the MDS.            
+            project_id=project["id"] if project else None,
             time_start=data["time_start"],
             time_end=data["time_end"],
             timestamp=data["timestamp"]

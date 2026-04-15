@@ -305,6 +305,7 @@ class MdsConnector:
         death_timestamp: Optional[str] = None,
         clean_exit: Optional[bool] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        data_topics: Optional[List[str]] = None,
         timestamp: Optional[str] = None,
     ) -> Dict[str, Any]:
         data: Dict[str, Any] = {
@@ -316,6 +317,7 @@ class MdsConnector:
             "death_timestamp": death_timestamp,
             "clean_exit": clean_exit,
             "metadata": metadata,
+            "data_topics": data_topics,
             "timestamp": timestamp,
         }
         try:
@@ -333,6 +335,7 @@ class MdsConnector:
         death_timestamp: Optional[str] = None,
         clean_exit: Optional[bool] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        data_topics: Optional[List[str]] = None,
         timestamp: Optional[str] = None,
         time_start: Optional[str] = None,
         time_end: Optional[str] = None,
@@ -347,6 +350,7 @@ class MdsConnector:
             "clean_exit": clean_exit,
             "metadata": metadata,
             "timestamp": timestamp,
+            "data_topics": data_topics,
         }
         
         selected_trials = self._lookup("trial", {
