@@ -34,7 +34,7 @@ erDiagram
     }
 
     TRIAL {
-        UUID id PK
+        UUID uuid PK
         VARCHAR(255) trial_name
         VARCHAR(50) user_id FK
         VARCHAR(50) user_domain FK

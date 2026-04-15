@@ -57,7 +57,7 @@ def create_tables():
         """,
         """
         CREATE TABLE trial (
-            id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            uuid               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             trial_name       VARCHAR(255),
             user_id          VARCHAR(50),
             user_domain      VARCHAR(50),
@@ -69,7 +69,7 @@ def create_tables():
             data_topics      TEXT[],            
             created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            CONSTRAINT pk_trial PRIMARY KEY (id),
+            CONSTRAINT pk_trial PRIMARY KEY (uuid),
             CONSTRAINT fk_trial_user FOREIGN KEY (user_id, user_domain) REFERENCES user(user_id, domain)
         );        
         """,
@@ -113,7 +113,7 @@ def create_tables():
         """
         CREATE TABLE graph_edges (
             edge_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            source_trial_id    UUID NOT NULL REFERENCES trial(id),
+            source_trial_id    UUID NOT NULL REFERENCES trial(uuid),
             target_entity_id   VARCHAR(255) NOT NULL,
             target_entity_type VARCHAR(50) NOT NULL --  ('trial', 'project', 'tag'),
             CONSTRAINT pk_graph_edges PRIMARY KEY (edge_id)
