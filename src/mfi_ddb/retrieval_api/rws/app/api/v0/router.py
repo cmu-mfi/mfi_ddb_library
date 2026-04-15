@@ -85,7 +85,7 @@ def _validate_time_range(start: Optional[datetime.datetime], end: Optional[datet
 
 @router.get(
     "/type0",
-    description=Path("../../docs/type0.md").read_text(),
+    description=Path("./app/docs/type0.md").read_text(),
     summary="Type 0: Get Endpoints Info",
     response_model=schema.Type0Response,
 )
@@ -122,7 +122,7 @@ async def list_endpoints():
 
 @router.post(
     "/type1",
-    description=Path("../../docs/type1.md").read_text(),
+    description=Path("./app/docs/type1.md").read_text(),
     summary="Type 1: Search Trials",
     response_model=schema.Type1Response,
 )
@@ -162,7 +162,7 @@ async def search_trials(request: schema.Type1Request):
 
 @router.post(
     "/type2",
-    description=Path("../../docs/type2.md").read_text(),
+    description=Path("./app/docs/type2.md").read_text(),
     summary="Type 2: Get Trial Data",
     response_model=schema.Type2Response,
 )
@@ -187,7 +187,7 @@ async def get_trial_details(request: schema.Type2Request):
 
 @router.post(
     "/type3",
-    description=Path("../../docs/type3.md").read_text(),
+    description=Path("./app/docs/type3.md").read_text(),
     summary="Type 3: Search Trials and Get Data",
     response_model=schema.Type3Response,
 )
