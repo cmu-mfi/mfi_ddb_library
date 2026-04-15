@@ -7,8 +7,8 @@ Retrieve detailed data for a specific trial UUID using metadata from the metadat
 
 Request body:
 - `trial_uuid` (string, required): UUID of the trial to retrieve.
-- `time_start` (string, optional): retrieval window start. Supports ISO 8601, `birth`, `now`.
-- `time_end` (string, optional): retrieval window end. Supports ISO 8601, `birth`, `now`.
+- `time_start` (string, optional): retrieval window start. Supports ISO 8601,  `now`.
+- `time_end` (string, optional): retrieval window end. Supports ISO 8601,  `now`.
 - `user_id` (string, required): requesting user ID.
 - `user_domain` (string, optional): requesting user domain.
 - `frequency` (integer, optional): data sampling frequency in Hz. `-1` for latest only, `0` for default.

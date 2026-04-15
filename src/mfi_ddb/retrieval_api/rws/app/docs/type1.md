@@ -7,8 +7,8 @@ Search the metadata store for trials that match the supplied filters, and return
 
 Request body:
 - `enterprise_id` (string, required): enterprise identifier to search within.
-- `time_start` (string, required): start of the search window. Supports ISO 8601, `birth`, `now`.
-- `time_end` (string, required): end of the search window. Supports ISO 8601, `birth`, `now`.
+- `time_start` (string, required): start of the search window. Supports ISO 8601, `now`.
+- `time_end` (string, required): end of the search window. Supports ISO 8601, `now`.
 - `user_id` (string, required): requesting user ID.
 - `user_domain` (string, optional): requesting user domain.
 - `data_format` (string, optional): desired response format (`json` or `csv`).
