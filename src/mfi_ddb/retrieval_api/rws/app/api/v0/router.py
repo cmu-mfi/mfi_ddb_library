@@ -150,13 +150,11 @@ async def search_trials(request: schema.Type1Request):
         project_name=request.project_name,
         search_terms=request.search_terms,
     )
-
-    trial_uuids = [row["id"] for row in trials]
-
+    
     return schema.Type1Response(
         status="success",
-        message=f"Found {len(trial_uuids)} trial(s).",
-        trial_uuids=trial_uuids,
+        message=f"Found {len(trials)} trial(s).",
+        trials=[schema.Type1Response.TrialInfo(**trial) for trial in trials],
     )
 
 
@@ -224,9 +222,8 @@ async def search_trials_and_get_data(request: schema.Type3Request):
             data=data,
         )
 
-    trial_uuids = [row["id"] for row in trials]
     return schema.Type1Response(
         status="success",
-        message=f"Found {len(trial_uuids)} trial(s). Return UUID list because the result is not unique.",
-        trial_uuids=trial_uuids,
+        message=f"Found {len(trials)} trial(s).",
+        trials=[schema.Type1Response.TrialInfo(**trial) for trial in trials],
     )

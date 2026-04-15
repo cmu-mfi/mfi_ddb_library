@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional, Union
+from typing import List, Optional, Union
 from enum import Enum
 
 class _ResponseTypeEnum(str, Enum):
@@ -54,7 +54,22 @@ class Type1Response(_Response):
     """
     Response model for Type 1 endpoint.
     """
-    trial_uuids: Optional[list[str]] = Field(None, description="A list of trial UUIDs that match the search criteria.")
+    class TrialInfo(BaseModel):
+        """
+        Model representing information about a trial that matches the search criteria.
+        """
+        uuid: str = Field(..., description="The UUID of the trial.")
+        trial_name: str = Field(..., description="The trial ID associated with the trial.")
+        project_id: Optional[str] = Field(None, description="The project ID associated with the trial.")
+        project_name: Optional[str] = Field(None, description="The project name associated with the trial.")
+        metadata: Optional[dict] = Field(None, description="A dictionary containing metadata about the trial.")
+        data_topics: Optional[List[str]] = Field(None, description="A list of data topics associated with the trial.")
+        birth_timestamp: str = Field(..., description="The start time of the trial.")
+        death_timestamp: str = Field(..., description="The end time of the trial.")
+        created_at: str = Field(..., description="The timestamp when the trial was created.")
+        updated_at: str = Field(..., description="The timestamp when the trial was last updated.")
+
+    trials: Optional[List[TrialInfo]] = Field(None, description="A list of trial UUIDs that match the search criteria.")
     
 class Type2Request(BaseModel):
     """
