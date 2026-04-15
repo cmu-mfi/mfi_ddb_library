@@ -43,6 +43,7 @@ erDiagram
         TIMESTAMPTZ death_timestamp
         BOOLEAN clean_exit
         JSONB metadata
+        TEXT[] data_topics
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
     }

@@ -66,6 +66,7 @@ def create_tables():
             death_timestamp  TIMESTAMPTZ,
             clean_exit	     BOOLEAN DEFAULT FALSE,
             metadata         JSONB,
+            data_topics      TEXT[],            
             created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             CONSTRAINT pk_trial PRIMARY KEY (id),

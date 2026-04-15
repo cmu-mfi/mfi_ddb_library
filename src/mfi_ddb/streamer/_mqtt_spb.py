@@ -28,6 +28,7 @@ class MqttSpb:
         
         self._topic_family = topic_family
         self._components: Dict[str, MqttSpbEntityDevice] = {}
+        self.__data_topics = set()
              
     def connect(self, component_ids:list):
               
@@ -47,7 +48,7 @@ class MqttSpb:
                     
         mqtt_tls_enabled = mqtt_cfg['tls_enabled'] if 'tls_enabled' in mqtt_cfg.keys() else False
         debug = mqtt_cfg['debug'] if 'debug' in mqtt_cfg.keys() else False
-        
+                
         for component_id in component_ids:
             spb_component = MqttSpbEntityDevice(group_name,
                                                 edge_node_name,
@@ -66,7 +67,13 @@ class MqttSpb:
                     time.sleep(3)
 
             self._components[component_id] = spb_component
-        print(f"All SPB components connected to broker") 
+            data_topic = "%s/%s/DBIRTH/%s/%s" % (spb_component._spb_namespace,
+                                                spb_component._spb_domain_name,
+                                                spb_component._spb_eon_name,
+                                                spb_component._spb_eon_device_name)            
+            self.__data_topics.add(data_topic)
+
+        print("All SPB components connected to broker") 
             
     def publish_birth(self, attributes, data):
         if not bool(self._components):
@@ -132,6 +139,9 @@ class MqttSpb:
         for component_id in self._components.keys():
             self._components[component_id].disconnect()
             print(f"Disconnected from component {component_id}")
+    
+    def get_data_topics(self) -> set:
+        return self.__data_topics
     
     def __check_attributes(self, attributes: dict):
         return self.__check_data(attributes)

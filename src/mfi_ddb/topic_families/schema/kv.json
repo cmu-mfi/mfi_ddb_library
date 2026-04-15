@@ -131,9 +131,10 @@
                     },
                     "source": {"type": "object"},
                     "adapter": {"type": "object"},
-                    "broker": {"type": "object"}
+                    "broker": {"type": "object"},
+                    "data_topics": {"type": "array", "items": {"type": "string"}}
                 },
-                "required": ["time", "user", "source", "adapter", "broker"]
+                "required": ["time", "user", "source", "adapter", "broker", "data_topics"]
             }
         }              
 
