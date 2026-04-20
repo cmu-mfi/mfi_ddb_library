@@ -36,9 +36,9 @@ DEFAULT_USER = ("superadmin", "superadmin")
 logger = logging.getLogger(__name__)
 
 class MdsConnector:
-    def __init__(self):
+    def __init__(self, config_path='pg_database.ini'):
         try:
-            config = load_config()
+            config = load_config(filename=config_path)
             self.__conn_pool = psycopg2.pool.ThreadedConnectionPool(
                 minconn=1,
                 maxconn=10,

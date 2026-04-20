@@ -1,8 +1,11 @@
+import argparse
+
 import psycopg2
 from pg_config import load_config
 
-def connect(config):
+def connect(pg_config):
     """ Connect to the PostgreSQL database server """
+    config = load_config(pg_config)
     try:
         # connecting to the PostgreSQL server
         with psycopg2.connect(**config) as conn:
@@ -13,5 +16,8 @@ def connect(config):
 
 
 if __name__ == '__main__':
-    config = load_config()
-    connect(config)
+    parser = argparse.ArgumentParser(description="PG Connection Check")
+    parser.add_argument("--pg_config", "-p", type=str, default="pg_database.ini", help="Path to the DB configuration file")
+    args = parser.parse_args()
+        
+    connect(args.pg_config)

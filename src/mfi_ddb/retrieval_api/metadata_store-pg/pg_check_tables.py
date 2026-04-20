@@ -1,9 +1,9 @@
 import psycopg2
 from pg_config import load_config
 
-def check_tables():
+def check_tables(config_path='pg_database.ini'):
     tables = [
-        "user",
+        "ddb_user",
         "project",
         "user_project_role_linking",
         "trial",
@@ -17,7 +17,7 @@ def check_tables():
         """
     
     try:
-        config = load_config()
+        config = load_config(filename=config_path)
         print(f"Checking for tables: {', '.join(tables)} ...")
         with psycopg2.connect(**config) as conn:
             with conn.cursor() as cur:
@@ -27,11 +27,14 @@ def check_tables():
                 missing_tables = set(tables) - existing_tables
                 if missing_tables:
                     print(f"Missing tables: {', '.join(missing_tables)}")
+                    return False
                 else:
                     print("All tables exist.")
+                    return True
 
     except (psycopg2.DatabaseError, Exception) as error:
         print(error)
+        return False
         
 if __name__ == '__main__':
     check_tables()

@@ -1,11 +1,14 @@
+import argparse
+
 import psycopg2
 from pg_config import load_config
+from pg_check_tables import check_tables
 
-def create_tables():
+def create_tables(config_path='pg_database.ini'):
     """ Create tables in the PostgreSQL database"""
     commands = (
         """
-        CREATE TABLE user (
+        CREATE TABLE ddb_user (
             user_id            VARCHAR(50) NOT NULL,
             domain             VARCHAR(50) NOT NULL,
             created_by_user_id VARCHAR(50),
@@ -15,12 +18,12 @@ def create_tables():
             created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             CONSTRAINT pk_user PRIMARY KEY (user_id, domain),
-            CONSTRAINT fk_user_created_by FOREIGN KEY (created_by_user_id, created_by_domain) REFERENCES user(user_id, domain) DEFERRABLE INITIALLY DEFERRED
+            CONSTRAINT fk_user_created_by FOREIGN KEY (created_by_user_id, created_by_domain) REFERENCES ddb_user(user_id, domain) DEFERRABLE INITIALLY DEFERRED
         );        
         """,        
         """
         CREATE TABLE project (
-            project_id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            project_id           UUID DEFAULT gen_random_uuid(),
             name      	         VARCHAR(50),
             created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -28,7 +31,7 @@ def create_tables():
             created_by_domain    VARCHAR(50),
             details	             JSONB,
             CONSTRAINT pk_project PRIMARY KEY (project_id),
-            CONSTRAINT fk_project_created_by FOREIGN KEY (created_by_user_id, created_by_domain) REFERENCES user(user_id, domain)
+            CONSTRAINT fk_project_created_by FOREIGN KEY (created_by_user_id, created_by_domain) REFERENCES ddb_user(user_id, domain)
         );
         """,
         """
@@ -43,7 +46,7 @@ def create_tables():
         """,
         """
         CREATE TABLE user_project_role_linking (
-            id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            id          UUID DEFAULT gen_random_uuid(),
             user_id     VARCHAR(50) NOT NULL,
             domain      VARCHAR(50) NOT NULL,
             project_id  UUID NOT NULL REFERENCES project(project_id),
@@ -51,13 +54,13 @@ def create_tables():
             created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             CONSTRAINT pk_user_project_role_linking PRIMARY KEY (id),
-            CONSTRAINT fk_user FOREIGN KEY (user_id, domain) REFERENCES user(user_id, domain),
+            CONSTRAINT fk_user FOREIGN KEY (user_id, domain) REFERENCES ddb_user(user_id, domain),
             CONSTRAINT unique_user_project_role UNIQUE (user_id, domain, project_id)
         );
         """,
         """
         CREATE TABLE trial (
-            uuid               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            uuid             UUID DEFAULT gen_random_uuid(),
             trial_name       VARCHAR(255),
             user_id          VARCHAR(50),
             user_domain      VARCHAR(50),
@@ -70,7 +73,7 @@ def create_tables():
             created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             CONSTRAINT pk_trial PRIMARY KEY (uuid),
-            CONSTRAINT fk_trial_user FOREIGN KEY (user_id, user_domain) REFERENCES user(user_id, domain)
+            CONSTRAINT fk_trial_user FOREIGN KEY (user_id, user_domain) REFERENCES ddb_user(user_id, domain)
         );        
         """,
         """
@@ -97,9 +100,9 @@ def create_tables():
         EXECUTE PROCEDURE set_updated_at_timestamp();
         """,
         """
-        DROP TRIGGER IF EXISTS user_set_updated_at ON user;
-        CREATE TRIGGER user_set_updated_at
-        BEFORE UPDATE ON user
+        DROP TRIGGER IF EXISTS ddb_user_set_updated_at ON ddb_user;
+        CREATE TRIGGER ddb_user_set_updated_at
+        BEFORE UPDATE ON ddb_user
         FOR EACH ROW
         EXECUTE PROCEDURE set_updated_at_timestamp();
         """,
@@ -112,20 +115,20 @@ def create_tables():
         """,
         """
         CREATE TABLE graph_edges (
-            edge_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            edge_id            UUID DEFAULT gen_random_uuid(),
             source_trial_id    UUID NOT NULL REFERENCES trial(uuid),
             target_entity_id   VARCHAR(255) NOT NULL,
-            target_entity_type VARCHAR(50) NOT NULL --  ('trial', 'project', 'tag'),
+            target_entity_type VARCHAR(50) NOT NULL, --  ('trial', 'project', 'tag')
             CONSTRAINT pk_graph_edges PRIMARY KEY (edge_id)
         );
         """
         )
     try:
-        config = load_config()
+        config = load_config(filename=config_path)
         with psycopg2.connect(**config) as conn:
             with conn.cursor() as cur:
                 # execute the CREATE TABLE statement
-                ctr = 1;
+                ctr = 1
                 for command in commands:
                     print(f"Executing command {ctr}/{len(commands)}...")
                     cur.execute(command)
@@ -134,4 +137,9 @@ def create_tables():
         print(error)
 
 if __name__ == '__main__':
-    create_tables()
+    parser = argparse.ArgumentParser(description="PG CONNECTION")
+    parser.add_argument("--pg_config", "-p", type=str, default="pg_database.ini", help="Path to the DB configuration file")
+    args = parser.parse_args()    
+    
+    if not check_tables(args.pg_config):
+        create_tables(args.pg_config)
