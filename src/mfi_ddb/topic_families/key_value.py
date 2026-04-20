@@ -3,7 +3,7 @@ import json
 import jsonschema
 import logging
 
-SCHEMA_FILE = "schema/kv.json"
+SCHEMA_FILE = "./schema/kv.json"
 LOGGER = logging.getLogger(__name__)
 
 class KeyValueTopicFamily(BaseTopicFamily):
@@ -47,7 +47,9 @@ class KeyValueTopicFamily(BaseTopicFamily):
     
     @staticmethod
     def get_schema_validator():
-        with open(SCHEMA_FILE, "r") as f:
+        current_dir = __file__.rsplit("/", 1)[0]
+        schema_path = f"{current_dir}/{SCHEMA_FILE}"
+        with open(schema_path, "r") as f:
             schema = json.load(f)
         return jsonschema.Draft7Validator(schema)
         
