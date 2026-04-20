@@ -1,5 +1,5 @@
 services:
-  postgres:
+  mds_db:
     image: postgres:15
     container_name: mds_db
     environment:

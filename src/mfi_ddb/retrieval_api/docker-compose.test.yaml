@@ -1,7 +1,7 @@
 services:
-  postgres:
+  test_mds_db:
     image: postgres:15
-    container_name: test_mds
+    container_name: test_mds_db
     environment:
       POSTGRES_PASSWORD: mfiddb
       POSTGRES_USER: mfi
@@ -11,7 +11,7 @@ services:
     # volumes:
       # - ./metadata_store-pg/init-mds.sql:/docker-entrypoint-initdb.d/init-mds.sql
   
-  broker:
+  test_broker:
     image: emqx/emqx-enterprise:6.2.0
     container_name: test_broker
     ports:
@@ -23,7 +23,7 @@ services:
       timeout: 10s
       retries: 3
 
-  mds_connector:
+  test_mds_connector:
     build:
       context: ./metadata_store-pg
       dockerfile: Dockerfile
