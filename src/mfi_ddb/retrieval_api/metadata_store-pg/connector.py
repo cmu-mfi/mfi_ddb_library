@@ -1,20 +1,23 @@
-import json
-import os
-from configparser import ConfigParser
+import argparse
 import logging
 from datetime import datetime
-from typing import Optional, Dict, List, Any
+from typing import Any, Dict, List, Optional
+
+from pg_check_tables import check_tables
+from pg_config import load_config
+from pg_connect import connect as pg_connect
+from pg_create_tables import create_tables
+from pg_mds import MdsConnector
 
 from mfi_ddb import KeyValueTopicFamily, Subscriber
 from mfi_ddb.utils.script_utils import get_topic_from_config
-from pg_mds import MdsConnector
-from pg_config import load_config
 
 logging.basicConfig(level=logging.INFO)
-mds = MdsConnector()
+mds = None
 
 
 def callback(config, topic, message):
+    print("Received message on topic:", topic)
     data: dict = KeyValueTopicFamily.process_message(message)
     logging.info(f"Received message with keys: {data.keys()} on topic: {topic}")
 
@@ -125,14 +128,19 @@ def callback(config, topic, message):
         logging.info(f"Unknown message type: {msg_type} with topic: {topic}")
 
 
-def main():
+def main(broker_config_path):
     # LOAD CONFIG
-    config_file = "broker.ini"
+    config_file = broker_config_path
     mqtt_config = load_config(config_file, section="mqtt")
 
     # INIT A CONNECTION
-    mqtt_sub = Subscriber(mqtt_config)
-
+    try:
+        mqtt_sub = Subscriber({"mqtt": mqtt_config})
+        logging.info(f"Connected to MQTT broker at {mqtt_config['broker_address']}:{mqtt_config['broker_port']}, client id: {mqtt_sub.client._client_id.decode('utf-8')}")
+    except Exception as e:
+        logging.error(f"Failed to connect to the MQTT broker. Error: \n {str(e)}")
+        return
+    
     # SUBSCRIBE TO TOPIC AND SET A CALLBACK
     topic_config = load_config(config_file, section="topic")
     topic = get_topic_from_config(topic_config)
@@ -141,6 +149,7 @@ def main():
     )
 
     mqtt_sub.client.loop_start()
+    logging.info(f"Subscribed to topic: {topic}")
 
     while KeyboardInterrupt:
         pass
@@ -150,4 +159,21 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="MDS Connector")
+    parser.add_argument("--broker_config", "-b", type=str, default="broker.ini", help="Path to the configuration file")
+    parser.add_argument("--pg_config", "-p", type=str, default="pg_database.ini", help="Path to the DB configuration file")
+    args = parser.parse_args()
+    
+    try:
+        pg_conn = pg_connect(args.pg_config)
+        logging.info("Successfully connected to PostgreSQL database.")
+    except Exception as e:
+        logging.error(f"Failed to connect to PostgreSQL database. Error: \n {str(e)}")
+        exit(1)
+    
+    if not check_tables(args.pg_config):
+        create_tables(args.pg_config)
+    
+    mds = MdsConnector(config_path=args.pg_config)
+    
+    main(args.broker_config)
