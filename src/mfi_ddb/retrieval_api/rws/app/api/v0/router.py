@@ -111,6 +111,10 @@ async def list_endpoints():
             "endpoint": "/type3",
             "description": "Search trials and retrieve data when a unique trial is found.",
         },
+        {
+            "endpoint": "/type4",
+            "description": "Download files/bytes data. (NOT IMPLEMENTED YET)",
+        }
     ]
 
     return schema.Type0Response(
