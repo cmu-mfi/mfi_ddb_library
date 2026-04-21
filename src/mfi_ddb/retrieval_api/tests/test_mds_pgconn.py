@@ -13,10 +13,13 @@ import uuid
 from datetime import datetime, timezone
 
 import pytest
-from pg_mds import MdsConnector
+try:
+    from pg_mds import MdsConnector
+except ModuleNotFoundError:
+    raise Exception("RUN WITH PYTHONPATH=./metadata_store_pg")
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Helpers and Fixtures
 # ---------------------------------------------------------------------------
 
 def uid(prefix: str = "") -> str:
@@ -27,6 +30,10 @@ def uid(prefix: str = "") -> str:
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
+
+@pytest.fixture(scope="session")
+def connector():
+    return MdsConnector(config_path="./metadata_store_pg/pg_database.test.ini")
 
 # ---------------------------------------------------------------------------
 # insert_user
