@@ -17,14 +17,14 @@ Requires: psycopg2
 
 from typing import Optional, Tuple, Dict, Any, List
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 import psycopg2.pool
 from psycopg2 import sql
 import psycopg2.extras
 from pg_config import load_config
 
 _ALLOWED_TABLES = {
-    "user",
+    "ddb_user",
     "project",
     "trial",
     "user_project_role_linking",
@@ -91,8 +91,8 @@ class MdsConnector:
         # Convert python dict/list to JSON wrapper for psycopg2
         processed_vals: List[Any] = []
         for v in vals:
-            if isinstance(v, (dict, list)):
-                processed_vals.append(psycopg2.extras.Json(v))
+            if isinstance(v, dict):
+                processed_vals.append(psycopg2.extras.Json(v))  # JSONB
             else:
                 processed_vals.append(v)
 
@@ -105,14 +105,16 @@ class MdsConnector:
             processed_vals.append(timestamp_value)
             processed_vals.append(timestamp_value)
 
+        # constrain_name = f"pk_{table}"
         query = sql.SQL(
             "INSERT INTO {table} \
             ({fields}, created_at) VALUES ({values}, {created_at}) \
-            ON CONFLICT ON CONSTRAINT pk_{table} \
+            ON CONFLICT ON CONSTRAINT {constraint} \
             DO UPDATE SET {updates}, updated_at = {updated_at} \
             RETURNING *;"
         ).format(
             table=sql.Identifier(table),
+            constraint=sql.Identifier(f"pk_{table}"),
             fields=sql.SQL(", ").join(map(sql.Identifier, cols)),
             values=sql.SQL(", ").join(placeholders),
             created_at=created_at_clause,
@@ -269,7 +271,7 @@ class MdsConnector:
             "timestamp": timestamp,
         }
         try:
-            return self._upsert("user", data)
+            return self._upsert("ddb_user", data)
         except Exception as e:
             logger.error(f"Error inserting user {user}: {e}")
             return {}
@@ -314,14 +316,14 @@ class MdsConnector:
             "user_domain": user[1],
             "project_id": project_id,
             "birth_timestamp": birth_timestamp,
-            "death_timestamp": death_timestamp,
+            "death_timestamp": death_timestamp if death_timestamp is not None else birth_timestamp,
             "clean_exit": clean_exit,
             "metadata": metadata,
             "data_topics": data_topics,
             "timestamp": timestamp,
         }
         try:
-             return self._upsert("trial", data)
+            return self._upsert("trial", data)
         except Exception as e:
             logger.error(f"Error inserting trial {trial_id}: {e}")
             return {}
@@ -337,7 +339,7 @@ class MdsConnector:
         metadata: Optional[Dict[str, Any]] = None,
         data_topics: Optional[List[str]] = None,
         timestamp: Optional[str] = None,
-        time_start: Optional[str] = None,
+        time_start: Optional[str] = '-infinity',
         time_end: Optional[str] = None,
     ) -> Dict[str, Any]:
         data: Dict[str, Any] = {
@@ -352,6 +354,8 @@ class MdsConnector:
             "timestamp": timestamp,
             "data_topics": data_topics,
         }
+
+        time_end = datetime.now(timezone.utc).isoformat() if time_end is None else time_end
         
         selected_trials = self._lookup("trial", {
             "trial_name": trial_id, 
@@ -360,7 +364,7 @@ class MdsConnector:
             "birth_timestamp": ('between', time_start, time_end) if time_start and time_end else None,
             "death_timestamp": ('between', time_start, time_end) if time_start and time_end else None
         })
-        
+                
         if not selected_trials:
             logger.warning(f"No trial found for update with trial_id={trial_id}, user={user}, time range=({time_start}, {time_end}). Skipping update.")
             return {}
@@ -373,7 +377,7 @@ class MdsConnector:
             return {}
         
         # Use the primary key 'id' for the upsert to target the correct row
-        data["id"] = selected_trials[0]["id"]
+        data["uuid"] = selected_trials[0]["uuid"]
         
         try:
             return self._upsert("trial", data)

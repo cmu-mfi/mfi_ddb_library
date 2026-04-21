@@ -17,14 +17,21 @@ def create_tables(config_path='pg_database.ini'):
             name               VARCHAR(50),
             created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            CONSTRAINT pk_user PRIMARY KEY (user_id, domain),
+            CONSTRAINT pk_ddb_user PRIMARY KEY (user_id, domain),
             CONSTRAINT fk_user_created_by FOREIGN KEY (created_by_user_id, created_by_domain) REFERENCES ddb_user(user_id, domain) DEFERRABLE INITIALLY DEFERRED
         );        
+        """,
+        """
+        INSERT INTO ddb_user (
+            user_id, domain, email, name
+        ) VALUES (
+            'superadmin', 'superadmin', 'superadmin@example.com','Super Admin'
+        );
         """,        
         """
         CREATE TABLE project (
             project_id           UUID DEFAULT gen_random_uuid(),
-            name      	         VARCHAR(50),
+            name      	         VARCHAR(50) NOT NULL,
             created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             created_by_user_id   VARCHAR(50),
