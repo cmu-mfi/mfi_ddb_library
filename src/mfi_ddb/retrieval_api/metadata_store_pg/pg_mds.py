@@ -300,7 +300,7 @@ class MdsConnector:
                 ...
             elif len(project_row)==1:
                 # CHECK IF USER IS ALLOWED TO UPDATE
-                if created_by is not DEFAULT_USER:
+                if created_by != DEFAULT_USER:
                     user_role = self._lookup(
                         "user_project_role_linking",
                         {
