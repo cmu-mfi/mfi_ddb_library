@@ -308,7 +308,7 @@ class TestUpdateTrial:
             clean_exit=True,
         )
 
-        assert row["clean_exit"] is True
+        assert row["clean_exit"]
 
     def test_updates_metadata(self, connector, existing_trial):
         user_id, _, trial_id, _ = existing_trial

@@ -58,7 +58,22 @@
                     "project_name": {"type": "string"},
                     "created_by_user_id": {"type": "string"},
                     "created_by_domain": {"type": "string", "default": ""},
-                    "timestamp": {"type": "string", "format": "date-time"}
+                    "timestamp": {"type": "string", "format": "date-time"},
+                    "user_roles": {
+                        "type": "array",
+                        "items" : {
+                            "type": "object",
+                            "properties": {
+                                "user_id": {"type": "string"},
+                                "domain": {"type": "string"},
+                                "role": {
+                                    "type": "string", 
+                                    "options": ["admin", "operator", "maintainer", "researcher"],
+                                    "default": "operator"
+                                }
+                            }
+                        }
+                    }
                 },
                 "required": ["created_by_user_id", "created_by_domain", "timestamp"],
                 "anyOf": [

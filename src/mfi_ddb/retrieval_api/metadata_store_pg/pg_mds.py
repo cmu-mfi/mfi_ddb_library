@@ -15,13 +15,14 @@ Requires: psycopg2
     pip install psycopg2-binary
 """
 
-from typing import Optional, Tuple, Dict, Any, List
 import logging
 from datetime import datetime, timezone
-import psycopg2.pool
-from psycopg2 import sql
+from typing import Any, Dict, List, Optional, Tuple
+
 import psycopg2.extras
+import psycopg2.pool
 from pg_config import load_config
+from psycopg2 import sql
 
 _ALLOWED_TABLES = {
     "ddb_user",
@@ -37,8 +38,8 @@ logger = logging.getLogger(__name__)
 
 class MdsConnector:
     def __init__(self, config_path='pg_database.ini'):
+        config = load_config(filename=config_path)
         try:
-            config = load_config(filename=config_path)
             self.__conn_pool = psycopg2.pool.ThreadedConnectionPool(
                 minconn=1,
                 maxconn=10,
@@ -281,17 +282,58 @@ class MdsConnector:
         timestamp: str,
         project_id: Optional[str] = None,
         project_name: Optional[str] = None,
-        created_by: Optional[Tuple[str, str]] = None,
+        created_by: Optional[Tuple[str, str]] = DEFAULT_USER,
         details: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, Any]:        
+        if project_id is not None:
+            condition = {"project_id": project_id}
+        else:
+            condition = {"project_name": project_name}
+        
+        project_row = self._lookup("project", condition)
+        
+        if project_row is not None:
+            if len(project_row)>1:
+                # TODO: IT IS A MESS IF THERE ARE MULTIPLE RECORDS
+                # TRY AND USE USER PROJECT ROLES TO IDENTIFY WHICH
+                # PROJECT THE USER IS TRYING TO MODIFY
+                ...
+            elif len(project_row)==1:
+                # CHECK IF USER IS ALLOWED TO UPDATE
+                if created_by is not DEFAULT_USER:
+                    user_role = self._lookup(
+                        "user_project_role_linking",
+                        {
+                            "user_id": created_by[0],
+                            "domain": created_by[1],
+                            "project_id": project_row[0]["project_id"]
+                        }
+                    )
+                    if user_role is None or len(user_role) == 0:
+                        logging.warning(f"User {created_by} not allowed to update project {project_row[0]['project_name']}")
+                        return {}
+                    if user_role[0]["role"] not in ["admin", "maintainer"]:
+                        logging.warning(f"User {created_by} has role {user_role[0]['role']}")
+                        logging.warning(f"User {created_by} not allowed to update project {project_row[0]['project_name']}")
+                        return {}
+                    
+                # UPDATE VALUES
+                project_id = project_row[0]["project_id"]
+                old_details = project_row[0]["details"]
+                old_details.update(details)
+                details = old_details
+                if created_by is None:
+                    created_by = (project_row[0]["created_by_user_id"],
+                                  project_row[0]["created_by_domain"])
+                
         data: Dict[str, Any] = {
             "project_id": project_id,
-            "name": project_name,
-            "created_by_user_id": created_by[0] if created_by else DEFAULT_USER[0],
-            "created_by_domain": created_by[1] if created_by else DEFAULT_USER[1],
+            "project_name": project_name,
+            "created_by_user_id": created_by[0],
+            "created_by_domain": created_by[1],
             "details": details,
             "timestamp": timestamp,
-        }
+        }        
         try:
             return self._upsert("project", data)
         except Exception as e:
@@ -401,7 +443,11 @@ class MdsConnector:
             "project_id": project_id,
             "role": role,
         }
-        return self._upsert("user_project_role_linking", data)
+        try:
+            return self._upsert("user_project_role_linking", data)
+        except Exception as e:
+            logger.error(f"Error inserting user-project-role-linking: {e}")
+            return {}            
 
     def insert_graph_edge(
         self,
@@ -416,4 +462,6 @@ class MdsConnector:
             "target_entity_id": target_entity_id,
             "target_entity_type": target_entity_type,
         }
-        return self._upsert("graph_edges", data)
+        # return self._upsert("graph_edges", data)
+        logger.warning("NOT IMPLEMENTED AND TESTED")
+        return {}
