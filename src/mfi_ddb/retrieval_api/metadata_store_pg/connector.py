@@ -73,112 +73,114 @@ def callback(config, topic, message):
         if project_row is not None and len(project_row) == 1:
             project["name"] = project_row[0]["name"]
 
-    if msg_type == "birth":
-        metadata_exclude_keys = ["schema_version", "msg_type", "time", "trial_id"]
-                    
-        mds.insert_trial(
-            trial_id=data["trial_id"],
-            user=(data["user"]["user_id"], data["user"]["domain"]),
-            project_id= project["id"] if project else None,
-            birth_timestamp=data["time"]["birth"],
-            metadata={k: v for k, v in data.items() if k not in metadata_exclude_keys},
-            data_topics=data["data_topics"] if "data_topics" in data else None,
-            timestamp=data["time"]["birth"]
-        )
-    elif msg_type == "death":
-        if "death" not in data["time"]:
-            death_timestamp = datetime.now().isoformat()  # Use current time as fallback
-            clean_exit = False  # Assume unclean exit if death timestamp is not provided
-        else:
-            death_timestamp = data["time"]["death"]
-            clean_exit = True           
+    try:
+        if msg_type == "birth":
+            metadata_exclude_keys = ["schema_version", "msg_type", "time", "trial_id"]
+                        
+            mds.insert_trial(
+                trial_id=data["trial_id"],
+                user=(data["user"]["user_id"], data["user"]["domain"]),
+                project_id= project["id"] if project else None,
+                birth_timestamp=data["time"]["birth"],
+                metadata={k: v for k, v in data.items() if k not in metadata_exclude_keys},
+                data_topics=data["data_topics"] if "data_topics" in data else None,
+                timestamp=data["time"]["birth"]
+            )
+        elif msg_type == "death":
+            if "death" not in data["time"]:
+                death_timestamp = datetime.now().isoformat()  # Use current time as fallback
+                clean_exit = False  # Assume unclean exit if death timestamp is not provided
+            else:
+                death_timestamp = data["time"]["death"]
+                clean_exit = True           
+                
+            metadata_exclude_keys = ["schema_version", "msg_type", "time", "trial_id"]
             
-        metadata_exclude_keys = ["schema_version", "msg_type", "time", "trial_id"]
-        
-        mds.update_trial(
-            trial_id=data["trial_id"],
-            user=(data["user"]["user_id"], data["user"]["domain"]),
-            project_id=project["id"] if project else None,
-            death_timestamp=death_timestamp,
-            clean_exit=clean_exit,
-            timestamp=death_timestamp,
-            time_start=data["time"]["birth"],
-            time_end=data["time"]["death"]
-        )
-    elif msg_type == "user":
-        mds.insert_user(
-            user=(data["user_id"], data["domain"]),
-            created_by=(data["created_by_user_id"], data["created_by_domain"]),
-            email=data["email"] if "email" in data else "",
-            name=data["name"] if "name" in data else "",
-            timestamp=data["timestamp"]
-        )
-    elif msg_type == "project":
-        exclude_keys = [
-            "schema_version", 
-            "msg_type", 
-            "project_id", 
-            "project_name",
-            "created_by_user_id",
-            "created_by_domain",
-            "timestamp"
-        ]
-        project_row = mds.insert_project(
-            project_id=data["project_id"] if "project_id" in data else None,
-            project_name=data["project_name"] if "project_name" in data else None,
-            created_by=(data["created_by_user_id"], data["created_by_domain"]),
-            timestamp=data["timestamp"],
-            details={k: v for k, v in data.items() if k not in exclude_keys}
-        )
-        if "user_roles" in data:
-            if type(data["user_roles"]) is list:
-                for user in data["user_roles"]:
-                    role = user["role"]
-                    if role not in ["admin", "operator", "maintainer", "researcher"]:
-                        role = "operator"
-                    mds.insert_user_project_role_linking(
-                        user_id=user.get("user_id"),
-                        domain=user.get("domain",""),
-                        project_id=project_row["project_id"],
-                        role=role
-                    )
-    elif msg_type == "tp-tag":
-        selected_trials = mds._lookup("trial", {
-            "trial_name": data["trial_id"], 
-            "user_id": data["trial_user_id"], 
-            "user_domain": data["trial_user_domain"],
-            "birth_timestamp": ('between', data["time_start"], data["time_end"]) if data["time_start"] and data["time_end"] else None,
-            "death_timestamp": ('between', data["time_start"], data["time_end"]) if data["time_start"] and data["time_end"] else None
-        })
-        project_roles = mds._lookup("user_project_role_linking", {
-            "project_id": project["id"]
-        })
-        if selected_trials is None or len(selected_trials) != 1:
-            logger.error(f"Cannot update the tag for the trial {data['trial_id']}")
-            return
-        
-        # CHECK IF THE USER HAS THE PERMISSION TO UPDATE THE TRIAL
-        authorized_users = [(selected_trials[0]["user_id"], selected_trials[0]["user_domain"])]
-        if project_roles is not None:
-            authorized_users.extend([(role["user_id"], role["domain"]) for role in project_roles])
-        if (data["created_by_user_id"], data["created_by_domain"]) not in authorized_users:
-            logger.error(f"User {(data['created_by_user_id'], data['created_by_domain'])} not authorized\
-                            to update trial {selected_trials[0]['trial_name']}")
-            return
-                    
-        mds.update_trial(
-            trial_id=data["trial_id"],
-            user=(data["trial_user_id"], data["trial_user_domain"]),
-            project_id=project["id"] if project else None,
-            time_start=data["time_start"],
-            time_end=data["time_end"],
-            timestamp=data["timestamp"]
-        )
-    elif msg_type == "data":
-        pass
-    else:
-        logging.info(f"Unknown message type: {msg_type} with topic: {topic}")
-
+            mds.update_trial(
+                trial_id=data["trial_id"],
+                user=(data["user"]["user_id"], data["user"]["domain"]),
+                project_id=project["id"] if project else None,
+                death_timestamp=death_timestamp,
+                clean_exit=clean_exit,
+                timestamp=death_timestamp,
+                time_start=data["time"]["birth"],
+                time_end=death_timestamp
+            )
+        elif msg_type == "user":
+            mds.insert_user(
+                user=(data["user_id"], data["domain"]),
+                created_by=(data["created_by_user_id"], data["created_by_domain"]),
+                email=data["email"] if "email" in data else "",
+                name=data["name"] if "name" in data else "",
+                timestamp=data["timestamp"]
+            )
+        elif msg_type == "project":
+            exclude_keys = [
+                "schema_version", 
+                "msg_type", 
+                "project_id", 
+                "project_name",
+                "created_by_user_id",
+                "created_by_domain",
+                "timestamp"
+            ]
+            project_row = mds.insert_project(
+                project_id=data["project_id"] if "project_id" in data else None,
+                project_name=data["project_name"] if "project_name" in data else None,
+                created_by=(data["created_by_user_id"], data["created_by_domain"]),
+                timestamp=data["timestamp"],
+                details={k: v for k, v in data.items() if k not in exclude_keys}
+            )
+            if "user_roles" in data:
+                if type(data["user_roles"]) is list:
+                    for user in data["user_roles"]:
+                        role = user["role"]
+                        if role not in ["admin", "operator", "maintainer", "researcher"]:
+                            role = "operator"
+                        mds.insert_user_project_role_linking(
+                            user_id=user.get("user_id"),
+                            domain=user.get("domain",""),
+                            project_id=project_row["project_id"],
+                            role=role
+                        )
+        elif msg_type == "tp-tag":
+            selected_trials = mds._lookup("trial", {
+                "trial_name": data["trial_id"], 
+                "user_id": data["trial_user_id"], 
+                "user_domain": data["trial_user_domain"],
+                "birth_timestamp": ('between', data["time_start"], data["time_end"]) if data["time_start"] and data["time_end"] else None,
+                "death_timestamp": ('between', data["time_start"], data["time_end"]) if data["time_start"] and data["time_end"] else None
+            })
+            project_roles = mds._lookup("user_project_role_linking", {
+                "project_id": project["id"]
+            })
+            if selected_trials is None or len(selected_trials) != 1:
+                logger.error(f"Cannot update the tag for the trial {data['trial_id']}")
+                return
+            
+            # CHECK IF THE USER HAS THE PERMISSION TO UPDATE THE TRIAL
+            authorized_users = [(selected_trials[0]["user_id"], selected_trials[0]["user_domain"])]
+            if project_roles is not None:
+                authorized_users.extend([(role["user_id"], role["domain"]) for role in project_roles])
+            if (data["created_by_user_id"], data["created_by_domain"]) not in authorized_users:
+                logger.error(f"User {(data['created_by_user_id'], data['created_by_domain'])} not authorized\
+                                to update trial {selected_trials[0]['trial_name']}")
+                return
+                        
+            mds.update_trial(
+                trial_id=data["trial_id"],
+                user=(data["trial_user_id"], data["trial_user_domain"]),
+                project_id=project["id"] if project else None,
+                time_start=data["time_start"],
+                time_end=data["time_end"],
+                timestamp=data["timestamp"]
+            )
+        elif msg_type == "data":
+            pass
+        else:
+            logging.info(f"Unknown message type: {msg_type} with topic: {topic}")
+    except Exception as e:
+        logger.error(f"Couldn't process the msg: \n {message}. Error: {str(e)}")
 
 def main(broker_config_path, pg_config_path):
     
