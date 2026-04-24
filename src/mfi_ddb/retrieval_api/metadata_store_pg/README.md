@@ -15,7 +15,7 @@ erDiagram
 
     PROJECT {
         UUID project_id PK
-        VARCHAR(50) name
+        VARCHAR(50) project_name
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
         VARCHAR(50) created_by_user_id FK
