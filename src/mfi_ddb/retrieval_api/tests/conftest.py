@@ -1,24 +1,16 @@
-import pytest
 import psycopg2
-from fastapi.testclient import TestClient
-from my_app.main import app
-from my_app.database import get_db_connection
+import pytest
+# /from metadata_store_pg.pg_mds import MdsConnector
 
+'''
 # 1. Fixture for the raw psycopg2 connection
 @pytest.fixture(scope="session")
 def db_connection():
-    # Setup: Connect to the test database
-    conn = psycopg2.connect(
-        dbname="test_db", user="user", password="password", host="localhost", port="5433"
-    )
-    # Create tables (you might use an Alembic migration here instead)
-    with conn.cursor() as cur:
-        cur.execute("CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT);")
-    conn.commit()
+    config = load_config("./metadata_store_pg/pg_database.test.ini")
+    conn = psycopg2.connect(**config)
     
-    yield conn
+    yield conn    
     
-    # Teardown: Close connection
     conn.close()
 
 # 2. Fixture for a clean cursor per test (Rollback strategy)
@@ -36,3 +28,9 @@ def db_session(db_connection):
 @pytest.fixture
 def client():
     return TestClient(app)
+'''
+
+# @pytest.fixture(scope="session")
+# def connector():
+#     return MdsConnector(config_path="./metadata_store_pg/pg_database.test.ini")
+ 

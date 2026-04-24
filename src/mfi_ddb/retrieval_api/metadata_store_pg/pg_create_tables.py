@@ -31,7 +31,7 @@ def create_tables(config_path='pg_database.ini'):
         """
         CREATE TABLE project (
             project_id           UUID DEFAULT gen_random_uuid(),
-            name      	         VARCHAR(50) NOT NULL,
+            project_name         VARCHAR(50) NOT NULL,
             created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             created_by_user_id   VARCHAR(50),

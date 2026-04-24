@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -12,14 +13,23 @@ from pg_mds import MdsConnector
 from mfi_ddb import KeyValueTopicFamily, Subscriber
 from mfi_ddb.utils.script_utils import get_topic_from_config
 
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 mds = None
 
 
 def callback(config, topic, message):
     print("Received message on topic:", topic)
-    data: dict = KeyValueTopicFamily.process_message(message)
-    logging.info(f"Received message with keys: {data.keys()} on topic: {topic}")
+    if mds is None:
+        logging.error("MdsConnector not available")
+        return
+    try:
+        data: dict = KeyValueTopicFamily.process_message(message)
+    except Exception as e:
+        logging.info(f"Message payload: {json.dumps(json.loads(message), indent=2)}")
+        logging.error(f"Error occurred while processing message on topic {topic}: {str(e)}")
+        return
+
+    logging.info(f"Received message of msg_type: {data.get('msg_type')} on topic: {topic}")
 
     # TODO ----------------------------------------------------------------------
     # streamer.py uses "metadata" tags for the key-value metadata,
@@ -39,19 +49,24 @@ def callback(config, topic, message):
     # populate function parameters based on the message content.
     
     # Retrieve project information if available in the message, otherwise set to None
-    project = data["project"] if "project" in data else {}
+    project = data.get("project", {"id": None, "name":None})
     
     if "project_id" in data or "project_name" in data:
-        project["id"] = data.get("project_id", None)
-        project["name"] = data.get("project_name", None)
+        project["id"] = data.get("project_id")
+        project["name"] = data.get("project_name")
     
-    if project["id"] is None and project["name"] is not None:
+    if "id" not in project:
+        project["id"] = None
+    if "name" not in project:
+        project["name"] = None
+    
+    if project.get("id") is None and project.get("name") is not None:
         project_row: Optional[List[Dict]] = mds._lookup(
             table="project", 
-            conditions={"name": project["name"]},)
+            conditions={"project_name": project["name"]},)
         if project_row is not None and len(project_row) == 1:
             project["id"] = project_row[0]["project_id"]     
-    elif project["id"] is not None:
+    elif project.get("id") is not None:
         project_row: Optional[List[Dict]] = mds._lookup(
             table="project", 
             conditions={"project_id": project["id"]},)
@@ -86,7 +101,9 @@ def callback(config, topic, message):
             project_id=project["id"] if project else None,
             death_timestamp=death_timestamp,
             clean_exit=clean_exit,
-            timestamp=death_timestamp
+            timestamp=death_timestamp,
+            time_start=data["time"]["birth"],
+            time_end=data["time"]["death"]
         )
     elif msg_type == "user":
         mds.insert_user(
@@ -106,14 +123,49 @@ def callback(config, topic, message):
             "created_by_domain",
             "timestamp"
         ]
-        mds.insert_project(
+        project_row = mds.insert_project(
             project_id=data["project_id"] if "project_id" in data else None,
             project_name=data["project_name"] if "project_name" in data else None,
             created_by=(data["created_by_user_id"], data["created_by_domain"]),
             timestamp=data["timestamp"],
             details={k: v for k, v in data.items() if k not in exclude_keys}
         )
+        if "user_roles" in data:
+            if type(data["user_roles"]) is list:
+                for user in data["user_roles"]:
+                    role = user["role"]
+                    if role not in ["admin", "operator", "maintainer", "researcher"]:
+                        role = "operator"
+                    mds.insert_user_project_role_linking(
+                        user_id=user.get("user_id"),
+                        domain=user.get("domain",""),
+                        project_id=project_row["project_id"],
+                        role=role
+                    )
     elif msg_type == "tp-tag":
+        selected_trials = mds._lookup("trial", {
+            "trial_name": data["trial_id"], 
+            "user_id": data["trial_user_id"], 
+            "user_domain": data["trial_user_domain"],
+            "birth_timestamp": ('between', data["time_start"], data["time_end"]) if data["time_start"] and data["time_end"] else None,
+            "death_timestamp": ('between', data["time_start"], data["time_end"]) if data["time_start"] and data["time_end"] else None
+        })
+        project_roles = mds._lookup("user_project_role_linking", {
+            "project_id": project["id"]
+        })
+        if selected_trials is None or len(selected_trials) != 1:
+            logger.error(f"Cannot update the tag for the trial {data['trial_id']}")
+            return
+        
+        # CHECK IF THE USER HAS THE PERMISSION TO UPDATE THE TRIAL
+        authorized_users = [(selected_trials[0]["user_id"], selected_trials[0]["user_domain"])]
+        if project_roles is not None:
+            authorized_users.extend([(role["user_id"], role["domain"]) for role in project_roles])
+        if (data["created_by_user_id"], data["created_by_domain"]) not in authorized_users:
+            logger.error(f"User {(data['created_by_user_id'], data['created_by_domain'])} not authorized\
+                            to update trial {selected_trials[0]['trial_name']}")
+            return
+                    
         mds.update_trial(
             trial_id=data["trial_id"],
             user=(data["trial_user_id"], data["trial_user_domain"]),
@@ -128,7 +180,19 @@ def callback(config, topic, message):
         logging.info(f"Unknown message type: {msg_type} with topic: {topic}")
 
 
-def main(broker_config_path):
+def main(broker_config_path, pg_config_path):
+    
+    # CONNECT TO MDS (POSTGRESQL) AND CHECK/CREATE TABLES
+    try:        
+        if not check_tables(pg_config_path):
+            create_tables(pg_config_path)
+        
+        global mds
+        mds = MdsConnector(config_path=pg_config_path)    
+    except Exception as e:
+        logging.error(f"Failed to initialize MDS Connector. Error: \n {str(e)}")
+        return
+    
     # LOAD CONFIG
     config_file = broker_config_path
     mqtt_config = load_config(config_file, section="mqtt")
@@ -171,9 +235,4 @@ if __name__ == "__main__":
         logging.error(f"Failed to connect to PostgreSQL database. Error: \n {str(e)}")
         exit(1)
     
-    if not check_tables(args.pg_config):
-        create_tables(args.pg_config)
-    
-    mds = MdsConnector(config_path=args.pg_config)
-    
-    main(args.broker_config)
+    main(args.broker_config, args.pg_config)
