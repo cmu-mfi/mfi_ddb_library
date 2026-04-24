@@ -1,16 +1,54 @@
 {
   "schema_version": "mfi-v1.0",
-  "msg_type": "death",
+  "msg_type": "birth",
   "trial_id": "trial-abc-123",
   "time": {
-    "birth": "2026-03-31T20:00:00Z",
-    "death": "2026-03-31T23:34:00Z"
+    "birth": "2026-03-31T20:34:00Z",
+    "death": "2026-03-31T22:20:00Z"
   },
   "user": {
-    "user_id": "user_01",
-    "domain": "internal"
+    "user_id": "user123",
+    "domain": "ANDREW",
+    "email": "user123@example.com",
+    "name": "User 123"
   },
-  "source": {},
-  "adapter": {},
-  "broker": {}
+  "project": {
+    "project_id": "proj-99"
+  },
+  "source": {
+    "os": "linux",
+    "hostname": "testhost",
+    "fqdn": "testhost.cmu.edu"
+  },
+  "adapter": {
+    "config": {
+      "key1": "value",
+      "key2": 19
+    },
+    "component_ids": [
+      "test"
+    ],
+    "attributes": {
+      "attr1": "value",
+      "attr2": 19
+    },
+    "sample_data": {
+      "test": {
+        "stream1": 10.9
+      }
+    }    
+  },
+  "broker": {
+    "broker_address": "test.mosquitto.org",
+    "broker_port": "1883",
+    "enterprise": "CMU",
+    "site": "Machine Shop",
+    "username": "mqtt_user",
+    "password": "mqtt_password",
+    "tls_enabled": false,
+    "debug": false
+  },
+  "data_topics":[
+    "mfi-v1.0-historian/CMU/machine_shop/data"
+  ]
 }
