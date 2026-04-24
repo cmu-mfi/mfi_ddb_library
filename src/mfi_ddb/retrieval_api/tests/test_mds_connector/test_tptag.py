@@ -67,7 +67,9 @@ def insert_user(client, user: Tuple[str,str]):
     publish(client, payload)
     grace_wait()
 
-def insert_trial(client, user: Tuple[str, str], time_period_sec: float, trial_name: str = uid("test_")) -> str:
+def insert_trial(client, user: Tuple[str, str], time_period_sec: float, trial_name: str = "") -> str:
+    if trial_name == "":
+        trial_name = uid("test_")
     birth_payload = get_payload_template("birth")
     birth_payload["trial_id"] = trial_name
     birth_payload["time"]["birth"] = now_iso()
