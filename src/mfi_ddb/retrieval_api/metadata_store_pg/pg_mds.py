@@ -408,13 +408,13 @@ class MdsConnector:
         })
                 
         if not selected_trials:
-            logger.warning(f"No trial found for update with trial_id={trial_id}, user={user}, time range=({time_start}, {time_end}). Skipping update.")
+            logger.error(f"No trial found for update with trial_id={trial_id}, user={user}, time range=({time_start}, {time_end}). Skipping update.")
             return {}
         elif len(selected_trials) == 0:
-            logger.warning(f"No trial found for update with trial_id={trial_id}, user={user}, time range=({time_start}, {time_end}). Skipping update.")
+            logger.error(f"No trial found for update with trial_id={trial_id}, user={user}, time range=({time_start}, {time_end}). Skipping update.")
             return {}
         elif len(selected_trials) > 1:
-            logger.warning(f"Multiple trials found for update with trial_id={trial_id}, user={user}, time range=({time_start}, {time_end}). \
+            logger.error(f"Multiple trials found for update with trial_id={trial_id}, user={user}, time range=({time_start}, {time_end}). \
                 This should not happen. Update may affect multiple rows. Skipping update.")
             return {}
         
@@ -463,5 +463,5 @@ class MdsConnector:
             "target_entity_type": target_entity_type,
         }
         # return self._upsert("graph_edges", data)
-        logger.warning("NOT IMPLEMENTED AND TESTED")
+        logger.error("NOT IMPLEMENTED AND TESTED")
         return {}
