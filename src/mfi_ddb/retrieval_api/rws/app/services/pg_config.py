@@ -4,11 +4,11 @@ from pathlib import Path
 
 
 def load_config(filename: Optional[str] = None, section: str = 'postgresql'):
-    if filename is None:
-        filename = str(Path(__file__).resolve().parents[1] / 'config' / 'pg_database.ini')
+    filename = 'pg_database.ini' if filename is None else filename
+    filepath = str(Path(__file__).resolve().parents[1] / 'config' / filename)
 
     parser = ConfigParser()
-    parser.read(filename)
+    parser.read(filepath)
 
     config = {}
     if parser.has_section(section):

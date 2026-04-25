@@ -27,10 +27,9 @@ DEFAULT_USER = ("superadmin", "superadmin")
 logger = logging.getLogger(__name__)
 
 class MdsReader:
-    def __init__(self):
-        config = None
+    def __init__(self, config_file = 'pg_database.ini'):
         try:
-            config = load_config()
+            config = load_config(filename=config_file)
             self.__conn_pool = psycopg2.pool.ThreadedConnectionPool(
                 minconn=1,
                 maxconn=10,
@@ -121,29 +120,51 @@ class MdsReader:
         finally:
             self.__conn_pool.putconn(conn)
 
-    def get_trial_by_uuid(self, trial_uuid: str) -> Optional[Dict[str, Any]]:
-        self._validate_table("trial")
+    def _validate_access_and_filter_trial_rows(self, trial_rows: Optional[List], user: Tuple[str,Optional[str]]) -> List:
+        filtered_rows = []
+        if trial_rows is None:
+            return []
+        
+        if user == ("superadmin", "superadmin"):
+            return trial_rows
+        
+        for row in trial_rows:
+            if user == (row["user_id"], row["user_domain"]):
+                filtered_rows.append(row)
+                continue
+            if row["project_id"] is None:
+                continue
+            user_roles = self._lookup("user_project_role_linking", {
+                "project_id":row["project_id"],
+                "user_id":user[0],
+                "domain":user[1]
+            })
+            if user_roles is None or len(user_roles)==0:
+                continue
+            if len(user_roles) > 1:
+                logger.warning(f"Same user {user} has multiple roles for project {row['project_id']}.")
 
-        query = sql.SQL("SELECT * FROM {table} WHERE id = %s;").format(
-            table=sql.Identifier("trial")
-        )
+            roles = set([u["role"] for u in user_roles])
+            if roles & {"admin", "maintainer"}:
+                filtered_rows.append(row)
+        
+        return filtered_rows           
+            
 
-        try:
-            conn = self.__conn_pool.getconn()
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute(query, (trial_uuid,))
-                row = cur.fetchone()
-                return dict(row) if row else None
-        finally:
-            self.__conn_pool.putconn(conn)
+    def get_trial_by_uuid(self, trial_uuid: str, user_id: str, user_domain: Optional[str]) -> Optional[Dict[str, Any]]:
+        row = self._lookup("trial", {"uuid": trial_uuid})
+        if row is None:
+            return None
+        row = self._validate_access_and_filter_trial_rows(row, (user_id,user_domain))        
+        return row[0] if row else None
 
     def find_trials(
         self,
+        user_id: str,        
+        user_domain: Optional[str] = None,
         enterprise_id: Optional[str] = None,
         time_start: Optional[datetime] = None,
         time_end: Optional[datetime] = None,
-        user_id: Optional[str] = None,
-        user_domain: Optional[str] = None,
         site: Optional[str] = None,
         device: Optional[str] = None,
         trial_id: Optional[str] = None,
@@ -157,14 +178,6 @@ class MdsReader:
         where_clauses: List[sql.SQL] = []
         join_project = False
 
-        if user_id is not None:
-            where_clauses.append(sql.SQL("trial.user_id = %s"))
-            values.append(user_id)
-
-        if user_domain is not None:
-            where_clauses.append(sql.SQL("trial.user_domain = %s"))
-            values.append(user_domain)
-
         if project_id is not None:
             where_clauses.append(sql.SQL("trial.project_id = %s"))
             values.append(project_id)
@@ -173,6 +186,12 @@ class MdsReader:
             where_clauses.append(sql.SQL("trial.trial_name = %s"))
             values.append(trial_id)
 
+        '''
+        # SEARCHING METADATA FOR SPECIFIC KEY VALUES IS UNIMPLEMENTED
+        # IDEAS: 
+        # * Do RAG-like search?
+        # * Use pg_vector?
+        
         if enterprise_id is not None:
             where_clauses.append(
                 sql.SQL("(trial.metadata->>%s = %s OR trial.metadata->>%s = %s)")
@@ -186,12 +205,17 @@ class MdsReader:
         if device is not None:
             where_clauses.append(sql.SQL("trial.metadata->>%s = %s"))
             values.extend(["device", device])
-
+        
         if project_name is not None:
             where_clauses.append(
                 sql.SQL("(trial.metadata->>%s = %s OR project.name = %s)")
             )
             values.extend(["project_name", project_name, project_name])
+            join_project = True
+        '''
+        if project_name is not None:
+            where_clauses.append(sql.SQL("(project.project_name = %s)"))
+            values.append(project_name)
             join_project = True
 
         if time_start is not None and time_end is not None:
@@ -241,6 +265,7 @@ class MdsReader:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(query, values)
                 rows = cur.fetchall()
+                rows = self._validate_access_and_filter_trial_rows(rows, (user_id,user_domain))
                 return [dict(row) for row in rows] if rows else []
         finally:
             self.__conn_pool.putconn(conn)
