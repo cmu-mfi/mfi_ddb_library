@@ -5,14 +5,16 @@ Configuration Router for MFI DDB Retrieval API
 """
 
 import datetime
-from dateutil import parser
+import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from dateutil import parser
+from fastapi import APIRouter, Depends, HTTPException, Request
+
 import app.schema.schema as schema
 from app.services.pg_mds import MdsReader
-from fastapi import APIRouter, HTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +22,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # psql initialization
-metadata_reader = MdsReader()
+def get_metadata_reader(request: Request):
+    """Dependency to get metadata_reader from app state."""
+    return request.app.state.metadata_reader
 
 # dws initialization
 dws_agent = None  # Placeholder for DWS agent initialization
@@ -130,7 +134,7 @@ async def list_endpoints():
     summary="Type 1: Search Trials",
     response_model=schema.Type1Response,
 )
-async def search_trials(request: schema.Type1Request):
+async def search_trials(request: schema.Type1Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
     """
     Search for trials based on provided criteria.
 
@@ -155,6 +159,11 @@ async def search_trials(request: schema.Type1Request):
         search_terms=request.search_terms,
     )
     
+    for trial in trials:
+        for key, value in trial.items():
+            if isinstance(value, datetime.datetime):
+                trial[key] = value.isoformat()
+    
     return schema.Type1Response(
         status="success",
         message=f"Found {len(trials)} trial(s).",
@@ -168,14 +177,14 @@ async def search_trials(request: schema.Type1Request):
     summary="Type 2: Get Trial Data",
     response_model=schema.Type2Response,
 )
-async def get_trial_details(request: schema.Type2Request):
+async def get_trial_details(request: schema.Type2Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
     """
     Retrieve detailed data for a specific trial.
 
     - **request**: A JSON object containing the trial UUID and other optional parameters for data retrieval.
     """
 
-    trial = metadata_reader.get_trial_by_uuid(request.trial_uuid)
+    trial = metadata_reader.get_trial_by_uuid(request.trial_uuid, request.user_id, request.user_domain)
     if not trial:
         raise HTTPException(status_code=404, detail="Trial not found")
 
@@ -193,7 +202,7 @@ async def get_trial_details(request: schema.Type2Request):
     summary="Type 3: Search Trials and Get Data",
     response_model=schema.Type3Response,
 )
-async def search_trials_and_get_data(request: schema.Type3Request):
+async def search_trials_and_get_data(request: schema.Type3Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
     """
     Search for trials based on provided criteria and retrieve detailed data for matching trials.
 

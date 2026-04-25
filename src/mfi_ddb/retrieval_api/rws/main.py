@@ -3,19 +3,37 @@ Retrieval API - Main Application Entry Point
 """
 
 import os
+from contextlib import asynccontextmanager
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+import logging
 
 # Import configuration router and application lifespan manager
 from app.api.v0.router import router
+from app.services.pg_mds import MdsReader
 
+logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: initialize metadata_reader
+    import sys
+    config_file = 'pg_database.test.ini' if 'pytest' in sys.modules else 'pg_database.ini'
+    app.state.metadata_reader = MdsReader(config_file=config_file)
+    yield
+    # Shutdown: cleanup if needed
+    if hasattr(app.state, 'metadata_reader'):
+        del app.state.metadata_reader
+        
 # FastAPI application instance with metadata and lifecycle management
 app = FastAPI(
     title="Retrieval API",
     version="0.1.0",
     description="Core API for data retrieval from MFI DDB Data store",
+    lifespan=lifespan
     # lifespan=lifespan  # Manages startup/shutdown tasks for adapters and connections
 )
 
