@@ -10,11 +10,8 @@ Run with:
 
 import pytest
 
-try:
-    from pg_mds import MdsConnector
-except ModuleNotFoundError:
-    raise Exception("RUN WITH PYTHONPATH=./metadata_store_pg")
+from pg_mds import MdsConnector
 
 @pytest.fixture(scope="session")
 def connector():
-    return MdsConnector(config_path="./metadata_store_pg/pg_database.test.ini")
+    return MdsConnector(config_path="pg_database.test.ini")

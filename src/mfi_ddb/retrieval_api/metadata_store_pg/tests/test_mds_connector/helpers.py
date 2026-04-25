@@ -22,7 +22,7 @@ def publish(client: mqtt.Client, payload: dict):
 
 def get_payload_template(type: str):
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    file_path = f"../../metadata_store_pg/json_payload_examples/{type}.json"
+    file_path = f"../../json_payload_examples/{type}.json"
     with open(os.path.join(current_dir, file_path), "r") as f:
         data = json.load(f)
 
