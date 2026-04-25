@@ -16,7 +16,7 @@ All of the above are configured in docker-compose.test.yml.
 
 import logging
 
-import pytest
+import pytest  # noqa: F401
 
 from test_rws.helpers import (
     insert_trial,
@@ -138,7 +138,7 @@ def test_access_trials_with_mixed_project_roles(user_factory, trial_factory, tes
     
     start_time = now_iso()
     trial1 = trial_factory(user_operator)
-    trial2 = trial_factory(user_operator) # untagged, so not accessible by other project users
+    trial2 = trial_factory(user_operator) # untagged, so not accessible by other project users  # noqa: F841
     trial3 = trial_factory(user_operator)
     
     tp_tag_by_project_name(mqtt_client, trial1, test_project, start_time, user_operator)
@@ -180,7 +180,7 @@ def test_find_trial_by_search_terms(user_factory, trial_factory, mqtt_client, rw
     # PUBLISHING MQTT PAYLOAD TO BROKER
     start_time = now_iso()
     test_user = user_factory()
-    other_trial = trial_factory(test_user)
+    other_trial = trial_factory(test_user)  # noqa: F841
     target_trial_name = insert_trial(
         client = mqtt_client,
         user = test_user,
@@ -217,7 +217,7 @@ def test_find_trial_by_multiple_search_terms(user_factory, trial_factory, mqtt_c
     # PUBLISHING MQTT PAYLOAD TO BROKER
     start_time = now_iso()
     test_user = user_factory()
-    other_trial = trial_factory(test_user)
+    other_trial = trial_factory(test_user)  # noqa: F841
     target_trial_name = insert_trial(
         client = mqtt_client,
         user = test_user,

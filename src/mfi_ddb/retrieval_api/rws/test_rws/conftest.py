@@ -19,7 +19,7 @@ Make sure to run the dockers before running these tests.
 import copy
 import logging
 import time
-from typing import Tuple
+# from typing import Tuple
 
 import paho.mqtt.client as mqtt
 import pytest

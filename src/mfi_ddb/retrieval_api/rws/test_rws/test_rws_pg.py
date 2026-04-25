@@ -16,7 +16,6 @@ All of the above are configured in docker-compose.test.yml.
 
 import logging
 import time
-import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Tuple
 
