@@ -7,7 +7,6 @@ Requires: psycopg2
 
 from typing import Optional, Tuple, Dict, Any, List
 import logging
-import re
 from datetime import datetime
 import psycopg2.pool
 from psycopg2 import sql
@@ -28,8 +27,8 @@ logger = logging.getLogger(__name__)
 
 class MdsReader:
     def __init__(self, config_file = 'pg_database.ini'):
+        config = load_config(filename=config_file)
         try:
-            config = load_config(filename=config_file)
             self.__conn_pool = psycopg2.pool.ThreadedConnectionPool(
                 minconn=1,
                 maxconn=10,
@@ -111,6 +110,7 @@ class MdsReader:
             where=sql.SQL(" AND ").join(where_clauses),
         )
 
+        conn = None
         try:
             conn = self.__conn_pool.getconn()
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -260,6 +260,7 @@ class MdsReader:
 
         query = query + sql.SQL(" ORDER BY trial.birth_timestamp DESC;")
 
+        conn = None
         try:
             conn = self.__conn_pool.getconn()
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -268,4 +269,5 @@ class MdsReader:
                 rows = self._validate_access_and_filter_trial_rows(rows, (user_id,user_domain))
                 return [dict(row) for row in rows] if rows else []
         finally:
-            self.__conn_pool.putconn(conn)
+            if conn is not None:
+                self.__conn_pool.putconn(conn)

@@ -5,10 +5,9 @@ Configuration Router for MFI DDB Retrieval API
 """
 
 import datetime
-import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from dateutil import parser
 from fastapi import APIRouter, Depends, HTTPException, Request
