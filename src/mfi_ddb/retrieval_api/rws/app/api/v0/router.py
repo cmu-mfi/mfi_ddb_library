@@ -59,7 +59,7 @@ def _build_trial_payload(trial_row: Dict[str, Any], request: schema.Type2Request
         end_value = str(end_ts)
 
     metadata = {
-        "trial_uuid": trial_row.get("id"),
+        "trial_uuid": trial_row.get("uuid"),
         "trial_name": trial_row.get("trial_name"),
         "metadata": trial_row.get("metadata") or {},
         "request_user": (request.user_id, request.user_domain),
@@ -233,7 +233,12 @@ async def search_trials_and_get_data(request: schema.Type3Request, metadata_read
             message="Unique trial found and data retrieved.",
             data=data,
         )
-
+        
+    for trial in trials:
+        for key, value in trial.items():
+            if isinstance(value, datetime.datetime):
+                trial[key] = value.isoformat()
+                
     return schema.Type1Response(
         status="success",
         message=f"Found {len(trials)} trial(s).",
