@@ -1,15 +1,4 @@
 """
-Tests for Type 3 endpoint: Search Trials and Get Data.
-
-Type 3 combines Type 1 (search) and Type 2 (get data):
-- If exactly 1 trial is found → returns trial data (Type2Response)
-- If 0 or multiple trials found → returns trial list (Type1Response)
-
-RUN WITH PYTHONPATH=./metadata_store_pg
-```
-$ PYTHONPATH=./metadata_store_pg pytest -v test_rws/test_rws_api_type3.py
-```
-
 Requires:
 * A running test PostgreSQL database (pg_database.test.ini)
 * A running test MQTT broker (broker.test.ini)

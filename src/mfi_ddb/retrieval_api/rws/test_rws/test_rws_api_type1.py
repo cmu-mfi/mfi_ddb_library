@@ -1,11 +1,4 @@
 """
-Tests for MdsReader.get_trial_by_uuid and MdsReader.find_trials.
-
-RUN WITH PYTHONPATH=./metadata_store_pg
-```
-$ PYTHONPATH=./metadata_store_pg pytest -v tests/test_mds_connector/test_pg_mds.py
-```
-
 Requires:
 * A running test PostgreSQL database (pg_database.test.ini)
 * A running test MQTT broker (broker.test.ini)
