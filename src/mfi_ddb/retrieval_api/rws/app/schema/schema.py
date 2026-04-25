@@ -31,24 +31,24 @@ class Type0Response(_Response):
         description: Optional[str] = Field(
             None, description="A brief description of what the endpoint does."
         )
-    endpoints: Optional[list[EndpointInfo]] = Field(None, description="A list of available API endpoints with their descriptions.")
+    endpoints: Optional[List[EndpointInfo]] = Field(None, description="A list of available API endpoints with their descriptions.")
 
 class Type1Request(BaseModel):
     """
     Request model for Type 1 endpoint.
     """
-    enterprise_id: str = Field(..., description="The enterprise ID to search for.")
     time_start: str = Field(..., description="The start time for the search in ISO 8601 format.")
     time_end: str = Field(..., description="The end time for the search in ISO 8601 format.")
     user_id: str = Field(..., description="The user ID requesting the search.")
     user_domain: Optional[str] = Field(None, description="The domain of the user requesting the search.")
     data_format: _ResponseTypeEnum = Field(_ResponseTypeEnum.json, description="The desired data format for the response (e.g., 'json', 'csv').")
+    enterprise_id: Optional[str] = Field(None, description="The enterprise ID to search for.")
     site: Optional[str] = Field(None, description="The site to filter the search results by.")
     device: Optional[str] = Field(None, description="The device to filter the search results by.")
     trial_id: Optional[str] = Field(None, description="The trial ID to filter the search results by.")
     project_id: Optional[str] = Field(None, description="The project ID to filter the search results by.")
     project_name: Optional[str] = Field(None, description="The project name to filter the search results by.")
-    search_terms: Optional[list[str]] = Field(None, description="A list of search terms to filter the search results by.")
+    search_terms: Optional[List[str]] = Field(None, description="A list of search terms to filter the search results by.")
 
 class Type1Response(_Response):
     """
