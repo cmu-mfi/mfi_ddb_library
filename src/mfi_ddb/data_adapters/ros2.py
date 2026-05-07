@@ -143,6 +143,7 @@ class Ros2DataAdapter(BaseDataAdapter):
                 try:
                     # ROS2 utility to get the message class from the type string
                     msg_class = self.get_message(msg_type_string)
+                    _, _ = self.rclpy.wait_for_message.wait_for_message(msg_class, self.node, topic)
                     self._raw_data[device][topic] = {'type': msg_class, 'msg': None}
                 except Exception as e:
                     self.node.get_logger().error(
@@ -168,7 +169,7 @@ class Ros2DataAdapter(BaseDataAdapter):
         """Cleanly shut down the ROS2 node and executor."""
         try:
             self.node.get_logger().info("Shutting down RosDataAdapter ROS2 node...")
-        except:
+        except:  # noqa: E722
             pass
 
         if self.rclpy.ok() and self.node:
@@ -180,8 +181,9 @@ class Ros2DataAdapter(BaseDataAdapter):
         if len(self.component_ids) == 0:
             self.node.get_logger().error("No components found in the data object.")
             return
-
-        return self._data
+        
+        # self.rclpy.spin_once(self.node, self.executor_thread)  # allow some time for callback to get data
+        # multiple executor spin commands may cause failures.
         
     def __process_rawdata(self, device, topic):
         """Processes the received message and updates the internal data."""
