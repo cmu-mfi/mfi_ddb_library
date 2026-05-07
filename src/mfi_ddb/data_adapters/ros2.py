@@ -181,7 +181,7 @@ class Ros2DataAdapter(BaseDataAdapter):
             self.node.get_logger().error("No components found in the data object.")
             return
 
-        self.rclpy.spin_once(self.node, self.executor_thread)  # allow some time for callback to get data
+        return self._data
         
     def __process_rawdata(self, device, topic):
         """Processes the received message and updates the internal data."""
@@ -320,12 +320,12 @@ class Ros2DataAdapter(BaseDataAdapter):
             
     def __start_executor(self):
 
-        executor = self.MultiThreadedExecutor()
-        executor.add_node(self.node)
+        self.executor = self.MultiThreadedExecutor()
+        self.executor.add_node(self.node)
 
         # Background thread
         self.executor_thread = threading.Thread(
-            target=executor.spin,
+            target=self.executor.spin,
             daemon=True
         )
         self.executor_thread.start()
