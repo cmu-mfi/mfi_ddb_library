@@ -124,13 +124,37 @@ class Ros2DataAdapter(BaseDataAdapter):
         self.node = rclpy.create_node('mfi_ddb_ros2_adapter')
     
         #CHECK IF LISTED TOPICS EXIST AND GET THEIR TYPES
-        print("Checking if listed ROS topics exist and fetching types...")        
-        all_topics_and_types = self.node.get_topic_names_and_types()
-        topic_to_type_map = {name: types[0] for name, types in all_topics_and_types}
+        print("Checking if listed ROS topics exist and fetching types...")    
 
         topics_to_remove = []
         for device in self.component_ids:
-            for topic in list(self._raw_data[device].keys()): # Use list for safe modification
+            for topic in list(self._raw_data[device].keys()):  # Use list for safe modification
+                rclpy.spin_once(self.node, timeout_sec=0.1)
+                topic_to_type_map = {
+                    name: types[0]
+                    for name, types in self.node.get_topic_names_and_types()
+                }
+
+                '''            
+                # spin_once above should be good enough to allow DDS to discover all 
+                # the ROS2 topics
+                # 
+                # Alternative: 
+                # We wait for timeout_sec period and spin the ros thread each time 
+                # to try and discover the topic
+                timeout_sec = 1.0
+                start_time = time.time()
+                while time.time()-start_time < timeout_sec:                    
+                    rclpy.spin_once(self.node, timeout_sec=0.1)
+                    topic_to_type_map = {
+                        name: types[0]
+                        for name, types in self.node.get_topic_names_and_types()
+                    }
+                    if topic in topic_to_type_map:
+                        break
+                # Alternative ends
+                '''
+                    
                 if topic not in topic_to_type_map:
                     self.node.get_logger().error(
                         f"Topic {topic} not found. Removing from the Ros2DataAdapter."
@@ -143,7 +167,6 @@ class Ros2DataAdapter(BaseDataAdapter):
                 try:
                     # ROS2 utility to get the message class from the type string
                     msg_class = self.get_message(msg_type_string)
-                    _, _ = self.rclpy.wait_for_message.wait_for_message(msg_class, self.node, topic)
                     self._raw_data[device][topic] = {'type': msg_class, 'msg': None}
                 except Exception as e:
                     self.node.get_logger().error(
