@@ -129,21 +129,10 @@ class Ros2DataAdapter(BaseDataAdapter):
         topics_to_remove = []
         for device in self.component_ids:
             for topic in list(self._raw_data[device].keys()):  # Use list for safe modification
-                rclpy.spin_once(self.node, timeout_sec=0.1)
-                topic_to_type_map = {
-                    name: types[0]
-                    for name, types in self.node.get_topic_names_and_types()
-                }
-
-                '''            
-                # spin_once above should be good enough to allow DDS to discover all 
-                # the ROS2 topics
-                # 
-                # Alternative: 
-                # We wait for timeout_sec period and spin the ros thread each time 
-                # to try and discover the topic
+                
                 timeout_sec = 1.0
                 start_time = time.time()
+                
                 while time.time()-start_time < timeout_sec:                    
                     rclpy.spin_once(self.node, timeout_sec=0.1)
                     topic_to_type_map = {
@@ -152,8 +141,6 @@ class Ros2DataAdapter(BaseDataAdapter):
                     }
                     if topic in topic_to_type_map:
                         break
-                # Alternative ends
-                '''
                     
                 if topic not in topic_to_type_map:
                     self.node.get_logger().error(
