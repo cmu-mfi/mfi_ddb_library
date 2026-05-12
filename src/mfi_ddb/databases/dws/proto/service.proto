@@ -23,7 +23,8 @@ service DataService {
 message GetDataPointRequest {
   string topic = 1; // can include wildcard in the topic name
   google.protobuf.Timestamp timestamp = 2;
-  // return value includes the closest datapoint to the requested timestamp, even if it's not an exact match.
+  // return value includes the closest datapoint to the requested timestamp, if there is no exact match.
+  bool do_closest_past = 3 [default = true]; // if false, checks closest datapoint in the future instead.
 }
 
 message GetDataPointResponse {
