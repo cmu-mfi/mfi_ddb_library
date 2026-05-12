@@ -21,20 +21,18 @@ service DataService {
 // --- Request/Response Definitions ---
 
 message GetDataPointRequest {
-  string topic = 1;
-  // TODO: is the user_id necessary?? Discuss.
-  // string user_id = 2; 
+  string topic = 1; // can include wildcard in the topic name
   google.protobuf.Timestamp timestamp = 2;
+  // return value includes the closest datapoint to the requested timestamp, even if it's not an exact match.
 }
 
 message GetDataPointResponse {
   dws.models.Datapoint datapoint = 1;
+  //returns error if multiple topics exist for the requested topic
 }
 
 message GetDataRangeRequest {
-  string topic = 1;
-  // TODO: is the user_id necessary?? Discuss.
-  // string user_id = 2;
+  string topic = 1; // can include wildcard in the topic name
   google.protobuf.Timestamp start_time = 2;
   google.protobuf.Timestamp end_time = 3;
   
@@ -42,7 +40,7 @@ message GetDataRangeRequest {
   // Reference: https://google.aip.dev/158
   // Assuming a default page size of 1000 if not specified, but allowing clients to set it as needed.
   int32 page_size = 4 [default = 1000];
-  string page_token = 5;
+  string page_token = 5 [default = ""];
 }
 
 message GetDataRangeResponse {
@@ -50,7 +48,7 @@ message GetDataRangeResponse {
   
   // Pagination token for the next set of results
   // Reference: https://google.aip.dev/158
-  string next_page_token = 2;
+  string next_page_token = 2 [default = ""];
 }
 
 message StreamDataRequest {
