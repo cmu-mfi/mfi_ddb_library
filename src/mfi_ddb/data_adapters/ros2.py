@@ -129,18 +129,24 @@ class Ros2DataAdapter(BaseDataAdapter):
         topics_to_remove = []
         for device in self.component_ids:
             for topic in list(self._raw_data[device].keys()):  # Use list for safe modification
+                rclpy.spin_once(self.node, timeout_sec=0.1)
+                topic_to_type_map = {
+                    name: types[0]
+                    for name, types in self.node.get_topic_names_and_types()
+                }
                 
-                timeout_sec = 1.0
-                start_time = time.time()
-                
-                while time.time()-start_time < timeout_sec:                    
-                    rclpy.spin_once(self.node, timeout_sec=0.1)
-                    topic_to_type_map = {
-                        name: types[0]
-                        for name, types in self.node.get_topic_names_and_types()
-                    }
-                    if topic in topic_to_type_map:
-                        break
+                if topic not in topic_to_type_map:                
+                    timeout_sec = 1.0
+                    start_time = time.time()
+                    
+                    while time.time()-start_time < timeout_sec:                    
+                        rclpy.spin_once(self.node, timeout_sec=0.1)
+                        topic_to_type_map = {
+                            name: types[0]
+                            for name, types in self.node.get_topic_names_and_types()
+                        }
+                        if topic in topic_to_type_map:
+                            break
                     
                 if topic not in topic_to_type_map:
                     self.node.get_logger().error(
