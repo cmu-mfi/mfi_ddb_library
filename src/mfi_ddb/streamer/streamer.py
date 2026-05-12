@@ -260,10 +260,11 @@ class Streamer(Observer):
                 "attributes": self.__data_adp.attributes,
                 "sample_data": sample_data,
             },
-            "broker": self.cfg["mqtt"]
+            "broker": self.cfg["mqtt"],
+            "data_topics": self.__client.get_data_topics()
         }         
         
-        return payload
+        return payload    
 
     def __generate_death_kv_payload(self, birth_payload: dict) -> dict:
         death_payload = copy.deepcopy(birth_payload)

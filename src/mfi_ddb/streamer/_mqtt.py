@@ -33,6 +33,7 @@ class Mqtt:
         
         self.__last_will_set = False
         self.__last_will = {}
+        self.__data_topics = set()
     
     def __get_topic_header(self, config:dict):
         ver = 'mfi-v1.0'
@@ -45,6 +46,9 @@ class Mqtt:
         
         args = [topic_head, enterprise, site, area]
         return '/'.join([arg for arg in args if arg])
+
+    def get_data_topics(self) -> set:
+        return self.__data_topics
 
     def connect(self, component_ids:list = []):
 
@@ -77,6 +81,12 @@ class Mqtt:
         while not self.client.is_connected():
             print("Connecting to MQTT broker...")
             time.sleep(1)
+            
+        # DATA TOPICS
+        for component_id in component_ids:
+            topic = f"{self.__topic_header}/{component_id}"
+            self.__data_topics.add(topic)
+            print(f"Data topic added: {topic}")
 
         self._components = component_ids
         
