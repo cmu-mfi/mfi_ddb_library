@@ -74,18 +74,18 @@ To be able to do the above three major classes are provided:
 * [MQTT](src/mfi_ddb/data_adapters/mqtt.py)
 * [MTConnect](src/mfi_ddb/data_adapters/mtconnect.py)
 * [gRPC](src/mfi_ddb/data_adapters/grpc.py)
-* [Ros2]((src/mfi_ddb/data_adapters/ros2.py)
+* [ROS2](src/mfi_ddb/data_adapters/ros2.py)
 
 ### Streamer
 
-* [Streamer](src/mfi_ddb/streamer/streamer.py)
+* [Streamer](mfi_ddb/streamer/streamer.py)
 
 ### Topic Family
 
-* [BaseTopicFamily](src/mfi_ddb/topic_families/base.py)
-* [BlobTopicFamily](src/mfi_ddb/topic_families/blob.py)
-* [KeyValueTopicFamily](src/mfi_ddb/topic_families/key_value.py)
-* [SpbTopicFamily](src/mfi_ddb/topic_families/time_series_spb.py)
+* [BaseTopicFamily](mfi_ddb/topic_families/base.py)
+* [BlobTopicFamily](mfi_ddb/topic_families/blob.py)
+* [KeyValueTopicFamily](mfi_ddb/topic_families/key_value.py)
+* [SpbTopicFamily](mfi_ddb/topic_families/time_series_spb.py)
 
 ## Streaming Metadata
 
@@ -110,9 +110,18 @@ python -m mfi_ddb.scripts.store_cfs path/to/mqtt.yaml path/to/cfs.yaml
 
 #### Command-line arguments
 
+#### Example usage
+
+```
+python -m mfi_ddb.scripts.store_cfs path/to/mqtt.yaml path/to/cfs.yaml
+```
+
+#### Command-line arguments
+
 ```
 usage: store_cfs.py [-h] mqtt_config_path cfs_config_path
 
+Subscribe to a topic and save files to Cloud File Store (CFS) based on configuration.
 Subscribe to a topic and save files to Cloud File Store (CFS) based on configuration.
 
 positional arguments:
@@ -120,6 +129,54 @@ positional arguments:
   cfs_config_path   Path to the CFS configuration file (e.g., cfs.yaml).
 ```
 
+### [stream_data.py](mfi_ddb/scripts/stream_data.py)
+
+#### Example usage
+
+Use a configuration directory:
+```
+$ python -m mfi_ddb.scripts.stream_data --data_adapter 'MQTT' --config_dir ./configs
+```
+
+Use specific configuration files:
+```
+$ python -m mfi_ddb.scripts.stream_data -d 'Local Files' --adapter_cfg ./configs/local_files.yaml --streamer_cfg ./configs/streamer.yaml
+```
+
+Enable polling mode with a specific rate (in Hz):
+```
+$ python -m mfi_ddb.scripts.stream_data -d 'MTConnect' -a ./configs/mtconnect.yaml -s ./configs/streamer.yaml -p True -r 2
+```
+
+#### Command-line arguments
+```
+usage: stream_data.py [-h] --data_adapter DATA_ADAPTER [--config_dir CONFIG_DIR]
+                      [--adapter_cfg ADAPTER_CFG] [--streamer_cfg STREAMER_CFG] [--polling POLLING]
+                      [--poll_rate POLL_RATE]
+
+Stream data using MFI-DDB library.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --data_adapter DATA_ADAPTER, -d DATA_ADAPTER
+                        Type of data adapter to use. Supported: 'Local Files', 'MTConnect', 'MQTT',
+                        'ROS', 'ROS Files'
+  --config_dir CONFIG_DIR, -cd CONFIG_DIR
+                        Directory containing the configuration files (local_files.yaml and mqtt.yaml).
+                        If --streamer_cfg or --adapter_cfg are provided, this argument is ignored.
+  --adapter_cfg ADAPTER_CFG, -a ADAPTER_CFG
+                        Path to the local files adapter configuration file (local_files.yaml).
+  --streamer_cfg STREAMER_CFG, -s STREAMER_CFG
+                        Path to the Streamer configuration file (streamer.yaml).
+  --polling POLLING, -p POLLING
+                        Enable polling mode. Default is False.
+  --poll_rate POLL_RATE, -r POLL_RATE
+                        Polling rate in Hz. Default is 1 Hz, if --polling is set to True.
+```
+
+## License
+
+This project is licensed under the BSD-3-Clause License - see the [LICENSE](LICENSE) file for details.
 ### [stream_data.py](mfi_ddb/scripts/stream_data.py)
 
 #### Example usage
