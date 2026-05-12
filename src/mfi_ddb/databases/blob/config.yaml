@@ -1,0 +1,3 @@
+config:
+  blob_dir: "/path/to/blob/storage"
+  index_path: "/path/to/index.jsonl"
