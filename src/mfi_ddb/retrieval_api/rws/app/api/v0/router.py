@@ -12,8 +12,9 @@ from typing import Any, Dict, Optional
 from dateutil import parser
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-import app.schema.schema as schema
+from app.schema import schema
 from app.services.pg_mds import MdsReader
+from app.services.dws_agent import DwsAgent
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,8 @@ def _build_trial_payload(trial_row: Dict[str, Any], request: schema.Type2Request
     }
     
     # TODO: USE THE METADATA TO GET DATA USING DWS AGENT
-    ...
+    data_topics = trial_row.get("data_topics", [])
+    
     
     return {
         "metadata": metadata,
