@@ -1,6 +1,6 @@
 services:
   metadata_service:                     # service name is arbitrary, but should be unique across services
-    url: "http://localhost:8001"   # (required) DWS server URL (protocol, host, port)
+    url: "http://localhost:8001"        # (required) DWS server URL (protocol, host, port)
     topic_families:                     # (required) list of topic families that this service can handle; used for routing requests
     - mfi-v1.0-kv
     # topics:                                             # (optional) list of topics (wildcards allowed) 
@@ -20,5 +20,3 @@ services:
     url: "http://localhost:8003"  
     topic_families: 
     - mfi-v1.0-blob
-
-

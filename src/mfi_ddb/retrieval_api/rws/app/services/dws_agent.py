@@ -2,7 +2,7 @@ import copy
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict
 
 import grpc
 import yaml
@@ -19,9 +19,9 @@ from app.utils.dws.gen.service_pb2_grpc import DataServiceStub
 
 logger = logging.getLogger(__name__)
 class __DwsAgent:
-    def __init__(self):
+    def __init__(self, cfg_file:str = "dws.endpoints.yaml"):
         current_dir = Path(__file__).parent
-        dws_config_path = Path(current_dir, "../config","dws_config.yaml")
+        dws_config_path = Path(current_dir, "../config", cfg_file)
         
         self.config = self._load_config(dws_config_path)
         
@@ -34,13 +34,15 @@ class __DwsAgent:
         
         config = {}
         for service in data['services']:
-            for topic_family in service['topic_families']:
+            service_cfg = data['services'][service]
+            service_cfg['name'] = service
+            for topic_family in service_cfg['topic_families']:
                 if topic_family not in config:
                     config[topic_family] = []
-                config[topic_family].append(service)
+                config[topic_family].append(service_cfg)
         return config   
 
-    def get_data(self, topics: Union[str, List[str]], time_start: str, time_end: str):
+    def get_data(self, topics: Union[str, List[str]], time_start: str, time_end: str) -> Dict:
         
         if isinstance(topics, str):
             topics = [topics]
@@ -50,6 +52,7 @@ class __DwsAgent:
             topic_family = topic.split("/")[0]
             topic_family_map[topic_family] = topic_family_map.get(topic_family, []) + [topic]
         
+        result = {}
         for topic_family in list(topic_family_map.keys()):
             if topic_family not in self.config:
                 logger.error(f"Topic family '{topic_family}' not found in DWS configuration. Skipping data retrieval for topics: {topic_family_map[topic_family]}")
@@ -66,18 +69,18 @@ class __DwsAgent:
             servers = self.config[topic_family]
             data_points: List[Datapoint] = []
             for server in servers:
-                logger.info(f"Retrieving data for topics: {topic_family_map[topic_family]} from server: {server['name']} at {server['endpoint']}")
-                response: GetDataRangeResponse = self._call_dws_server(server['endpoint'], request)
+                logger.info(f"Retrieving data for topics: {topic_family_map[topic_family]} from server: {server['name']} at {server['url']}")
+                response: GetDataRangeResponse = self._call_dws_server(server['url'], request)
                 raw_data = response.datapoints
                 
                 while response.next_page_token != "":
-                    request_2 = copy.deepcopy(request)
-                    request_2.page_token = response.next_page_token
-                    response_2: GetDataRangeResponse = self._call_dws_server(server['endpoint'], request_2)
-                    raw_data.extend(response_2.datapoints)
+                    request = copy.deepcopy(request)
+                    request.page_token = response.next_page_token
+                    response: GetDataRangeResponse = self._call_dws_server(server['url'], request)
+                    raw_data.extend(response.datapoints)
                     
                 data_points.extend(raw_data)
-                
+                    
             # REMOVE DUPLICATES BASED ON TOPIC AND TIMESTAMP
             seen = set()
             unique_data_points: List[Datapoint] = []
@@ -86,9 +89,8 @@ class __DwsAgent:
                 if key not in seen:
                     seen.add(key)
                     unique_data_points.append(dp)
-                    
+                                
             # CONVERT TO KEY VALUE PAIRS
-            result = {}
             for dp in unique_data_points:
                 value = None
                 if dp.int_value != 0:
@@ -113,10 +115,12 @@ class __DwsAgent:
                         "timestamp": datetime.fromtimestamp(dp.timestamp.seconds).isoformat(),
                         "value": value
                     }]
-            return result
+        return result
         
     def _call_dws_server(self, endpoint: str, request: GetDataRangeRequest) -> GetDataRangeResponse:
         with grpc.insecure_channel(endpoint) as channel:
             stub = DataServiceStub(channel)
             response = stub.GetDataRange(request)
             return response
+        
+DwsAgent = __DwsAgent()

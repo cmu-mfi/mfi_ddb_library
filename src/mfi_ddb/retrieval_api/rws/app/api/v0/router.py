@@ -73,11 +73,16 @@ def _build_trial_payload(trial_row: Dict[str, Any], request: schema.Type2Request
     
     # TODO: USE THE METADATA TO GET DATA USING DWS AGENT
     data_topics = trial_row.get("data_topics", [])
-    
+    try:
+        data = DwsAgent.get_data(data_topics, start_value, end_value)
+        logger.info(f"Retrieved data for trial {trial_row.get('uuid')}: {data}")    
+    except Exception as e:
+        logger.error(f"Error retrieving data for trial {trial_row.get('trial_name')}: {e}")
+        data = {}
     
     return {
         "metadata": metadata,
-        "data": {},  # Placeholder for actual data retrieved using DWS agent
+        "data": data,  # Actual data retrieved using DWS agent
     }
 
 

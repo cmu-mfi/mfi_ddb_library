@@ -23,7 +23,7 @@ _sym_db = _symbol_database.Default()
 
 
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
-import models_pb2 as models__pb2
+from . import models_pb2 as models__pb2
 
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rservice.proto\x12\x0b\x64ws.service\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x0cmodels.proto\"d\n\x13GetDataPointRequest\x12\r\n\x05topic\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\x12-\n\ttimestamp\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"@\n\x14GetDataPointResponse\x12(\n\tdatapoint\x18\x01 \x01(\x0b\x32\x15.dws.models.Datapoint\"\xba\x01\n\x13GetDataRangeRequest\x12\r\n\x05topic\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\x12.\n\nstart_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12,\n\x08\x65nd_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x11\n\tpage_size\x18\x05 \x01(\x05\x12\x12\n\npage_token\x18\x06 \x01(\t\"Z\n\x14GetDataRangeResponse\x12)\n\ndatapoints\x18\x01 \x03(\x0b\x32\x15.dws.models.Datapoint\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t\"c\n\x11StreamDataRequest\x12\r\n\x05topic\x18\x01 \x01(\t\x12\x0f\n\x07user_id\x18\x02 \x01(\t\x12.\n\nstart_from\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\">\n\x12StreamDataResponse\x12(\n\tdatapoint\x18\x01 \x01(\x0b\x32\x15.dws.models.Datapoint2\x88\x02\n\x0b\x44\x61taService\x12S\n\x0cGetDataPoint\x12 .dws.service.GetDataPointRequest\x1a!.dws.service.GetDataPointResponse\x12S\n\x0cGetDataRange\x12 .dws.service.GetDataRangeRequest\x1a!.dws.service.GetDataRangeResponse\x12O\n\nStreamData\x12\x1e.dws.service.StreamDataRequest\x1a\x1f.dws.service.StreamDataResponse0\x01\x62\x06proto3')
