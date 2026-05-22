@@ -2,7 +2,7 @@
 
 ```mermaid
 erDiagram
-    USER {
+    DDB_USER {
         VARCHAR(50) user_id PK
         VARCHAR(50) domain PK
         VARCHAR(50) created_by_user_id FK
@@ -56,11 +56,11 @@ erDiagram
     }
 
     %% Relationships
-    %% USER ||--o{ USER : "created_by (self-referencing)"
-    USER ||--o{ PROJECT : "creates"
-    USER ||--o{ USER_PROJECT_ROLE_LINKING : "has_role_in"
+    %% DDB_USER ||--o{ USER : "created_by (self-referencing)"
+    DDB_USER ||--o{ PROJECT : "creates"
+    DDB_USER ||--o{ USER_PROJECT_ROLE_LINKING : "has_role_in"
     PROJECT ||--o{ USER_PROJECT_ROLE_LINKING : "assigned_to"
-    USER ||--o{ TRIAL : "runs"
+    DDB_USER ||--o{ TRIAL : "runs"
     PROJECT ||--o{ TRIAL : "contains"
     TRIAL ||--o{ GRAPH_EDGES : "is_source_for"
 ```
