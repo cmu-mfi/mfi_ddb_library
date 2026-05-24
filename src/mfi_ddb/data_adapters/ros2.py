@@ -181,7 +181,7 @@ class Ros2DataAdapter(BaseDataAdapter):
         self.__start_executor()
         self.node.get_logger().info("RosDataAdapter initialized successfully.")
 
-    def shutdown(self):
+    def disconnect(self):
         """Cleanly shut down the ROS2 node and executor."""
         try:
             self.node.get_logger().info("Shutting down RosDataAdapter ROS2 node...")
@@ -190,8 +190,8 @@ class Ros2DataAdapter(BaseDataAdapter):
 
         if self.rclpy.ok() and self.node:
              self.node.destroy_node()
-        # ROS2 rclpy.shutdown() should ideally be called once at the program's end.
-        # It's omitted here to allow other nodes to run, but should be considered.
+        
+        super().disconnect()
     
     def get_data(self):
         if len(self.component_ids) == 0:
