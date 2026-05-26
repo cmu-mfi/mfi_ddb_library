@@ -1,0 +1,6 @@
+timescaledb:
+  host: "localhost"
+  port: 5432
+  user: "tsdb"
+  password: "timescale"
+  dbname: "ddb_ts"
