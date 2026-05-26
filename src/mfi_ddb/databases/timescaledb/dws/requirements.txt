@@ -1,0 +1,6 @@
+paho-mqtt
+pyyaml
+psycopg2-binary
+grpcio
+grpcio-tools
+protobuf
