@@ -4,17 +4,18 @@ Database Web Service (DWS) Server for PostgreSQL Key-Value Store
 Exposes gRPC services for data retrieval.
 """
 
+import argparse
 import logging
-import time
+import os
+import sys
 import threading
+import time
+from concurrent import futures
 from datetime import datetime, timezone
 from typing import Optional
 
 import grpc
-from concurrent import futures
-
-import sys
-import os
+import yaml
 
 # Add the gen directory to the path for imports
 gen_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gen')
@@ -22,30 +23,37 @@ if gen_dir not in sys.path:
     sys.path.insert(0, gen_dir)
 
 # Import protobuf modules
+import psycopg2
 from gen import models_pb2, models_pb2_grpc, service_pb2, service_pb2_grpc
 
 # Import timestamp for proto conversion
 from google.protobuf import timestamp_pb2
-
-import psycopg2
 from psycopg2 import sql
 
-
+logger = logging.getLogger(__name__)
 class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
     """Implementation of the DataService gRPC service."""
     
-    def __init__(self, db_config: dict):
+    def __init__(self, db_config: dict, debug: bool = False):
         self.db_config = db_config
         self.logger = logging.getLogger(__name__)
-        self._setup_logging()
+        self._setup_logging(debug)
+        
+        conn = self._get_connection()
+        if not conn:
+            raise Exception("Unable to connect to the kv database") 
+        else:
+            self.logger.info("kv database connection success!")
+        
         
         # Cache for database connections
         self._db_cache: dict = {}
         
-    def _setup_logging(self):
+    def _setup_logging(self, debug: bool = False):
         """Configure logging format and level."""
+        level = logging.DEBUG if debug else logging.INFO
         logging.basicConfig(
-            level=logging.INFO,
+            level=level,
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
     
@@ -280,17 +288,17 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
             conn.close()
 
 
-def serve(db_config: dict, port: int = 50051):
+def serve(db_config: dict, port: int = 50051, debug: bool = False):
     """Start the gRPC server."""
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     service_pb2_grpc.add_DataServiceServicer_to_server(
-        DataServiceServicer(db_config), server
+        DataServiceServicer(db_config, debug=debug), server
     )
     server.add_insecure_port(f'[::]:{port}')
     server.start()
     
     logging.info(f"DWS Server started on port {port}")
-    
+        
     try:
         while True:
             time.sleep(86400)  # Sleep for a day
@@ -299,15 +307,20 @@ def serve(db_config: dict, port: int = 50051):
         logging.info("DWS Server stopped")
 
 
-def main():
-    """Main entry point."""
-    import yaml
+def main():    
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='DWS Server for PostgreSQL')
+    parser.add_argument('-v', '--verbose', action='store_true', 
+                        help='Enable debug logging')
+    args = parser.parse_args()
     
     # Load configuration
     try:
-        with open('secrets.yaml', 'r') as f:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(script_dir,'config.yaml'), 'r') as f:
             config = yaml.safe_load(f)
     except FileNotFoundError:
+        logger.error("ERROR: config.yaml not found")
         config = {'postgres': {}}
     
     db_config = config.get('postgres', {})
@@ -315,7 +328,7 @@ def main():
     # Get port from config or use default
     port = config.get('dws', {}).get('port', 50051)
     
-    serve(db_config, port)
+    serve(db_config, port, debug=args.verbose)
 
 
 if __name__ == '__main__':

@@ -4,8 +4,10 @@ MQTT Connector for PostgreSQL Key-Value Store
 Subscribes to MQTT topics and writes data to PostgreSQL database.
 """
 
+import argparse
 import json
 import logging
+import os
 import signal
 import sys
 import time
@@ -18,12 +20,13 @@ import yaml
 from psycopg2 import sql
 from psycopg2.extras import Json
 
+logger = logging.getLogger(__name__)
 
 class MQTTConnector:
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, debug: bool = False):
         self.config = config
         self.logger = logging.getLogger(__name__)
-        self._setup_logging()
+        self._setup_logging(debug)
         
         # MQTT configuration
         self.mqtt_config = config.get('mqtt', {})
@@ -39,10 +42,11 @@ class MQTTConnector:
         
         self.running = False
         
-    def _setup_logging(self):
+    def _setup_logging(self, debug: bool = False):
         """Configure logging format and level."""
+        level = logging.DEBUG if debug else logging.INFO
         logging.basicConfig(
-            level=logging.INFO,
+            level=level,
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
     
@@ -104,7 +108,7 @@ class MQTTConnector:
             self.logger.error(f"Failed to store data point: {e}")
             return False
     
-    def on_connect(self, client: mqtt.Client, userdata, flags, rc):
+    def on_connect(self, client: mqtt.Client, userdata, flags, rc, properties=None):
         """Callback for when the client connects to the broker."""
         if rc == 0:
             self.logger.info("Connected to MQTT broker")
@@ -193,30 +197,37 @@ class MQTTConnector:
         self.stop()
 
 
-def load_config(config_path: str = "secrets.yaml") -> dict:
+def load_config(config_path: str) -> dict:
     """Load configuration from YAML file."""
     try:
         with open(config_path, 'r') as f:
             return yaml.safe_load(f)
     except FileNotFoundError:
-        print(f"Config file not found: {config_path}")
+        logger.error(f"Config file not found: {config_path}")
         return {}
     except yaml.YAMLError as e:
-        print(f"Error parsing config file: {e}")
+        logger.error(f"Error parsing config file: {e}")
         return {}
 
 
 def main():
     """Main entry point."""
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='MQTT Connector for PostgreSQL')
+    parser.add_argument('-v', '--verbose', action='store_true', 
+                        help='Enable debug logging')
+    args = parser.parse_args()
+    
     # Load configuration
-    config = load_config()
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config = load_config(os.path.join(script_dir,'config.yaml'))
     
     if not config:
-        print("Failed to load configuration")
+        logger.error("Failed to load configuration")
         sys.exit(1)
     
     # Create and start connector
-    connector = MQTTConnector(config)
+    connector = MQTTConnector(config, debug=args.verbose)
     connector.start()
 
 

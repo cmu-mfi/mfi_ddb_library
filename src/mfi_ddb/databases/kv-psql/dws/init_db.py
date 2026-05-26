@@ -7,11 +7,37 @@ Creates the necessary tables for storing MQTT data.
 import psycopg2
 from psycopg2 import sql
 import sys
+import os
+import yaml
 
 
-def init_database(host: str = 'localhost', port: int = 5432,
-                   database: str = 'mfi_kv', user: str = 'postgres',
-                  password: str = ''):
+def load_config(config_path: str) -> dict:
+    """Load and validate the configuration from YAML file."""
+    if not os.path.exists(config_path):
+        print(f"Error: Configuration file not found: {config_path}")
+        sys.exit(1)
+    
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    if config is None:
+        print("Error: Configuration file is empty or invalid")
+        sys.exit(1)
+    
+    postgres_config = config.get('postgres', {})
+    
+    # Required fields for PostgreSQL connection
+    required_fields = ['host', 'port', 'database', 'user', 'password']
+    missing_fields = [field for field in required_fields if field not in postgres_config]
+    
+    if missing_fields:
+        print(f"Error: Missing required PostgreSQL configuration fields: {', '.join(missing_fields)}")
+        sys.exit(1)
+    
+    return postgres_config
+
+
+def init_database(host: str, port: int, database: str, user: str, password: str):
     """Initialize the database with the required schema."""
     try:
         # Connect to PostgreSQL
@@ -76,24 +102,18 @@ def init_database(host: str = 'localhost', port: int = 5432,
 
 def main():
     """Main entry point."""
-    import yaml
-    import argparse
+    # Get the directory where the script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(script_dir, 'config.yaml')
     
-    parser = argparse.ArgumentParser(description='Initialize the PostgreSQL database')
-    parser.add_argument('--host', default='localhost', help='Database host')
-    parser.add_argument('--port', type=int, default=5432, help='Database port')
-    parser.add_argument('--database', default='mfi_kv', help='Database name')
-    parser.add_argument('--user', default='postgres', help='Database user')
-    parser.add_argument('--password', default='', help='Database password')
-    
-    args = parser.parse_args()
+    postgres_config = load_config(config_path)
     
     success = init_database(
-        host=args.host,
-        port=args.port,
-        database=args.database,
-        user=args.user,
-        password=args.password
+        host=postgres_config['host'],
+        port=postgres_config['port'],
+        database=postgres_config['database'],
+        user=postgres_config['user'],
+        password=postgres_config['password']
     )
     
     sys.exit(0 if success else 1)
