@@ -389,6 +389,24 @@ class TestGetDataRange:
         assert len(response.datapoints) == 1
         assert response.datapoints[0].json_value.fields["temperature"].number_value == 25.5
 
+    def test_get_data_range_wildcard(self, stub_get_data_range):
+        """Test range query with MQTT wildcard topic matching."""
+        start_time = datetime(2024, 1, 1, 11, 59, 0, tzinfo=timezone.utc)
+        end_time = datetime(2024, 1, 1, 12, 1, 0, tzinfo=timezone.utc)
+        
+        # Use wildcard topic to match all topics under "mfi/test/"
+        request = service_pb2.GetDataRangeRequest(
+            topic="mfi/test/#",
+            start_time=timestamp_to_protobuf(start_time),
+            end_time=timestamp_to_protobuf(end_time),
+            page_size=100
+        )
+        
+        response = stub_get_data_range.GetDataRange(request)
+        
+        # Should return 4 datapoints: topic1 (2 entries) + topic2 (1 entry) + topic3 (1 entry)
+        assert len(response.datapoints) == 4
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

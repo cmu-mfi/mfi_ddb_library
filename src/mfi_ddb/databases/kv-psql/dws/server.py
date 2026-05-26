@@ -121,16 +121,7 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
             target_time = self._timestamp_to_datetime(request.timestamp)
             
             # Get exact match or closest past/future based on request
-            if request.do_closest_past:
-                # Get closest datapoint at or before the requested timestamp
-                query = """
-                    SELECT timestamp, topic, payload
-                    FROM kv_data
-                    WHERE topic = %s AND timestamp <= %s
-                    ORDER BY timestamp DESC
-                    LIMIT 1
-                """
-            else:
+            if not request.do_closest_past:
                 # Get closest datapoint at or after the requested timestamp
                 query = """
                     SELECT timestamp, topic, payload
@@ -139,7 +130,15 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
                     ORDER BY timestamp ASC
                     LIMIT 1
                 """
-            
+            else:
+                # Get closest datapoint at or before the requested timestamp
+                query = """
+                    SELECT timestamp, topic, payload
+                    FROM kv_data
+                    WHERE topic = %s AND timestamp <= %s
+                    ORDER BY timestamp DESC
+                    LIMIT 1
+                """            
             cursor.execute(query, (request.topic, target_time))
             row = cursor.fetchone()
             
@@ -159,6 +158,25 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
         finally:
             conn.close()
     
+    def _topic_to_sql_pattern(self, topic: str) -> tuple[str, bool]:
+        """Convert MQTT topic to SQL pattern for wildcard matching.
+        
+        Returns (pattern, is_wildcard) tuple.
+        Converts "mfi/test/#" to "mfi/test%" for LIKE matching.
+        """
+        is_wildcard = False
+        if topic.endswith('/#'):
+            # Convert MQTT wildcard to SQL LIKE pattern
+            pattern = topic[:-2] + '%'
+            is_wildcard = True
+        elif topic.endswith('#'):
+            # Handle case like "mfi/test/#" where # is at the end
+            pattern = topic[:-1] + '%'
+            is_wildcard = True
+        else:
+            pattern = topic
+        return pattern, is_wildcard
+    
     def GetDataRange(self, request, context):
         """Retrieve a list of datapoints between start_time and end_time."""
         conn = self._get_connection()
@@ -176,6 +194,9 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
             page_size = request.page_size if request.page_size > 0 else 1000
             page_token = request.page_token
             
+            # Convert topic to SQL pattern for wildcard matching
+            topic_pattern, is_wildcard = self._topic_to_sql_pattern(request.topic)
+            
             # Build query with pagination
             # The page_token is a Unix timestamp (string) to continue from
             if page_token:
@@ -192,23 +213,43 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
                 params = (start_time, end_time)
             
             # Get total count for this query to check if there are more pages
-            count_query = f"""
-                SELECT COUNT(*) FROM kv_data WHERE topic = %s AND {time_filter}
-            """
+            if is_wildcard:
+                count_query = f"""
+                    SELECT COUNT(*) FROM kv_data WHERE topic LIKE %s AND {time_filter}
+                """
+            else:
+                count_query = f"""
+                    SELECT COUNT(*) FROM kv_data WHERE topic = %s AND {time_filter}
+                """
             
-            data_query = f"""
-                SELECT timestamp, topic, payload
-                FROM kv_data
-                WHERE topic = %s AND {time_filter}
-                ORDER BY timestamp ASC
-                LIMIT %s
-            """
+            if is_wildcard:
+                data_query = f"""
+                    SELECT timestamp, topic, payload
+                    FROM kv_data
+                    WHERE topic LIKE %s AND {time_filter}
+                    ORDER BY timestamp ASC
+                    LIMIT %s
+                """
+            else:
+                data_query = f"""
+                    SELECT timestamp, topic, payload
+                    FROM kv_data
+                    WHERE topic = %s AND {time_filter}
+                    ORDER BY timestamp ASC
+                    LIMIT %s
+                """
             
             # Execute queries
-            cursor.execute(count_query, (request.topic, *params))
+            if is_wildcard:
+                cursor.execute(count_query, (topic_pattern, *params))
+            else:
+                cursor.execute(count_query, (request.topic, *params))
             total_count = cursor.fetchone()[0]
             
-            cursor.execute(data_query, (request.topic, *params, page_size))
+            if is_wildcard:
+                cursor.execute(data_query, (topic_pattern, *params, page_size))
+            else:
+                cursor.execute(data_query, (request.topic, *params, page_size))
             rows = cursor.fetchall()
             
             # Convert to protobuf messages
