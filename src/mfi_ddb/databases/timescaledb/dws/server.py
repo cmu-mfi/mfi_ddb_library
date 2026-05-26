@@ -17,7 +17,7 @@ GEN_DIR = ROOT_DIR / "databases" / "dws" / "gen"
 sys.path.insert(0, str(GEN_DIR))
 sys.path.insert(0, str(ROOT_DIR.parent))
 
-from .db import TimeScaleReader
+from mfi_ddb.databases.timescaledb.dws.db import TimeScaleReader
 
 from mfi_ddb.databases.dws.gen import service_pb2, service_pb2_grpc
 from mfi_ddb.databases.dws.gen import models_pb2

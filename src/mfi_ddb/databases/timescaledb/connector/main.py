@@ -11,7 +11,7 @@ import paho.mqtt.client as mqtt
 from datetime import datetime, timezone
 from mfi_ddb.streamer.mqtt_spb_wrapper.src.mqtt_spb_wrapper.spb_base import SpbPayloadParser
 
-from db import TimeScaleWriter
+from mfi_ddb.databases.timescaledb.connector.db import TimeScaleWriter
 
 # Configuration and initialization
 def load_config(path: Path):
@@ -19,11 +19,13 @@ def load_config(path: Path):
     with path.open("r") as f:
         return yaml.safe_load(f)
 
+# Load configuration
 CONFIG_PATH = Path(__file__).with_name("config.yaml")
 cfg = load_config(CONFIG_PATH)
 
-# Initialization of the TimeScaleDB writer
-writer = TimeScaleWriter(cfg["timescaledb"])
+# `writer` is created inside `main()` to avoid opening a DB socket at import time
+# which makes testing and other import-time operations brittle.
+writer = None
 
 # Thread safe queue to pass metrics from MQTT thread to DB worker thread
 # Limit the queue to 50,000 message chunks to prevent memory bloat if the DB drops
@@ -147,17 +149,19 @@ def db_batch_writer_worker(
             while True:
                 try:
                     # If connection was previously broken, try to reset it
-                    if db_writer.conn.closed:
+                    if db_writer.is_closed():
                         print("DB connection closed. Attempting reconnect...")
-                        db_writer.__init__(cfg["timescaledb"]) # Re-run constructor to reconnect
-                    
+                        db_writer.reconnect()
+
                     db_writer.insert_rows(batch)
-                    break # Success! Break the retry loop and move to next batch
+                    break  # Success! Break the retry loop and move to next batch
                 except Exception as e:
                     print(f"Database insertion error (Size: {len(batch)}): {e}. Retrying in 5s...")
-                    # Force-close the socket so db_writer.conn.closed registers properly
+                    # Force-close the socket so subsequent loop iterations notice the closed state
                     try:
-                        db_writer.conn.close()
+                        conn = getattr(db_writer, "conn", None)
+                        if conn is not None:
+                            conn.close()
                     except Exception:
                         pass
                     time.sleep(5)
@@ -165,10 +169,12 @@ def db_batch_writer_worker(
 
 def main():
     """Start the background batch worker, connect to broker, and process events."""
-    # 1. Spin up the background consumer thread
+    # 1. Create DB writer instance and spin up the background consumer thread
+    db_writer = TimeScaleWriter(cfg["timescaledb"])
+
     worker_thread = threading.Thread(
         target=db_batch_writer_worker,
-        args=(data_queue, writer),
+        args=(data_queue, db_writer),
         kwargs={"max_batch_size": 1000, "flush_interval_sec": 0.1},
         daemon=True,  # Allows clean application termination
     )
