@@ -300,6 +300,39 @@ class TestGetDataPoint:
             stub_get_data_point.GetDataPoint(request)
         
         assert exc_info.value.code() == grpc.StatusCode.NOT_FOUND
+    
+    def test_get_data_point_wildcard(self, stub_get_data_point):
+        """Test retrieving a datapoint using MQTT wildcard topic matching."""
+        target_time = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+        
+        # Insert test data with a topic that matches a wildcard pattern
+        conn = get_test_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO kv_data (timestamp, topic, payload)
+                    VALUES (%s, %s, %s::jsonb)
+                    """,
+                    (target_time, "mfi-v1.0-kv/CMU/machine-a/sensor1", json.dumps({"value": 42, "unit": "psi"}))
+                )
+                conn.commit()
+        finally:
+            conn.close()
+        
+        # Use wildcard topic to match the inserted data
+        request = service_pb2.GetDataPointRequest(
+            topic="mfi-v1.0-kv/CMU/machine-a/#",
+            timestamp=timestamp_to_protobuf(target_time),
+            do_closest_past=True
+        )
+        
+        response = stub_get_data_point.GetDataPoint(request)
+        
+        assert response.datapoint.topic == "mfi-v1.0-kv/CMU/machine-a/sensor1"
+        assert response.datapoint.timestamp.seconds > 0
+        assert response.datapoint.json_value.fields["value"].number_value == 42
+        assert response.datapoint.json_value.fields["unit"].string_value == "psi"
 
 
 class TestGetDataRange:

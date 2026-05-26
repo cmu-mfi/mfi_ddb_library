@@ -12,7 +12,7 @@ import threading
 import time
 from concurrent import futures
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Tuple
 
 import grpc
 import yaml
@@ -120,30 +120,65 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
             # Convert timestamp
             target_time = self._timestamp_to_datetime(request.timestamp)
             
+            # Check if topic contains wildcard
+            topic_pattern, is_wildcard = self._topic_to_sql_pattern(request.topic)
+            
             # Get exact match or closest past/future based on request
             if not request.do_closest_past:
                 # Get closest datapoint at or after the requested timestamp
-                query = """
-                    SELECT timestamp, topic, payload
-                    FROM kv_data
-                    WHERE topic = %s AND timestamp >= %s
-                    ORDER BY timestamp ASC
-                    LIMIT 1
-                """
+                if is_wildcard:
+                    query = """
+                        SELECT timestamp, topic, payload
+                        FROM kv_data
+                        WHERE topic LIKE %s AND timestamp >= %s
+                        ORDER BY timestamp ASC
+                    """
+                else:
+                    query = """
+                        SELECT timestamp, topic, payload
+                        FROM kv_data
+                        WHERE topic = %s AND timestamp >= %s
+                        ORDER BY timestamp ASC
+                        LIMIT 1
+                    """
             else:
                 # Get closest datapoint at or before the requested timestamp
-                query = """
-                    SELECT timestamp, topic, payload
-                    FROM kv_data
-                    WHERE topic = %s AND timestamp <= %s
-                    ORDER BY timestamp DESC
-                    LIMIT 1
-                """            
-            cursor.execute(query, (request.topic, target_time))
-            row = cursor.fetchone()
+                if is_wildcard:
+                    query = """
+                        SELECT timestamp, topic, payload
+                        FROM kv_data
+                        WHERE topic LIKE %s AND timestamp <= %s
+                        ORDER BY timestamp DESC
+                    """
+                else:
+                    query = """
+                        SELECT timestamp, topic, payload
+                        FROM kv_data
+                        WHERE topic = %s AND timestamp <= %s
+                        ORDER BY timestamp DESC
+                        LIMIT 1
+                    """
             
-            if row:
-                datapoint = self._datapoint_to_proto(row)
+            # Execute query
+            if is_wildcard:
+                cursor.execute(query, (topic_pattern, target_time))
+            else:
+                cursor.execute(query, (request.topic, target_time))
+            
+            rows = cursor.fetchall()
+            
+            # For wildcard topics, verify exactly one topic matches
+            if is_wildcard and len(rows) != 1:
+                if len(rows) == 0:
+                    context.set_code(grpc.StatusCode.NOT_FOUND)
+                    context.set_details("No datapoint found")
+                else:
+                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                    context.set_details(f"Topic pattern matches {len(rows)} topics, expected exactly 1")
+                return service_pb2.GetDataPointResponse()
+            
+            if rows:
+                datapoint = self._datapoint_to_proto(rows[0])
                 return service_pb2.GetDataPointResponse(datapoint=datapoint)
             else:
                 context.set_code(grpc.StatusCode.NOT_FOUND)
@@ -158,7 +193,7 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
         finally:
             conn.close()
     
-    def _topic_to_sql_pattern(self, topic: str) -> tuple[str, bool]:
+    def _topic_to_sql_pattern(self, topic: str) -> Tuple[str, bool]:
         """Convert MQTT topic to SQL pattern for wildcard matching.
         
         Returns (pattern, is_wildcard) tuple.
