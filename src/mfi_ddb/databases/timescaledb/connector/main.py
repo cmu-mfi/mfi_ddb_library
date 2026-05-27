@@ -9,9 +9,10 @@ import yaml
 from typing import Any, List, Tuple, Optional
 import paho.mqtt.client as mqtt
 from datetime import datetime, timezone
-from mfi_ddb.streamer.mqtt_spb_wrapper.src.mqtt_spb_wrapper.spb_base import SpbPayloadParser
+from ..mqtt_spb_wrapper.spb_base import SpbPayloadParser
+# from mfi_ddb.streamer.mqtt_spb_wrapper.src.mqtt_spb_wrapper.spb_base import SpbPayloadParser
 
-from mfi_ddb.databases.timescaledb.connector.db import TimeScaleWriter
+from .db import TimeScaleWriter
 
 # Configuration and initialization
 def load_config(path: Path):
@@ -102,7 +103,7 @@ def on_message(client, userdata, msg):
                 (t, msg.topic, cfg["component_id"], name, value_num, value_text, value_json)
             )
         if rows:
-            # writer.insert_rows(rows)
+            # writer.insert_rows(rows) --> would overwhelm the DB if we do it directly in the MQTT thread; instead, push to the queue for the background worker to consume
             try:
                 data_queue.put(rows, block=False)  # Non-blocking put; raises queue.Full if the worker is too far behind
             except queue.Full:

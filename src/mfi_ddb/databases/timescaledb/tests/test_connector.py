@@ -31,15 +31,14 @@ import sys
 import time
 import pytest
 
-# Absolute workspace imports based on project structure
-from mfi_ddb.databases.timescaledb.connector.main import (
+from connector.main import (
     classify_value,
     to_ts,
     on_message,
     data_queue,
     db_batch_writer_worker,
 )
-from mfi_ddb.databases.timescaledb.connector.db import TimeScaleWriter
+from connector.db import TimeScaleWriter
 
 
 @pytest.fixture(autouse=True)
@@ -150,14 +149,14 @@ def test_on_message_success(monkeypatch):
     """Verifies decoded MQTT Sparkplug B frames are correctly formatted and appended to data_queue."""
     # Mock decode_sparkplug to bypass protobuf deserialization
     mock_metrics = [("DATA/data/temperature", 21.5, 1779810223839)]
-    monkeypatch.setattr("mfi_ddb.databases.timescaledb.connector.main.decode_sparkplug", lambda p: mock_metrics)
+    monkeypatch.setattr("connector.main.decode_sparkplug", lambda p: mock_metrics)
     
     # Mock app config reads
     # monkeypatch.setitem(data_queue.queue if hasattr(data_queue, 'queue') else {}, "component_id", "demo-component")
     
 	# Target and mock the active app configuration dictionary module property cleanly here:
     try:
-        monkeypatch.setitem(sys.modules["mfi_ddb.databases.timescaledb.connector.main"].cfg, "component_id", "demo-component")
+        monkeypatch.setitem(sys.modules["connector.main"].cfg, "component_id", "demo-component")
     except (AttributeError, KeyError):
         pass # If cfg object doesn't strictly exist as a mutable dict property, bypass it safely
 
@@ -178,7 +177,7 @@ def test_on_message_success(monkeypatch):
 
 def test_on_message_overflow(monkeypatch):
     """Verifies that when memory buffer is completely full, it drops elements safely without an OOM crash."""
-    monkeypatch.setattr("mfi_ddb.databases.timescaledb.connector.main.decode_sparkplug", lambda p: [("metric", 1.0, None)])
+    monkeypatch.setattr("connector.main.decode_sparkplug", lambda p: [("metric", 1.0, None)])
     
     # Artificially force maxsize boundary constraint lower for quick execution
     monkeypatch.setattr(data_queue, "maxsize", 2)

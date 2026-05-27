@@ -7,16 +7,14 @@ import sys
 import grpc
 from google.protobuf.timestamp_pb2 import Timestamp
 
-ROOT_DIR = Path(__file__).resolve().parents[5]
-GEN_DIR = ROOT_DIR / "src" / "mfi_ddb" / "databases" / "dws" / "gen"
-# Make generated protobuf modules importable without touching generated code.
-sys.path.insert(0, str(GEN_DIR))
-sys.path.insert(0, str(ROOT_DIR / "src"))
-
-from mfi_ddb.databases.dws.gen import service_pb2, service_pb2_grpc
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+    from mfi_ddb.databases.timescaledb.dws.gen import service_pb2, service_pb2_grpc
+else:
+    from .gen import service_pb2, service_pb2_grpc
 
 DWS_ADDR = "localhost:50051"
-TOPIC = "mfi-v1.0-historian/CMU/DDATA/Machine Shop/demo-component"
+TOPIC = "mfi-v1.0-historian/CMU/DDATA/Machine Shop/robot-arm-1"
 
 
 def to_pb_ts(dt: datetime) -> Timestamp:

@@ -4,23 +4,14 @@ import json
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-import sys
 import grpc
 from concurrent import futures
 import yaml
 from google.protobuf.timestamp_pb2 import Timestamp
 from google.protobuf.struct_pb2 import Struct
 
-ROOT_DIR = Path(__file__).resolve().parents[3]
-GEN_DIR = ROOT_DIR / "databases" / "dws" / "gen"
-# Ensure generated protobuf modules are importable without editing generated files.
-sys.path.insert(0, str(GEN_DIR))
-sys.path.insert(0, str(ROOT_DIR.parent))
-
-from mfi_ddb.databases.timescaledb.dws.db import TimeScaleReader
-
-from mfi_ddb.databases.dws.gen import service_pb2, service_pb2_grpc
-from mfi_ddb.databases.dws.gen import models_pb2
+from .db import TimeScaleReader
+from .gen import models_pb2, service_pb2, service_pb2_grpc
 
 def load_config(path: Path):
     """Load YAML config for TimeScaleDB connection settings."""

@@ -28,9 +28,12 @@ import json
 import pytest
 
 from google.protobuf.timestamp_pb2 import Timestamp
-from mfi_ddb.databases.timescaledb.dws.server import DataService, row_to_datapoint, STREAM_BATCH_SIZE
-from mfi_ddb.databases.timescaledb.dws.db import TimeScaleReader
-from mfi_ddb.databases.dws.gen import service_pb2
+# from mfi_ddb.databases.timescaledb.dws.server import DataService, row_to_datapoint, STREAM_BATCH_SIZE
+# from mfi_ddb.databases.timescaledb.dws.db import TimeScaleReader
+# from mfi_ddb.databases.timescaledb.dws.gen import service_pb2
+from dws.server import DataService, row_to_datapoint, STREAM_BATCH_SIZE
+from dws.db import TimeScaleReader
+from dws.gen import service_pb2
 
 
 # 1. SERIALIZATION & DATA CONVERSION TESTS
@@ -69,7 +72,8 @@ def test_get_data_point_found(monkeypatch):
     db_row = (mock_time, "test/topic", "comp", "metric", 99.9, None, None)
 
     # Mock the reader module instance attached to the server
-    monkeypatch.setattr("mfi_ddb.databases.timescaledb.dws.server.reader.get_point", lambda topic, ts, past: db_row)
+    # monkeypatch.setattr("mfi_ddb.databases.timescaledb.dws.server.reader.get_point", lambda topic, ts, past: db_row)
+    monkeypatch.setattr("dws.server.reader.get_point", lambda topic, ts, past: db_row)
 
     service = DataService()
     request = service_pb2.GetDataPointRequest()
@@ -84,7 +88,7 @@ def test_get_data_point_found(monkeypatch):
 def test_get_data_point_empty_table(monkeypatch):
     """Verifies elegant empty responses when a cold-boot request targets an empty table, avoiding index errors."""
     # Table lookup returns None if zero matching records are located
-    monkeypatch.setattr("mfi_ddb.databases.timescaledb.dws.server.reader.get_point", lambda topic, ts, past: None)
+    monkeypatch.setattr("dws.server.reader.get_point", lambda topic, ts, past: None)
 
     service = DataService()
     request = service_pb2.GetDataPointRequest()
@@ -109,7 +113,7 @@ def test_get_data_range(monkeypatch):
     ]
 
     monkeypatch.setattr(
-        "mfi_ddb.databases.timescaledb.dws.server.reader.get_range", 
+        "dws.server.reader.get_range", 
         lambda topic, start, end, size, token: db_rows
     )
 
@@ -136,7 +140,7 @@ def test_get_data_range_timestamp_collision(monkeypatch):
     ]
 
     monkeypatch.setattr(
-        "mfi_ddb.databases.timescaledb.dws.server.reader.get_range", 
+        "dws.server.reader.get_range", 
         lambda topic, start, end, size, token: db_rows
     )
 
@@ -174,7 +178,7 @@ def test_stream_data_polling(monkeypatch):
     def mock_stream_batch(topic, since_ts, limit):
         return db_responses.pop(0) if db_responses else []
 
-    monkeypatch.setattr("mfi_ddb.databases.timescaledb.dws.server.reader.stream_batch", mock_stream_batch)
+    monkeypatch.setattr("dws.server.reader.stream_batch", mock_stream_batch)
 
     # Intercept sleep to measure backend loop throttling actions without locking test timings
     sleep_calls = []
@@ -198,7 +202,7 @@ def test_stream_data_polling(monkeypatch):
 
 def test_stream_data_disconnect(monkeypatch):
     """Verifies streaming resources free up instantly and exit the loop the moment a client drops connection."""
-    monkeypatch.setattr("mfi_ddb.databases.timescaledb.dws.server.reader.stream_batch", lambda t, s, l: [])
+    monkeypatch.setattr("dws.server.reader.stream_batch", lambda t, s, l: [])
     monkeypatch.setattr("time.sleep", lambda s: None)
 
     service = DataService()
