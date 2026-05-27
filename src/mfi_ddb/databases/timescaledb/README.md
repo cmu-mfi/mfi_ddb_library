@@ -16,13 +16,13 @@ timescaledb/
 │   │
 │   ├── main.py                     # Pipeline Coordinator & Queue Worker
 │   │                               └── Core Logic: 
-│   │                                   • Establishes the asynchronous Paho-MQTT client connection loop.
+│   │                                   • Establishes the Paho-MQTT client connection loop.
 │   │                                   • Subscribes to the industrial network root topic (`mfi-v1.0-historian/#`).
 │   │                                   • Intercepts raw Sparkplug B Protocol Buffer binary payloads.
 │   │                                   • Extracts timestamps, maps metric names, and determines type classifications.
 │   │                                   • Hands data over to an in-memory `queue.Queue` buffer with drop-safe boundaries.
-│   │                                   • Spawns a background worker thread (`db_batch_writer_worker`) that runs an 
-│   │                                     asynchronous micro-batch loop, flushing items when `max_batch_size` 
+│   │                                   • Spawns a background worker thread (`db_batch_writer_worker`) that runs a 
+│   │                                     micro-batch loop, flushing items when `max_batch_size` 
 │   │                                     or `flush_interval_sec` is reached to prevent write lockouts.
 │   │
 │   ├── db.py                       # TimeScaleDB Writer Client Layer
@@ -45,12 +45,13 @@ timescaledb/
 │   │                               └── Core Logic:
 │   │                                   • Implements the generated Protobuf gRPC base class compiled specs.
 │   │                                   • `GetDataPoint`: Queries the closest past or future record for a single point.
-│   │                                   • `GetDataRange`: Handles time-bounded pagination windows, generating stateless 
-│   │                                     ISO-8601 string continuation tokens to guarantee stability across exact 
-│   │                                     millisecond timestamp collisions.
-│   │                                   • `StreamData`: Executes a low-latency live tailing loop. It yields records 
-│   │                                     immediately when present, uses a dynamic sleep back-off strategy when idle, 
-│   │                                     and monitors `context.is_active()` to free resources instantly if a client drops.
+│   │                                   • `GetDataRange`: Handles time-bounded pagination windows and returns an 
+│   │                                     ISO-8601 string continuation token based on the last row timestamp.
+│   │                                     It is suitable for simple paging, but exact same-timestamp collisions are not 
+│   │                                     fully disambiguated yet.
+│   │                                   • `StreamData`: Executes a polling live tailing loop. It yields records 
+│   │                                     immediately when present, sleeps for a fixed interval when idle, and monitors 
+│   │                                     `context.is_active()` to free resources instantly if a client drops.
 │   │
 │   ├── db.py                       # TimeScaleDB Reader Client Layer
 │   │                               └── Core Logic:
@@ -101,6 +102,10 @@ timescaledb/
 
 ### 1. Start TimeScaleDB Engine
 
+Create a .env file and add a variable `DB_PORT`:`your_desired_port_no`.
+You can also directly add the port number in the timescale_build.sh file.
+If port number is not provided it defaults to 5432.
+
 ```bash
 bash timescale_build.sh
 
@@ -125,6 +130,8 @@ SELECT create_hypertable('timeseries_data', 'time', if_not_exists => TRUE);
 
 ```
 
+Although it may not happen, but if prompted for a password during db setup, you can find the password in timescale_build.sh
+
 ### 2. Start MQTT Broker Infrastructure
 
 Spin up a localized isolated Eclipse-Mosquitto engine instance to route your industrial network messaging:
@@ -138,17 +145,23 @@ docker run -d --name mqtt -p 1883:1883 eclipse-mosquitto:2
 
 ## Service Operations
 
+### TimescaleDB Node All Dependencies Download
+
+```bash
+pip install -r requirements.txt
+
+```
+
 ### Ingestion Connector
 
 The connector listens to the default root branch (`mfi-v1.0-historian/#`), translates binary Sparkplug payloads into flat database structures, and queues them into dynamic macro-transactions.
 
 1. Configure your target database environment variables and broker targets inside `connector/config.yaml`.
-2. Install application dependencies:
+2. Installing Connector dependencies:
 ```bash
 pip install -r connector/requirements.txt
 
 ```
-
 
 3. Run the worker process:
 ```bash
@@ -157,14 +170,12 @@ PYTHONPATH=. python -m connector.main
 
 ```
 
-
-
 ### DWS gRPC Engine Service
 
 Exposes database reads via safe API endpoint calls.
 
 1. Configure port bindings and connection parameters inside `dws/config.yaml`.
-2. Install application dependencies:
+2. Installing DWS dependencies:
 ```bash
 pip install -r dws/requirements.txt
 
@@ -208,10 +219,9 @@ PYTHONPATH=. pytest tests/ --import-mode=importlib -s
 
 * **Run a specific test module:**
 ```bash
-PYTHONPATH=. pytest tests/test_connector.py --import-mode=importlib
+PYTHONPATH=. pytest tests/test_connector.py
 
 ```
-
 
 
 ### Manual Database Query Verification
