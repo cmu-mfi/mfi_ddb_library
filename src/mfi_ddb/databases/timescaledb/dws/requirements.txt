@@ -4,3 +4,12 @@ psycopg2-binary
 grpcio
 grpcio-tools
 protobuf
+pytest
+pydantic
+numpy
+watchdog
+omegaconf
+requests
+xmltodict
+ping3
+jsonschema
