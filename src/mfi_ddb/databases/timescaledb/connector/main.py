@@ -9,7 +9,7 @@ import yaml
 from typing import Any, List, Tuple, Optional
 import paho.mqtt.client as mqtt
 from datetime import datetime, timezone
-from ..mqtt_spb_wrapper.spb_base import SpbPayloadParser
+from mqtt_spb_wrapper.spb_base import SpbPayloadParser
 # from mfi_ddb.streamer.mqtt_spb_wrapper.src.mqtt_spb_wrapper.spb_base import SpbPayloadParser
 
 from .db import TimeScaleWriter
