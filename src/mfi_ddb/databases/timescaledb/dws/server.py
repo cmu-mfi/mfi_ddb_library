@@ -60,7 +60,17 @@ def row_to_datapoint(row):
 
 class DataService(service_pb2_grpc.DataServiceServicer):
     def GetDataPoint(self, request, context):
-        """Return the closest datapoint at/around the requested timestamp."""
+        """Return a datapoint from the requested side of the timestamp.
+
+        The caller chooses the side with do_closest_past:
+        - True: return the newest row at or before the requested timestamp.
+        - False: return the oldest row at or after the requested timestamp.
+
+        The lookup is intentionally one-sided; if no row exists on the selected
+        side, the response stays empty instead of falling back to the other side.
+        Topic filters are passed through unchanged, so MQTT wildcards such as
+        '+' and '#' can be used when the underlying reader supports them.
+        """
         do_closest_past = getattr(request, "do_closest_past", True)
         row = reader.get_point(
             request.topic,
@@ -72,7 +82,12 @@ class DataService(service_pb2_grpc.DataServiceServicer):
         return service_pb2.GetDataPointResponse(datapoint=row_to_datapoint(row))
 
     def GetDataRange(self, request, context):
-        """Return a page of datapoints within the requested time range."""
+        """Return a page of datapoints within the requested time range.
+
+        The request topic can be an exact topic or a wildcard filter. The reader
+        handles the topic matching and keeps the existing time-based cursor
+        contract for pagination.
+        """
         rows = reader.get_range(
             request.topic,
             request.start_time.ToDatetime(),
@@ -91,7 +106,9 @@ class DataService(service_pb2_grpc.DataServiceServicer):
         """Stream datapoints by polling the DB for new rows.
 
         This is a simple tailing loop: query for rows after `last_ts`, emit them,
-        and sleep briefly when no new rows are available.
+        and sleep briefly when no new rows are available. The topic filter is
+        forwarded as-is, which lets the caller tail a single topic or a wildcard
+        family of topics.
         """
         if request.HasField("start_from"):
             last_ts = request.start_from.ToDatetime()
