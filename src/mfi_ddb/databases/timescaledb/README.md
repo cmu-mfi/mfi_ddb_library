@@ -44,20 +44,27 @@ timescaledb/
 │   ├── server.py                   # gRPC Interface Layer (DataService)
 │   │                               └── Core Logic:
 │   │                                   • Implements the generated Protobuf gRPC base class compiled specs.
-│   │                                   • `GetDataPoint`: Queries the closest past or future record for a single point.
-│   │                                   • `GetDataRange`: Handles time-bounded pagination windows and returns an 
+│   │                                   • `GetDataPoint`: Uses a one-sided timestamp lookup.
+│   │                                     - `do_closest_past=True` returns the newest row at or before the timestamp.
+│   │                                     - `do_closest_past=False` returns the oldest row at or after the timestamp.
+│   │                                     - If no row exists on that side, the response stays empty.
+│   │                                   • `GetDataRange`: Handles time-bounded pagination windows and returns an
 │   │                                     ISO-8601 string continuation token based on the last row timestamp.
-│   │                                     It is suitable for simple paging, but exact same-timestamp collisions are not 
+│   │                                     It is suitable for simple paging, but exact same-timestamp collisions are not
 │   │                                     fully disambiguated yet.
-│   │                                   • `StreamData`: Executes a polling live tailing loop. It yields records 
-│   │                                     immediately when present, sleeps for a fixed interval when idle, and monitors 
+│   │                                   • `StreamData`: Executes a polling live tailing loop. It yields records
+│   │                                     immediately when present, sleeps for a fixed interval when idle, and monitors
 │   │                                     `context.is_active()` to free resources instantly if a client drops.
 │   │
 │   ├── db.py                       # TimeScaleDB Reader Client Layer
 │   │                               └── Core Logic:
 │   │                                   • Manages a thread-safe `ThreadedConnectionPool` to isolate concurrent read operations.
 │   │                                   • Wraps all queries in safe `with` context managers to prevent socket leaks.
-│   │                                   • Implements index-optimized, time-series SQL lookups (`ORDER BY time DESC LIMIT 1`).
+│   │                                   • Supports exact topic matches and MQTT wildcards.
+│   │                                     - Exact topics use `topic = %s`.
+│   │                                     - Wildcards (`+` and `#`) are translated into PostgreSQL regex matching.
+│   │                                   • Implements time-series SQL lookups with one-sided nearest-point selection
+│   │                                     (`ORDER BY time DESC LIMIT 1` or `ORDER BY time ASC LIMIT 1`).
 │   │
 │   ├── config.yaml                 # gRPC Server Deployment Profiles
 │   │                               └── Details: Network port bindings (default gRPC port), pool capacities, 
@@ -80,6 +87,7 @@ timescaledb/
 │   │                                   • Relational query database tuple conversion to Protobuf formats.
 │   │                                   • Safe server responses during "cold boot" states (empty tables).
 │   │                                   • Pagination boundaries during high-frequency timestamp collisions.
+│   │                                   • MQTT wildcard matching and one-sided timestamp selection rules.
 │   │                                   • Live stream polling back-offs and graceful connection drop resource cleanups.
 │   │                                   • Threaded connection pool leak protection during transaction failures.
 │   │
@@ -157,7 +165,7 @@ pip install -r requirements.txt
 The connector listens to the default root branch (`mfi-v1.0-historian/#`), translates binary Sparkplug payloads into flat database structures, and queues them into dynamic macro-transactions.
 
 1. Configure your target database environment variables and broker targets inside `connector/config.yaml`.
-2. Installing Connector dependencies:
+2. Install Connector dependencies:
 ```bash
 pip install -r connector/requirements.txt
 
@@ -175,7 +183,7 @@ PYTHONPATH=. python -m connector.main
 Exposes database reads via safe API endpoint calls.
 
 1. Configure port bindings and connection parameters inside `dws/config.yaml`.
-2. Installing DWS dependencies:
+2. Install DWS dependencies:
 ```bash
 pip install -r dws/requirements.txt
 
