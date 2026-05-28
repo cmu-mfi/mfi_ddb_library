@@ -167,6 +167,60 @@ class FakegRPCContext:
         return self.active_sequence.pop(0)
 
 
+class CapturingCursor:
+    """Capture SQL text and parameters without talking to a real database."""
+    def __init__(self, rows=None):
+        self.rows = list(rows) if rows is not None else []
+        self.executed = []
+
+    def execute(self, sql, params=None):
+        self.executed.append((sql, params))
+
+    def fetchone(self):
+        return self.rows[0] if self.rows else None
+
+    def fetchall(self):
+        return list(self.rows)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
+class CapturingConnection:
+    """Return the capturing cursor through the same interface psycopg exposes."""
+    def __init__(self, cursor):
+        self.autocommit = False
+        self._cursor = cursor
+
+    def cursor(self):
+        return self._cursor
+
+
+class CapturingPool:
+    """Minimal pool double that records checkout and check-in counts."""
+    def __init__(self, rows=None):
+        self.cursor = CapturingCursor(rows=rows)
+        self.getconn_called = 0
+        self.putconn_called = 0
+
+    def getconn(self):
+        self.getconn_called += 1
+        return CapturingConnection(self.cursor)
+
+    def putconn(self, conn):
+        self.putconn_called += 1
+
+
+def make_reader(rows=None):
+    """Build a TimeScaleReader instance without opening a real connection pool."""
+    reader = TimeScaleReader.__new__(TimeScaleReader)
+    reader.pool = CapturingPool(rows=rows)
+    return reader
+
+
 def test_stream_data_polling(monkeypatch):
     """Verifies the tailing loop yields records immediately and backs off via sleep when the database is idle."""
     mock_time = datetime(2026, 5, 26, 12, 0, 0, tzinfo=timezone.utc)
@@ -215,6 +269,57 @@ def test_stream_data_disconnect(monkeypatch):
     responses = list(service.StreamData(request, context))
     # Generator exits execution immediately without returning metrics or locking connection channels
     assert len(responses) == 0
+
+
+# 5. TOPIC WILDCARD & TIMESTAMP-SELECTION RULES
+
+def test_get_point_uses_exact_topic_match_for_plain_topics():
+    """Exact topics should stay on the fast equality path."""
+    reader = make_reader()
+    request_time = datetime(2026, 5, 26, 12, 0, 0, tzinfo=timezone.utc)
+
+    assert reader.get_point("robot-arm/1/data", request_time) is None
+
+    sql, params = reader.pool.cursor.executed[0]
+    assert "topic = %s" in sql
+    assert "time <= %s" in sql
+    assert params == ("robot-arm/1/data", request_time)
+
+
+def test_get_point_uses_mqtt_wildcard_regex_match():
+    """MQTT wildcards should expand into a regex so one request can match a family of topics."""
+    reader = make_reader()
+    request_time = datetime(2026, 5, 26, 12, 0, 0, tzinfo=timezone.utc)
+
+    assert reader.get_point("robot-arm/#", request_time) is None
+
+    sql, params = reader.pool.cursor.executed[0]
+    assert "topic ~ %s" in sql
+    assert params == ("^robot-arm/.*$", request_time)
+
+
+def test_get_point_closest_past_is_one_sided():
+    """closest-past requests must not silently fall forward to a later row."""
+    reader = make_reader()
+    request_time = datetime(2026, 5, 26, 12, 0, 0, tzinfo=timezone.utc)
+
+    assert reader.get_point("robot-arm/1/data", request_time, do_closest_past=True) is None
+
+    sql, params = reader.pool.cursor.executed[0]
+    assert "time <= %s" in sql
+    assert params == ("robot-arm/1/data", request_time)
+
+
+def test_get_point_closest_future_is_one_sided():
+    """closest-future requests must not silently fall back to an earlier row."""
+    reader = make_reader()
+    request_time = datetime(2026, 5, 26, 12, 0, 0, tzinfo=timezone.utc)
+
+    assert reader.get_point("robot-arm/1/data", request_time, do_closest_past=False) is None
+
+    sql, params = reader.pool.cursor.executed[0]
+    assert "time >= %s" in sql
+    assert params == ("robot-arm/1/data", request_time)
 
 
 # 5. CONNECTION POOL RELIABILITY & CLEANUP TESTS
