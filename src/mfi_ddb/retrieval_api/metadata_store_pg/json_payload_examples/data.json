@@ -1,0 +1,6 @@
+{
+  "schema_version": "mfi-v1.0",
+  "msg_type": "data",
+  "payload": "Custom data here",
+  "value": 42
+}
