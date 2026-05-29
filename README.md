@@ -75,6 +75,8 @@ To be able to do the above three major classes are provided:
 * [MTConnect](src/mfi_ddb/data_adapters/mtconnect.py)
 * [gRPC](src/mfi_ddb/data_adapters/grpc.py)
 
+To create a new data adapter, please follow the [checklist](./src/mfi_ddb/data_adapters/README.md#new-data-adapter-checklist) and refer to the existing data adapters for implementation reference.
+
 ### Streamer
 
 * [Streamer](mfi_ddb/streamer/streamer.py)
