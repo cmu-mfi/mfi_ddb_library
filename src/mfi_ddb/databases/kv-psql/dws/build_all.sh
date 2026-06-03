@@ -22,6 +22,7 @@ echo "Generating gRPC code from .proto files..."
 python3 -m grpc_tools.protoc \
     -I"$PROTO_DIR" \
     --python_out="$GEN_DIR" \
+    --pyi_out="$GEN_DIR" \
     --grpc_python_out="$GEN_DIR" \
     "$PROTO_DIR/models.proto" \
     "$PROTO_DIR/service.proto"
