@@ -10,4 +10,4 @@ postgres:
   port: 5432
   database: mfi_kv
   user: mfi
-  password: mfiddb    
+  password: mfiddb

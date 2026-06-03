@@ -5,7 +5,7 @@ Creates the necessary tables for storing MQTT data.
 """
 
 import psycopg2
-from psycopg2 import sql
+from psycopg2 import sql, extensions
 import sys
 import os
 import yaml
@@ -40,8 +40,8 @@ def load_config(config_path: str) -> dict:
 def init_database(host: str, port: int, database: str, user: str, password: str):
     """Initialize the database with the required schema."""
     try:
-        # Connect to PostgreSQL
-        conn = psycopg2.connect(
+        # Connect to PostgreSQL, added strict type annotation for conn to show it's a psycopg2 connection
+        conn: extensions.connection = psycopg2.connect(
             host=host,
             port=port,
             database=database,
