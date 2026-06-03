@@ -18,9 +18,9 @@ import grpc
 import yaml
 
 # Add the gen directory to the path for imports
-# gen_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gen')
-# if gen_dir not in sys.path:
-#     sys.path.insert(0, gen_dir)
+gen_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'gen')
+if gen_dir not in sys.path:
+    sys.path.insert(0, gen_dir)
 
 # Import protobuf modules
 import psycopg2

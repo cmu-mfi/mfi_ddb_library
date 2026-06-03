@@ -132,7 +132,8 @@ class MQTTConnector:
                     """,
                     (timestamp, topic, Json(payload))
                 )
-            self.logger.debug(f"Stored data point: topic={topic}")
+            # self.logger.debug(f"Stored data point: topic={topic}")
+            self.logger.info(f"Stored data point: topic={topic}")
             return True
         except psycopg2.Error as e:
             self.logger.error(f"Failed to store data point: {e}")
