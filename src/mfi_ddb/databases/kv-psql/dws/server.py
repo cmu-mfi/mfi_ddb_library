@@ -64,8 +64,8 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
                 host=self.db_config.get('host', 'localhost'),
                 port=self.db_config.get('port', 5432),
                 database=self.db_config.get('database', 'mfi_kv'),
-                user=self.db_config.get('user', 'postgres'),
-                password=self.db_config.get('password', '')
+                user=self.db_config.get('user', 'mfi'),
+                password=self.db_config.get('password', 'mfiddb')
             )
         except psycopg2.Error as e:
             self.logger.error(f"Failed to connect to PostgreSQL: {e}")
