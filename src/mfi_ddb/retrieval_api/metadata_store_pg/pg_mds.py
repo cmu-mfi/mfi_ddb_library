@@ -124,7 +124,7 @@ class MdsConnector:
                 sql.SQL("{} = EXCLUDED.{}").format(sql.Identifier(c), sql.Identifier(c)) for c in cols
             ),
         )
-
+        conn = None
         try:
             conn = self.__conn_pool.getconn() 
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -245,6 +245,7 @@ class MdsConnector:
             where=sql.SQL(" AND ").join(where_clauses),
         )
 
+        conn = None
         try:
             conn = self.__conn_pool.getconn()
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -285,6 +286,10 @@ class MdsConnector:
         created_by: Optional[Tuple[str, str]] = DEFAULT_USER,
         details: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:        
+       
+        if created_by is None:
+            created_by = DEFAULT_USER
+       
         if project_id is not None:
             condition = {"project_id": project_id}
         else:
