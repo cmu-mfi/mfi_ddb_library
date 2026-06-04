@@ -124,7 +124,7 @@ def callback(config, topic, message):
                 "created_by_domain",
                 "timestamp"
             ]
-            project_row = mds.insert_project(
+            new_project = mds.insert_project(
                 project_id=data["project_id"] if "project_id" in data else None,
                 project_name=data["project_name"] if "project_name" in data else None,
                 created_by=(data["created_by_user_id"], data["created_by_domain"]),
@@ -140,7 +140,7 @@ def callback(config, topic, message):
                         mds.insert_user_project_role_linking(
                             user_id=user.get("user_id"),
                             domain=user.get("domain",""),
-                            project_id=project_row["project_id"],
+                            project_id=new_project["project_id"],
                             role=role
                         )
         elif msg_type == "tp-tag":

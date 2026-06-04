@@ -8,6 +8,9 @@ def create_tables(config_path='pg_database.ini'):
     """ Create tables in the PostgreSQL database"""
     commands = (
         """
+        CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+        """,
+        """
         CREATE TABLE ddb_user (
             user_id            VARCHAR(50) NOT NULL,
             domain             VARCHAR(50) NOT NULL,
