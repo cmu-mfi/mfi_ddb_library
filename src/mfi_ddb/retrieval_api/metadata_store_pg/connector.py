@@ -10,7 +10,8 @@ from pg_connect import connect as pg_connect
 from pg_create_tables import create_tables
 from pg_mds import MdsConnector
 
-from mfi_ddb import KeyValueTopicFamily, Subscriber
+from mfi_ddb.topic_families.key_value import KeyValueTopicFamily
+from mfi_ddb.streamer.subscriber import Subscriber
 from mfi_ddb.utils.script_utils import get_topic_from_config
 
 logger = logging.getLogger(__name__)
@@ -22,11 +23,38 @@ def callback(config, topic, message):
     if mds is None:
         logging.error("MdsConnector not available")
         return
+    
+    # Convert bytes to string safely if needed
+    if isinstance(message, bytes):
+        payload_str = message.decode('utf-8')
+    else:
+        payload_str = message
+
     try:
-        data: dict = KeyValueTopicFamily.process_message(message)
+        # Before parsing, let's look at what the schema validator says explicitly
+        import jsonschema
+        validator = KeyValueTopicFamily.get_schema_validator()
+        raw_json_dict = json.loads(payload_str)
+        
+        # Check for errors manually to print them out
+        errors = list(validator.iter_errors(raw_json_dict))
+        if errors:
+            print("\n❌ --- SCHEMA VALIDATION ERRORS FOUND ---")
+            for error in errors:
+                print(f"Field: {'.'.join(str(p) for p in error.path)}")
+                print(f"Error Message: {error.message}")
+            print("------------------------------------------\n")
+
+        data: dict = KeyValueTopicFamily.process_message(payload_str)
     except Exception as e:
-        logging.info(f"Message payload: {json.dumps(json.loads(message), indent=2)}")
+        # logging.info(f"Message payload: {json.dumps(json.loads(message), indent=2)}")
+        logging.info(f"Message payload: {json.dumps(json.loads(payload_str), indent=2)}")
         logging.error(f"Error occurred while processing message on topic {topic}: {str(e)}")
+        return
+
+    # SAFETY CHECK
+    if data is None:
+        logging.error(f"Message dropped: Core library could not parse payload on topic {topic}. Data was returned as None.")
         return
 
     logging.info(f"Received message of msg_type: {data.get('msg_type')} on topic: {topic}")
