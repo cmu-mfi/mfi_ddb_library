@@ -4,7 +4,7 @@ FROM python:3.12-slim
 # Set working directory inside the container
 WORKDIR /app
 
-# Install system dependencies if required (psycopg2-binary usually doesn't need libpq-dev, but good for safety)
+# Install system dependencies if required
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
@@ -16,8 +16,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the entire source tree so internal relative package imports resolve perfectly
 COPY src/ /app/src/
 
-# Set the PYTHONPATH environment variable so python can locate the modules
-ENV PYTHONPATH=/app/src
+# FIX: Added the nested timescaledb directory to the PYTHONPATH
+ENV PYTHONPATH=/app/src:/app/src/mfi_ddb/databases/timescaledb
 
 # Run the ingestion client module
 CMD ["python", "-m", "mfi_ddb.databases.timescaledb.connector.main"]

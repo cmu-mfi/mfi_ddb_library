@@ -16,7 +16,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ /app/src/
 
 # Instruct Python where to begin finding root modules
-ENV PYTHONPATH=/app/src
+# FIX: Added the nested dws folder so 'from gen import ...' resolves perfectly
+ENV PYTHONPATH=/app/src:/app/src/mfi_ddb/databases/kv-psql/dws
 
 # Expose the internal gRPC execution port
 EXPOSE 50051

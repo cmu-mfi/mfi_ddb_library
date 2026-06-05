@@ -12,6 +12,7 @@ volumes:
 services:
   # SHARED INFRASTRUCTURE
   mqtt-broker:
+    platform: linux/amd64
     image: eclipse-mosquitto:2
     container_name: mfi-mqtt-broker
     ports:
@@ -23,6 +24,7 @@ services:
 
   # NODE 1: TIMESCALEDB (Historian Engine)
   timescaledb-db:
+    platform: linux/amd64
     image: timescale/timescaledb:latest-pg16
     container_name: mfi-timescaledb-db
     environment:
@@ -30,41 +32,52 @@ services:
       - POSTGRES_PASSWORD=timescale
       - POSTGRES_DB=ddb_ts
     ports:
-      - "5432:5432" # Standard external port mapping
+      - "5432:5432"
     volumes:
       - timescale_storage:/var/lib/postgresql/data
       - ./src/mfi_ddb/databases/timescaledb/init_schema.sql:/docker-entrypoint-initdb.d/01_init_schema.sql
     networks:
       - mfi_network
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tsdb -d ddb_ts"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   timescaledb-connector:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: src/mfi_ddb/databases/timescaledb/connector/Dockerfile
     container_name: mfi-timescaledb-connector
     depends_on:
-      - timescaledb-db
-      - mqtt-broker
+      mqtt-broker:
+        condition: service_started
+      timescaledb-db:
+        condition: service_healthy
     networks:
       - mfi_network
     restart: on-failure
 
   timescaledb-dws:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: src/mfi_ddb/databases/timescaledb/dws/Dockerfile
     container_name: mfi-timescaledb-dws
     ports:
-      - "50052:50052" # gRPC Historian Path
+      - "50052:50052"
     depends_on:
-      - timescaledb-db
+      timescaledb-db:
+        condition: service_healthy
     networks:
       - mfi_network
     restart: always
 
   # NODE 2: KV-POSTGRES (Metadata Engine)
   kv-psql-db:
+    platform: linux/amd64
     image: postgres:15-alpine
     container_name: mfi-kv-psql-db
     environment:
@@ -72,42 +85,51 @@ services:
       - POSTGRES_PASSWORD=mfiddb
       - POSTGRES_DB=mfi_kv
     ports:
-      - "5431:5432" # Shifted to host port 5431 to completely avoid conflict with Timescale!
+      - "5431:5432"
     volumes:
       - kv_psql_storage:/var/lib/postgresql/data
     networks:
       - mfi_network
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mfi -d mfi_kv"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   kv-psql-connector:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: src/mfi_ddb/databases/kv-psql/connector/Dockerfile
     container_name: mfi-kv-psql-connector
     depends_on:
-      - kv-psql-db
-      - mqtt-broker
+      mqtt-broker:
+        condition: service_started
+      kv-psql-db:
+        condition: service_healthy
     networks:
       - mfi_network
     restart: on-failure
 
   kv-psql-dws:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: src/mfi_ddb/databases/kv-psql/dws/Dockerfile
     container_name: mfi-kv-psql-dws
     ports:
-      - "50051:50051" # gRPC Metadata Path
+      - "50051:50051"
     depends_on:
-      - kv-psql-db
+      kv-psql-db:
+        condition: service_healthy
     networks:
       - mfi_network
     restart: always
 
-  # ==================================================================
   # NODE 3: METADATA STORE RELATIONAL ECOSYSTEM
-  # ==================================================================
   metadata-store-db:
+    platform: linux/amd64
     image: postgres:15-alpine
     container_name: mfi-metadata-store-db
     environment:
@@ -115,21 +137,29 @@ services:
       - POSTGRES_PASSWORD=mfiddb
       - POSTGRES_DB=mds
     ports:
-      - "5430:5432" # Shifted to 5430 to prevent structural collisions with 5432 or 5431
+      - "5430:5432"
     volumes:
       - mds_storage:/var/lib/postgresql/data
     networks:
       - mfi_network
     restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mfi -d mds"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   metadata-store-connector:
+    platform: linux/amd64
     build:
       context: .
       dockerfile: src/mfi_ddb/retrieval_api/metadata_store_pg/Dockerfile
     container_name: mfi-metadata-store-connector
     depends_on:
-      - metadata-store-db
-      - mqtt-broker
+      mqtt-broker:
+        condition: service_started
+      metadata-store-db:
+        condition: service_healthy
     networks:
       - mfi_network
     restart: on-failure
