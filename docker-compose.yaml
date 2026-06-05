@@ -1,0 +1,104 @@
+version: '3.8'
+
+networks:
+  mfi_network:
+    driver: bridge
+
+volumes:
+  timescale_storage:
+  kv_psql_storage:
+
+services:
+  # SHARED INFRASTRUCTURE
+  mqtt-broker:
+    image: eclipse-mosquitto:2
+    container_name: mfi-mqtt-broker
+    ports:
+      - "1883:1883"
+    command: mosquitto -c /mosquitto/config/mosquitto.conf --allow-anonymous true
+    networks:
+      - mfi_network
+    restart: always
+
+  # NODE 1: TIMESCALEDB (Historian Engine)
+  timescaledb-db:
+    image: timescale/timescaledb:latest-pg16
+    container_name: mfi-timescaledb-db
+    environment:
+      - POSTGRES_USER=tsdb
+      - POSTGRES_PASSWORD=timescale
+      - POSTGRES_DB=ddb_ts
+    ports:
+      - "5432:5432" # Standard external port mapping
+    volumes:
+      - timescale_storage:/var/lib/postgresql/data
+      - ./src/mfi_ddb/databases/timescaledb/init_schema.sql:/docker-entrypoint-initdb.d/01_init_schema.sql
+    networks:
+      - mfi_network
+    restart: always
+
+  timescaledb-connector:
+    build:
+      context: .
+      dockerfile: src/mfi_ddb/databases/timescaledb/connector/Dockerfile
+    container_name: mfi-timescaledb-connector
+    depends_on:
+      - timescaledb-db
+      - mqtt-broker
+    networks:
+      - mfi_network
+    restart: on-failure
+
+  timescaledb-dws:
+    build:
+      context: .
+      dockerfile: src/mfi_ddb/databases/timescaledb/dws/Dockerfile
+    container_name: mfi-timescaledb-dws
+    ports:
+      - "50052:50052" # gRPC Historian Path
+    depends_on:
+      - timescaledb-db
+    networks:
+      - mfi_network
+    restart: always
+
+  # NODE 2: KV-POSTGRES (Metadata Engine)
+  kv-psql-db:
+    image: postgres:15-alpine
+    container_name: mfi-kv-psql-db
+    environment:
+      - POSTGRES_USER=mfi
+      - POSTGRES_PASSWORD=mfiddb
+      - POSTGRES_DB=mfi_kv
+    ports:
+      - "5431:5432" # Shifted to host port 5431 to completely avoid conflict with Timescale!
+    volumes:
+      - kv_psql_storage:/var/lib/postgresql/data
+    networks:
+      - mfi_network
+    restart: always
+
+  kv-psql-connector:
+    build:
+      context: .
+      dockerfile: src/mfi_ddb/databases/kv-psql/connector/Dockerfile
+    container_name: mfi-kv-psql-connector
+    depends_on:
+      - kv-psql-db
+      - mqtt-broker
+    networks:
+      - mfi_network
+    restart: on-failure
+
+  kv-psql-dws:
+    build:
+      context: .
+      dockerfile: src/mfi_ddb/databases/kv-psql/dws/Dockerfile
+    container_name: mfi-kv-psql-dws
+    ports:
+      - "50051:50051" # gRPC Metadata Path
+    depends_on:
+      - kv-psql-db
+    networks:
+      - mfi_network
+    restart: always

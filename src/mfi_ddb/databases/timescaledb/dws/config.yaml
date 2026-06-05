@@ -1,5 +1,5 @@
 timescaledb:
-  host: "localhost"
+  host: "timescaledb-db"
   port: 5432
   user: "tsdb"
   password: "timescale"

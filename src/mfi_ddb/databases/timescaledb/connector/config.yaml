@@ -1,12 +1,12 @@
 mqtt:
-  broker_address: "localhost"
+  broker_address: "mqtt-broker"
   broker_port: 1883
   topic: "mfi-v1.0-historian/#"
   username: ""
   password: ""
 
 timescaledb:
-  host: "localhost"
+  host: "timescaledb-db"
   port: 5432
   user: "tsdb"
   password: "timescale"
