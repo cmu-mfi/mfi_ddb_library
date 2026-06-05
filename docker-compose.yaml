@@ -7,6 +7,7 @@ networks:
 volumes:
   timescale_storage:
   kv_psql_storage:
+  mds_storage:
 
 services:
   # SHARED INFRASTRUCTURE
@@ -102,3 +103,33 @@ services:
     networks:
       - mfi_network
     restart: always
+
+  # ==================================================================
+  # NODE 3: METADATA STORE RELATIONAL ECOSYSTEM
+  # ==================================================================
+  metadata-store-db:
+    image: postgres:15-alpine
+    container_name: mfi-metadata-store-db
+    environment:
+      - POSTGRES_USER=mfi
+      - POSTGRES_PASSWORD=mfiddb
+      - POSTGRES_DB=mds
+    ports:
+      - "5430:5432" # Shifted to 5430 to prevent structural collisions with 5432 or 5431
+    volumes:
+      - mds_storage:/var/lib/postgresql/data
+    networks:
+      - mfi_network
+    restart: always
+
+  metadata-store-connector:
+    build:
+      context: .
+      dockerfile: src/mfi_ddb/retrieval_api/metadata_store_pg/Dockerfile
+    container_name: mfi-metadata-store-connector
+    depends_on:
+      - metadata-store-db
+      - mqtt-broker
+    networks:
+      - mfi_network
+    restart: on-failure
