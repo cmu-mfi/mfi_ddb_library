@@ -13,34 +13,18 @@ volumes:
 
 services:
   # SHARED INFRASTRUCTURE
-
-  # Broker using Eclipse Mosquitto
-  # mqtt-broker:
-  #   platform: linux/amd64
-  #   image: eclipse-mosquitto:2
-  #   container_name: mfi-mqtt-broker
-  #   ports:
-  #     - "1883:1883"
-  #   command: mosquitto -c /mosquitto/config/mosquitto.conf --allow-anonymous true
-  #   networks:
-  #     - mfi_network
-  #   restart: always
-  
-  # Broker using EMQX
   mqtt-broker:
-    platform: linux/amd64
-    image: emqx/emqx:5.8
+    image: emqx/emqx:5.8.0
     container_name: mfi-mqtt-broker
     ports:
       - "1883:1883"     # MQTT TCP port
-      - "8083:8083"     # MQTT websockets port (for web clients)
+      - "8083:8083"     # MQTT websockets port
       - "18083:18083"   # EMQX dashboard UI
     volumes:
       - emqx_data:/opt/emqx/data
       - emqx_log:/opt/emqx/log
     environment:
       - EMQX_NAME=mfi_broker
-      - EMQX_HOST=127.0.0.1
     networks:
       - mfi_network
     restart: always
@@ -79,6 +63,9 @@ services:
         condition: service_started
       timescaledb-db:
         condition: service_healthy
+    volumes:
+      - ./src/mfi_ddb/databases/timescaledb/connector/config.yaml:/app/config.yaml:ro
+      
     networks:
       - mfi_network
     restart: on-failure
@@ -133,6 +120,8 @@ services:
         condition: service_healthy
     networks:
       - mfi_network
+    volumes:
+      - ./src/mfi_ddb/databases/kv-psql/connector/config.yaml:/app/config.yaml:ro
     restart: on-failure
 
   kv-psql-dws:
@@ -143,6 +132,9 @@ services:
     container_name: mfi-kv-psql-dws
     ports:
       - "50051:50051"
+    command: >
+      sh -c "python -m mfi_ddb.databases.kv-psql.dws.init_db && 
+             python -m mfi_ddb.databases.kv-psql.dws.server"
     depends_on:
       kv-psql-db:
         condition: service_healthy
@@ -178,11 +170,17 @@ services:
       context: .
       dockerfile: src/mfi_ddb/retrieval_api/metadata_store_pg/Dockerfile
     container_name: mfi-metadata-store-connector
+    command: >
+      python src/mfi_ddb/retrieval_api/metadata_store_pg/connector.py
+      --broker_config src/mfi_ddb/retrieval_api/metadata_store_pg/broker.ini
+      --pg_config src/mfi_ddb/retrieval_api/metadata_store_pg/pg_database.ini
     depends_on:
       mqtt-broker:
         condition: service_started
       metadata-store-db:
         condition: service_healthy
+    # volumes:
+    #   - ./examples/configs/data_adapters/mqtt.yaml:/app/config.yaml:ro
     networks:
       - mfi_network
     restart: on-failure
