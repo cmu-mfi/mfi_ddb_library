@@ -8,16 +8,39 @@ volumes:
   timescale_storage:
   kv_psql_storage:
   mds_storage:
+  emqx_data:
+  emqx_log:
 
 services:
   # SHARED INFRASTRUCTURE
+
+  # Broker using Eclipse Mosquitto
+  # mqtt-broker:
+  #   platform: linux/amd64
+  #   image: eclipse-mosquitto:2
+  #   container_name: mfi-mqtt-broker
+  #   ports:
+  #     - "1883:1883"
+  #   command: mosquitto -c /mosquitto/config/mosquitto.conf --allow-anonymous true
+  #   networks:
+  #     - mfi_network
+  #   restart: always
+  
+  # Broker using EMQX
   mqtt-broker:
     platform: linux/amd64
-    image: eclipse-mosquitto:2
+    image: emqx/emqx:5.8
     container_name: mfi-mqtt-broker
     ports:
-      - "1883:1883"
-    command: mosquitto -c /mosquitto/config/mosquitto.conf --allow-anonymous true
+      - "1883:1883"     # MQTT TCP port
+      - "8083:8083"     # MQTT websockets port (for web clients)
+      - "18083:18083"   # EMQX dashboard UI
+    volumes:
+      - emqx_data:/opt/emqx/data
+      - emqx_log:/opt/emqx/log
+    environment:
+      - EMQX_NAME=mfi_broker
+      - EMQX_HOST=127.0.0.1
     networks:
       - mfi_network
     restart: always
