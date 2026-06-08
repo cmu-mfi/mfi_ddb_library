@@ -8,6 +8,7 @@ from pathlib import Path
 import yaml
 from typing import Any, List, Tuple, Optional
 import paho.mqtt.client as mqtt
+from paho.mqtt.enums import CallbackAPIVersion
 from datetime import datetime, timezone
 from mqtt_spb_wrapper.spb_base import SpbPayloadParser
 
@@ -89,6 +90,13 @@ def classify_value(v) -> Tuple[Optional[float], Optional[str], Optional[str]]:
 
 
 # MQTT Callback - the producer
+def on_connect(client, userdata, flags, rc, properties=None):
+    """MQTT callback: handle connection."""
+    if rc == 0:
+        print(f"Connected to MQTT broker successfully")
+    else:
+        print(f"Connection failed with result code {rc}")
+
 def on_message(client, userdata, msg):
     """MQTT callback: decode payload and batch insert into TimeScaleDB."""
     try:
@@ -182,10 +190,11 @@ def main():
 
     # 2. Setup and connect the MQTT broker client
     mqtt_cfg = cfg["mqtt"]
-    client = mqtt.Client()
+    client = mqtt.Client(CallbackAPIVersion.VERSION2)
     if mqtt_cfg.get("username"):
         client.username_pw_set(mqtt_cfg["username"], mqtt_cfg.get("password", ""))
 
+    client.on_connect = on_connect
     client.on_message = on_message
     client.connect(mqtt_cfg["broker_address"], mqtt_cfg.get("broker_port", 1883), 60)
     client.subscribe(mqtt_cfg["topic"])

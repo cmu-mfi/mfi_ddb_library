@@ -18,6 +18,7 @@ COPY src/ /app/src/
 
 # FIX: Added the nested timescaledb directory to the PYTHONPATH
 ENV PYTHONPATH=/app/src:/app/src/mfi_ddb/databases/timescaledb
+ENV PYTHONUNBUFFERED=1
 
-# Run the ingestion client module
-CMD ["python", "-m", "mfi_ddb.databases.timescaledb.connector.main"]
+# Run the ingestion client module with unbuffered output
+CMD ["python", "-u", "-m", "mfi_ddb.databases.timescaledb.connector.main"]
