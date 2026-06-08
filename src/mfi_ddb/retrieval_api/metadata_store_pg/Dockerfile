@@ -20,9 +20,10 @@ COPY src/mfi_ddb/retrieval_api/metadata_store_pg/*.py /app/
 COPY src/mfi_ddb/retrieval_api/metadata_store_pg/*.ini /app/
 
 ENV PYTHONPATH=/app/src:/app
+ENV PYTHONUNBUFFERED=1
 
 # Run connector.py (which runs internal check_tables and create_tables on startup)
-CMD ["python", "connector.py", "--broker_config", "broker.ini", "--pg_config", "pg_database.ini"]
+CMD ["python", "-u", "connector.py", "--broker_config", "broker.ini", "--pg_config", "pg_database.ini"]
 
 
 

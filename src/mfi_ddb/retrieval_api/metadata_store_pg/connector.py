@@ -99,7 +99,8 @@ def callback(config, topic, message):
             table="project", 
             conditions={"project_id": project["id"]},)
         if project_row is not None and len(project_row) == 1:
-            project["name"] = project_row[0]["name"]
+            # project["name"] = project_row[0]["name"]
+            project["name"] = project_row[0]["project_name"]
 
     try:
         if msg_type == "birth":
@@ -242,10 +243,14 @@ def main(broker_config_path, pg_config_path):
         topic, lambda full_topic, message: callback(mqtt_config, full_topic, message)
     )
 
+    import time
     mqtt_sub.client.loop_start()
     logging.info(f"Subscribed to topic: {topic}")
 
-    while KeyboardInterrupt:
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
         pass
 
     mqtt_sub.client.loop_stop()
@@ -253,6 +258,7 @@ def main(broker_config_path, pg_config_path):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     parser = argparse.ArgumentParser(description="MDS Connector")
     parser.add_argument("--broker_config", "-b", type=str, default="broker.ini", help="Path to the configuration file")
     parser.add_argument("--pg_config", "-p", type=str, default="pg_database.ini", help="Path to the DB configuration file")
