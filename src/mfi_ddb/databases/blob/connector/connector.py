@@ -46,7 +46,6 @@ class LocalFileStorage:
                 file_ext = f".{file_ext}"
 
             file_path = os.path.join(self.save_dir, f"{unique_id}{file_ext}")
-            rel_file_path = os.path.relpath(file_path)
 
             with open(file_path, 'wb') as f:
                 f.write(data["file"])
@@ -60,7 +59,6 @@ class LocalFileStorage:
             metadata["file_id"] = unique_id
 
             metadata_path = os.path.join(self.save_dir, f"{unique_id}.json")
-
             with open(metadata_path, 'w') as f:
                 json.dump(metadata, f, indent=4)
 
@@ -76,7 +74,6 @@ class LocalFileStorage:
             }
 
             self._append_to_index(index_record)
-
             return unique_id
 
         except Exception as e:
@@ -104,48 +101,27 @@ class CFSSubscriberService:
         self.subscriber = None
 
         if isinstance(mqtt_config, dict) and 'mqtt' in mqtt_config:
-             self.subscriber = Subscriber(mqtt_config)
+            self.subscriber = Subscriber(mqtt_config)
         else:
             logger.info("Running without MQTT subscriber (test mode)")
-        self.storage = LocalFileStorage(cfs_config)
 
+        self.storage = LocalFileStorage(cfs_config)
         self.running = False
 
     # ---------- LIFECYCLE ----------
-    # def start(self):
-    #     if not self.subscriber:
-    #         logger.warning("Subscriber not initialized (test mode)")
-    #         return
-    #     topic = get_topic_from_config(self.cfs_config['topic'])
-
-    #     logger.info(f"Subscribing to topic: {topic}")
-    #     logger.info("Starting MQTT listener...")   
-
-    #     self.subscriber.create_message_callback(
-    #         topic, self._callback
-    #     )
-
-    #     self.subscriber.client.loop_start()
-    #     self.running = True
-
-    #     logger.info("CFS Subscriber Service started")
     def start(self):
         if not self.subscriber:
-            logger.warning("Subscriber not initialized (test mode)")
+            logger.warning("Subscriber not initialized, running in test mode — storage only")
+            self.running = False
             return
-        
+
         topic = get_topic_from_config(self.cfs_config['topic'])
 
-        # start loop FIRST so network traffic is processed
         self.subscriber.client.loop_start()
-        
-        # give loop a moment to stabilize
         time.sleep(1)
 
         logger.info(f"Subscribing to topic: {topic}")
-        self.subscriber.create_message_callback(
-            topic, self._callback
-        )
+        self.subscriber.create_message_callback(topic, self._callback)
 
         self.running = True
         logger.info("CFS Subscriber Service started")
@@ -162,36 +138,6 @@ class CFSSubscriberService:
         logger.info("Service stopped")
 
     # ---------- CALLBACK ----------
-    # def _callback(self, message):
-    #     topic = getattr(message, "topic", None)
-
-    #     def parse():
-    #         return BlobTopicFamily.process_message(message.payload)
-
-    #     def get_handler(data_type):
-    #         return {
-    #             "attributes": self._handle_attributes,
-    #             "data": self._handle_data,
-    #         }.get(data_type)
-
-    #     try:
-    #         data_type, data = parse()
-    #     except Exception as e:
-    #         logger.exception(f"Failed to parse message: {e}")
-    #         return
-
-    #     logger.info(f"Received {data_type} message on topic: {topic}")
-
-    #     handler = get_handler(data_type)
-    #     if not handler:
-    #         logger.warning(f"Unknown data type received: {data_type}")
-    #         return
-
-    #     try:
-    #         handler(topic, data)
-    #     except Exception as e:
-    #         logger.exception(f"Error handling {data_type} message: {e}")
-
     def _callback(self, topic, payload):
         def parse():
             return BlobTopicFamily.process_message(payload)
@@ -219,6 +165,7 @@ class CFSSubscriberService:
             handler(topic, data)
         except Exception as e:
             logger.exception(f"Error handling {data_type} message: {e}")
+
     # ---------- HANDLERS ----------
     def _handle_attributes(self, topic, data):
         try:
@@ -243,8 +190,6 @@ class CFSSubscriberService:
 
     def _handle_data(self, topic, data):
         expected_keys = ["file_name", "file_type", "size", "timestamp", "file"]
-
-        # --- minimal validation (same as your original intent) ---
         missing = [k for k in expected_keys if k not in data]
         if missing:
             logger.warning(f"Missing keys in data message: {missing}")
@@ -272,13 +217,13 @@ def main(mqtt_cfg_file, cfs_cfg_file):
 
     try:
         service.start()
-
+        if not service.running:
+            logger.error("Service failed to start")
+            return
         while True:
             time.sleep(1)
-
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received")
-
     finally:
         service.stop()
 

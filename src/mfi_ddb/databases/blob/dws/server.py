@@ -1,17 +1,20 @@
 import logging
 from concurrent import futures
+import os
+from time import timezone
 
 import grpc
-import stubs.models_pb2 as models_pb2
-import stubs.models_pb2_grpc as models_pb2_grpc
-import stubs.service_pb2 as service_pb2
-import stubs.service_pb2_grpc as service_pb2_grpc
+import gen.models_pb2 as models_pb2
+import gen.models_pb2_grpc as models_pb2_grpc
+import gen.service_pb2 as service_pb2
+import gen.service_pb2_grpc as service_pb2_grpc
 from google.protobuf.timestamp_pb2 import Timestamp
 import yaml
-from error_codes import GrpcError
-from mfi_ddb.databases.blob.blobapi import BlobAPI
+from mfi_ddb_library.src.mfi_ddb.databases.blob.dws.error_codes import GrpcError
+from mfi_ddb_library.src.mfi_ddb.databases.blob.dws.blobapi import BlobAPI
 
-with open("config.yaml", "r") as file:
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml")
+with open(CONFIG_PATH, "r") as file:
     config = yaml.safe_load(file)
 
 cfg = config.get("config")
@@ -35,13 +38,16 @@ class DataService(service_pb2_grpc.DataServiceServicer):
         self.logger.error(f"Local Files DWS Error: {e}")
         context.set_details(str(e))
         context.set_code(status_code)
+    def _timestamp_to_string(self, ts):
+        dt = ts.ToDatetime().astimezone(timezone.utc)
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
 
     def GetDataPoint(self, request, context):
         try:
             blob = self.blob_api.get_data_point(
                 request.topic,
-                request.user_id,
-                request.timestamp
+                self._timestamp_to_string(request.timestamp),
+                request.do_closest_past
             )
 
             ts = Timestamp()
@@ -63,9 +69,8 @@ class DataService(service_pb2_grpc.DataServiceServicer):
         try:
             values = self.blob_api.get_data_range(
                 request.topic,
-                request.user_id,
-                request.start_time,
-                request.end_time,
+                self._timestamp_to_string(request.start_time), 
+                self._timestamp_to_string(request.end_time),
                 request.page_size,
                 request.page_token
             )
@@ -101,9 +106,6 @@ class DataService(service_pb2_grpc.DataServiceServicer):
             context.set_code(grpc.StatusCode.UNIMPLEMENTED)
             context.set_details("Streaming is not implemented yet.")
             return service_pb2.StreamDataResponse()
-            # for value in pi_client.stream_data(request.topic, request.user_id, request.start_from):
-            #     yield service_pb2.StreamDataResponse(datapoint=value)
-
 
 def serve():
     port = "50051"
