@@ -1,4 +1,9 @@
 topic_family: Topic family to use (e.g., 'historian', 'kv', 'blob')
+user:
+  user_id: User ID associated with the data
+  domain: Domain of the user
+  email: Email of the user
+  name: Name of the user
 mqtt:
   broker_address: Address of the MQTT broker
   broker_port: 'Port of the MQTT broker (default: 1883)'

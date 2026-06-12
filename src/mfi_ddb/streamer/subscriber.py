@@ -1,4 +1,3 @@
-import time
 from ._mqtt import Mqtt
 
 
@@ -13,7 +12,7 @@ class Subscriber(Mqtt):
         
         # pass only the message to callback
         def callback_wrapper(client, userdata, message):
-            callback(message.payload)
+            callback(message.topic, message.payload)
         
         # set the callback function
         self.client.on_message = callback_wrapper

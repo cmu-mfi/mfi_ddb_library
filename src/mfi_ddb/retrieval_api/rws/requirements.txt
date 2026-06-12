@@ -1,0 +1,5 @@
+FastAPI[all]
+psycopg2-binary
+dateutils
+pytest
+paho-mqtt

@@ -1,0 +1,1 @@
+# Generated gRPC stubs for MFI-DDB Database Web Service
