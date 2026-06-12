@@ -15,9 +15,10 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import paho.mqtt.client as mqtt
+from paho.mqtt.enums import CallbackAPIVersion
 import psycopg2
 import yaml
-from psycopg2 import sql
+from psycopg2 import sql, extensions
 from psycopg2.extras import Json
 
 logger = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ class MQTTConnector:
         
         # PostgreSQL configuration
         self.postgres_config = config.get('postgres', {})
-        self.db_conn: Optional[psycopg2.connection] = None
+        self.db_conn: Optional[extensions.connection] = None
         
         self.running = False
         
@@ -73,17 +74,46 @@ class MQTTConnector:
             self.db_conn.close()
             self.logger.info("Disconnected from PostgreSQL database")
     
+    # def create_table_if_not_exists(self):
+    #     """Create the kv_data table if it doesn't exist."""
+    #     with self.db_conn.cursor() as cursor:
+    #         cursor.execute("""
+    #             CREATE TABLE IF NOT EXISTS kv_data (
+    #                 timestamp TIMESTAMPTZ NOT NULL,
+    #                 topic TEXT NOT NULL,
+    #                 payload JSONB NOT NULL
+    #             )
+    #         """)
+    #         self.logger.info("Table 'kv_data' ready")
     def create_table_if_not_exists(self):
-        """Create the kv_data table if it doesn't exist."""
+        """Create the kv_data table and indexes if they don't exist."""
+        
+        # to show db_conn is not none
+        if not self.db_conn:
+            self.logger.error("Database connection is missing. Cannot create tables.")
+            return
+        
         with self.db_conn.cursor() as cursor:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS kv_data (
-                    timestamp TIMESTAMPTZ NOT NULL,
+                    id SERIAL PRIMARY KEY,
+                    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                     topic TEXT NOT NULL,
-                    payload JSONB NOT NULL
-                )
+                    payload JSONB NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
             """)
-            self.logger.info("Table 'kv_data' ready")
+            
+            create_index_queries = [
+                "CREATE INDEX IF NOT EXISTS idx_kv_data_timestamp ON kv_data(timestamp DESC);",
+                "CREATE INDEX IF NOT EXISTS idx_kv_data_topic ON kv_data(topic);",
+                "CREATE INDEX IF NOT EXISTS idx_kv_data_topic_timestamp ON kv_data(topic, timestamp DESC);",
+                "CREATE INDEX IF NOT EXISTS idx_kv_data_created_at ON kv_data(created_at);"
+            ]
+            for query in create_index_queries:
+                cursor.execute(query)
+                
+        self.logger.info("Table 'kv_data' and performance indexes verified and ready")
     
     def store_data_point(self, topic: str, payload: dict):
         """Store a single data point in the database."""
@@ -102,7 +132,8 @@ class MQTTConnector:
                     """,
                     (timestamp, topic, Json(payload))
                 )
-            self.logger.debug(f"Stored data point: topic={topic}")
+            # self.logger.debug(f"Stored data point: topic={topic}")
+            self.logger.info(f"Stored data point: topic={topic}")
             return True
         except psycopg2.Error as e:
             self.logger.error(f"Failed to store data point: {e}")
@@ -139,7 +170,7 @@ class MQTTConnector:
         # Set up MQTT client
         self.mqtt_client = mqtt.Client(
             client_id=f"kv-psql-connector-{int(time.time())}",
-            callback_api_version=mqtt.CallbackAPIVersion.VERSION2
+            callback_api_version=CallbackAPIVersion.VERSION2
         )
         
         if self.mqtt_username and self.mqtt_password:

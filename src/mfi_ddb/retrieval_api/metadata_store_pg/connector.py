@@ -10,7 +10,8 @@ from pg_connect import connect as pg_connect
 from pg_create_tables import create_tables
 from pg_mds import MdsConnector
 
-from mfi_ddb import KeyValueTopicFamily, Subscriber
+from mfi_ddb.topic_families.key_value import KeyValueTopicFamily
+from mfi_ddb.streamer.subscriber import Subscriber
 from mfi_ddb.utils.script_utils import get_topic_from_config
 
 logger = logging.getLogger(__name__)
@@ -22,11 +23,38 @@ def callback(config, topic, message):
     if mds is None:
         logging.error("MdsConnector not available")
         return
+    
+    # Convert bytes to string safely if needed
+    if isinstance(message, bytes):
+        payload_str = message.decode('utf-8')
+    else:
+        payload_str = message
+
     try:
-        data: dict = KeyValueTopicFamily.process_message(message)
+        # Before parsing, let's look at what the schema validator says explicitly
+        import jsonschema
+        validator = KeyValueTopicFamily.get_schema_validator()
+        raw_json_dict = json.loads(payload_str)
+        
+        # Check for errors manually to print them out
+        errors = list(validator.iter_errors(raw_json_dict))
+        if errors:
+            print("\n❌ --- SCHEMA VALIDATION ERRORS FOUND ---")
+            for error in errors:
+                print(f"Field: {'.'.join(str(p) for p in error.path)}")
+                print(f"Error Message: {error.message}")
+            print("------------------------------------------\n")
+
+        data: dict = KeyValueTopicFamily.process_message(payload_str)
     except Exception as e:
-        logging.info(f"Message payload: {json.dumps(json.loads(message), indent=2)}")
+        # logging.info(f"Message payload: {json.dumps(json.loads(message), indent=2)}")
+        logging.info(f"Message payload: {json.dumps(json.loads(payload_str), indent=2)}")
         logging.error(f"Error occurred while processing message on topic {topic}: {str(e)}")
+        return
+
+    # SAFETY CHECK
+    if data is None:
+        logging.error(f"Message dropped: Core library could not parse payload on topic {topic}. Data was returned as None.")
         return
 
     logging.info(f"Received message of msg_type: {data.get('msg_type')} on topic: {topic}")
@@ -71,7 +99,8 @@ def callback(config, topic, message):
             table="project", 
             conditions={"project_id": project["id"]},)
         if project_row is not None and len(project_row) == 1:
-            project["name"] = project_row[0]["name"]
+            # project["name"] = project_row[0]["name"]
+            project["name"] = project_row[0]["project_name"]
 
     try:
         if msg_type == "birth":
@@ -124,7 +153,7 @@ def callback(config, topic, message):
                 "created_by_domain",
                 "timestamp"
             ]
-            project_row = mds.insert_project(
+            new_project = mds.insert_project(
                 project_id=data["project_id"] if "project_id" in data else None,
                 project_name=data["project_name"] if "project_name" in data else None,
                 created_by=(data["created_by_user_id"], data["created_by_domain"]),
@@ -140,7 +169,7 @@ def callback(config, topic, message):
                         mds.insert_user_project_role_linking(
                             user_id=user.get("user_id"),
                             domain=user.get("domain",""),
-                            project_id=project_row["project_id"],
+                            project_id=new_project["project_id"],
                             role=role
                         )
         elif msg_type == "tp-tag":
@@ -214,10 +243,14 @@ def main(broker_config_path, pg_config_path):
         topic, lambda full_topic, message: callback(mqtt_config, full_topic, message)
     )
 
+    import time
     mqtt_sub.client.loop_start()
     logging.info(f"Subscribed to topic: {topic}")
 
-    while KeyboardInterrupt:
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
         pass
 
     mqtt_sub.client.loop_stop()
@@ -225,6 +258,7 @@ def main(broker_config_path, pg_config_path):
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     parser = argparse.ArgumentParser(description="MDS Connector")
     parser.add_argument("--broker_config", "-b", type=str, default="broker.ini", help="Path to the configuration file")
     parser.add_argument("--pg_config", "-p", type=str, default="pg_database.ini", help="Path to the DB configuration file")

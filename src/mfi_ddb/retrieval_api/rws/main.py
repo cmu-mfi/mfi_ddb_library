@@ -78,4 +78,4 @@ async def root():
 # Only runs when script is executed directly (not when imported as module)
 if __name__ == "__main__":
     # Start development server with auto-reload for code changes
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

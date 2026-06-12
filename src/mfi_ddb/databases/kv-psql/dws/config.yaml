@@ -1,5 +1,5 @@
 postgres:
-  host: localhost
+  host: "kv-psql-db"
   port: 5432
   database: mfi_kv
   user: mfi
