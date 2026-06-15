@@ -5,7 +5,7 @@ user:
   email: user123@example.com
   name: User 123
 mqtt:
-  broker_address: localhost
+  broker_address: test.mosquitto.org
   broker_port: 1883
   enterprise: CMU
   site: Machine Shop

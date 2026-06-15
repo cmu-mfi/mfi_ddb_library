@@ -1,5 +1,5 @@
 mqtt:
-  broker_address: localhost
+  broker_address: mqtt.example.com
   broker_port: 1883
 trial_id: trial_001
 queue_size: 10
