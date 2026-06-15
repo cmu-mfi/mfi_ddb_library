@@ -7,6 +7,7 @@ networks:
 volumes:
   timescale_storage:
   kv_psql_storage:
+  blob_storage:
   mds_storage:
   emqx_data:
   emqx_log:
@@ -184,3 +185,59 @@ services:
     networks:
       - mfi_network
     restart: on-failure
+
+  # NODE 4: READ-WRITE SERVICE (RWS) APP
+  rws-app:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: src/mfi_ddb/retrieval_api/rws/Dockerfile
+    container_name: mfi-rws-app
+    ports:
+      - "8000:8000"
+    depends_on:
+      metadata-store-db:
+        condition: service_healthy
+      kv-psql-db:
+        condition: service_healthy
+      timescaledb-db:
+        condition: service_healthy
+      kv-psql-dws:
+        condition: service_started
+      timescaledb-dws:
+        condition: service_started
+    networks:
+      - mfi_network
+    restart: always
+
+  # NODE 5: BLOB STORAGE
+  blob-connector:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: src/mfi_ddb/databases/blob/connector/Dockerfile
+    container_name: mfi-blob-connector
+    depends_on:
+      mqtt-broker:
+        condition: service_started
+    volumes:
+      - blob_storage:/data/blob_storage
+    networks:
+      - mfi_network
+    restart: on-failure
+
+  blob-dws:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: src/mfi_ddb/databases/blob/dws/Dockerfile
+    container_name: mfi-blob-dws
+    ports:
+      - "50053:50053"
+    depends_on:
+      - blob-connector
+    volumes:
+      - blob_storage:/data/blob_storage:ro
+    networks:
+      - mfi_network
+    restart: always
