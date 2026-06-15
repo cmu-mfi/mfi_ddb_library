@@ -1,0 +1,59 @@
+services:
+  metadata-store-db:
+    platform: linux/amd64
+    image: postgres:15-alpine
+    container_name: mfi-metadata-store-db
+    environment:
+      - POSTGRES_USER=mfi
+      - POSTGRES_PASSWORD=mfiddb
+      - POSTGRES_DB=mds
+    ports:
+      - "5430:5432"
+    volumes:
+      - mds_storage:/var/lib/postgresql/data
+    networks:
+      - mfi_network
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mfi -d mds"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  metadata-store-connector:
+    platform: linux/amd64
+    build:
+      context: ../
+      dockerfile: src/mfi_ddb/retrieval_api/metadata_store_pg/Dockerfile
+    container_name: mfi-metadata-store-connector
+    command: >
+      python src/mfi_ddb/retrieval_api/metadata_store_pg/connector.py
+      --broker_config src/mfi_ddb/retrieval_api/metadata_store_pg/broker.ini
+      --pg_config src/mfi_ddb/retrieval_api/metadata_store_pg/pg_database.ini
+    depends_on:
+      mqtt-broker:
+        condition: service_started
+      metadata-store-db:
+        condition: service_healthy
+    networks:
+      - mfi_network
+    restart: on-failure
+
+  rws-app:
+    platform: linux/amd64
+    build:
+      context: ../
+      dockerfile: src/mfi_ddb/retrieval_api/rws/Dockerfile
+    container_name: mfi-rws-app
+    ports:
+      - "8000:8000"
+    depends_on:
+      metadata-store-db:
+        condition: service_healthy
+      kv-psql-db:
+        condition: service_healthy
+      timescaledb-db:
+        condition: service_healthy
+    networks:
+      - mfi_network
+    restart: always
