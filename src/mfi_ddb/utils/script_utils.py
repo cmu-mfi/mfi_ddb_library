@@ -1,5 +1,6 @@
 import json
 import time
+import copy
 
 def get_topic_from_config(cfg: dict) -> str:
     """
@@ -50,3 +51,15 @@ def get_blob_json_payload_from_dict(data: dict, file_name: str, trial_id:str) ->
     }
                 
     return payload
+
+def redact_cfg(cfg: dict) -> dict:
+    """
+    Return a copy of cfg with password redacted.
+    """
+    safe_cfg = copy.deepcopy(cfg)
+
+    if 'mqtt' in safe_cfg.keys():
+        if 'password' in safe_cfg['mqtt'].keys():
+            safe_cfg['mqtt']['password'] = '***'
+
+    return safe_cfg

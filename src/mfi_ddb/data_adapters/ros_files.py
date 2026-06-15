@@ -36,7 +36,7 @@ class _SCHEMA(BaseModel):
     class _DEVICES(BaseModel):
         namespace: str = Field(..., description="Namespace of the device in ROS")
         rostopics: List[str] = Field(..., description="List of ROS topics to subscribe to for this device")
-        attributes: Optional[dict] = Field({}, description="Attributes of the device. Optional.")
+        attributes: dict = Field({}, description="Attributes of the device. Optional.")
     class SCHEMA(BaseModel):
         trial_id: str = Field(..., description="Trial ID for the ROS device. No spaces or special characters allowed.")
         set_ros_callback: bool = Field(True, description="Set ROS callback to receive data from ROS topics. If set to False, you need to call get_data() method to get data from ROS topics.")

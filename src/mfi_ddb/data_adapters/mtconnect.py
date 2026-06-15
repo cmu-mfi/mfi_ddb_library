@@ -55,6 +55,8 @@ class MTconnectDataAdapter(BaseDataAdapter):
         super().__init__()
         
         self.cfg = config
+        self.cfg['trial_id'] = self.cfg['mtconnect']['trial_id']
+        
         self.device_name = self.cfg['mtconnect']['device_name']
         # CHECK IF MTCONNECT AGENT IS ACTIVE
         self.__connect()
