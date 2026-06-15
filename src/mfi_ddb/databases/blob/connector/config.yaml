@@ -1,5 +1,5 @@
 mqtt:
-  broker_address: "128.128.128.128"
+  broker_address: "mfi-mqtt-broker"
   broker_port: 1883
   username: "username"
   password: "password"
@@ -7,11 +7,11 @@ mqtt:
   debug: false
 
 config:
-  save_directory: "/path/to/blob/storage"
+  save_directory: "/data/blob_storage"
   topic:
-    version: ""
-    topic_family: ""
-    enterprise: ""
+    version: "1.0"
+    topic_family: "blob"
+    enterprise: "mfi"
     site: null
     area: null
     device: null
