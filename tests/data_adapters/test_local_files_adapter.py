@@ -26,6 +26,12 @@ def test_system_polling():
     }
     streamer_config = {
         "topic_family": "blob",
+        "user": {
+            "user_id": "user123",
+            "domain": "ANDREW",
+            "email": "user123@example.com",
+            "name": "User 123"
+        },        
         "mqtt": {
             "broker_address": "localhost",
             "broker_port": 1883,
@@ -48,6 +54,7 @@ def test_system_polling():
 
     #wait for the streamer to finish processing before deleting the directory
     time.sleep(2)
+    streamer.disconnect()
     shutil.rmtree(dir_path)
     
     
@@ -69,6 +76,12 @@ def test_system_callback():
     }
     streamer_config = {
         "topic_family": "blob",
+        "user": {
+            "user_id": "user123",
+            "domain": "ANDREW",
+            "email": "user123@example.com",
+            "name": "User 123"
+        },        
         "mqtt": {
             "broker_address": "localhost",
             "broker_port": 1883,

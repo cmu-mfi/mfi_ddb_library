@@ -21,7 +21,7 @@ class KeyValueTopicFamily(BaseTopicFamily):
         for key in data.keys():
             data[key] = self.__autotype(data[key])
             
-        return json.dumps(data)
+        return {"data":data}
     
     def __autotype(self, data):
         if not isinstance(data, dict):
@@ -29,10 +29,8 @@ class KeyValueTopicFamily(BaseTopicFamily):
                 try:
                     return cast(data)
                 except:
-                    continue
-        else:
-            data = json.dumps(data)
-            return data        
+                    continue    
+        return data        
     
     @staticmethod
     def apply_defaults(data, validator = None):

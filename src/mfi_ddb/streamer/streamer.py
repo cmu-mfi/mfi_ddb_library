@@ -216,51 +216,6 @@ class Streamer(Observer):
             self.__reset_stream()
         self.__client.stream_data(self.__data_adp.data)
         self.__data_adp.clear_data_buffer()
-        
-    def __generate_birth_kv_payload(self) -> dict:
-        
-        sample_data = copy.deepcopy(self.__birth_data)
-        sample_data_size = sys.getsizeof(str(sample_data))
-        
-        # drop keys until the size is less than 32768 bytes
-        # since total size of payload <= 65536 bytes
-        # ref: error with paho-mqtt: "struct.error: 'H' format requires 0 <= number <= 65535"
-        while sample_data_size > 32768:
-            # remove the last key
-            sample_data.popitem()
-            sample_data_size = sys.getsizeof(str(sample_data))
-        
-        payload = {
-            "schema_version": "mfi-v1.0",
-            "msg_type": "birth",
-            "trial_id": str(self.__data_adp.cfg.get('trial_id', None)),
-            "time": {
-                "birth": datetime.now().isoformat()
-                },
-            "user": {
-                "user_id": self.cfg["user"]["user_id"],
-                "domain": self.cfg["user"]["domain"],
-                "email": self.cfg["user"]["email"],
-                "name": self.cfg["user"]["name"]
-            },
-            "source": {
-                "os": platform.system(),
-                "hostname": socket.gethostname(),
-                "fqdn": socket.getfqdn(),
-            },
-            "adapter": {
-                "name": self.__data_adp.NAME,
-                "config_help": self.__data_adp.CONFIG_HELP,
-                "config": self.__data_adp.cfg,
-                "component_ids": self.__data_adp.component_ids,
-                "attributes": self.__data_adp.attributes,
-                "sample_data": sample_data,
-            },
-            "broker": self.cfg["mqtt"],
-            "data_topics": self.__client.get_data_topics()
-        }         
-        
-        return payload
 
     def __refresh_birth_data_with_new_keys(self, data: dict = {}) -> bool:
         """
@@ -326,7 +281,6 @@ class Streamer(Observer):
 
         # 3. publish the key-value metadata birth message with initial data
         # ```````````````````````````````````````````````````````````````````````
-                
         self.__kv_client.set_death_payload("metadata", kv_death_payload)
         self.__kv_client.connect(['metadata'])
         
@@ -339,8 +293,53 @@ class Streamer(Observer):
         # 4. publish the birth message of the data adapter        
         # `````````````````````````````````````````````````````````````````````````
         self.__client.publish_birth(self.__data_adp.attributes, self.__data_adp.data)
-        self.__data_adp.clear_data_buffer()        
-
+        self.__data_adp.clear_data_buffer()   
+             
+    def __generate_birth_kv_payload(self) -> dict:
+        
+        sample_data = copy.deepcopy(self.__birth_data)
+        sample_data_size = sys.getsizeof(str(sample_data))
+        
+        # drop keys until the size is less than 32768 bytes
+        # since total size of payload <= 65536 bytes
+        # ref: error with paho-mqtt: "struct.error: 'H' format requires 0 <= number <= 65535"
+        while sample_data_size > 32768:
+            # remove the last key
+            sample_data.popitem()
+            sample_data_size = sys.getsizeof(str(sample_data))
+        
+        payload = {
+            "schema_version": "mfi-v1.0",
+            "msg_type": "birth",
+            "trial_id": str(self.__data_adp.cfg.get('trial_id', None)),
+            "time": {
+                "birth": datetime.now().isoformat()
+                },
+            "user": {
+                "user_id": self.cfg["user"]["user_id"],
+                "domain": self.cfg["user"]["domain"],
+                "email": self.cfg["user"]["email"],
+                "name": self.cfg["user"]["name"]
+            },
+            "source": {
+                "os": platform.system(),
+                "hostname": socket.gethostname(),
+                "fqdn": socket.getfqdn(),
+            },
+            "adapter": {
+                "name": self.__data_adp.NAME,
+                "config_help": self.__data_adp.CONFIG_HELP,
+                "config": self.__data_adp.cfg,
+                "component_ids": self.__data_adp.component_ids,
+                "attributes": self.__data_adp.attributes,
+                "sample_data": sample_data,
+            },
+            "broker": self.cfg["mqtt"],
+            "data_topics": list(self.__client.get_data_topics())
+        }         
+        
+        return payload
+    
     def __generate_death_kv_payload(self, birth_payload: dict) -> dict:
         death_payload = copy.deepcopy(birth_payload)
         death_payload["msg_type"] = "death"
@@ -348,7 +347,7 @@ class Streamer(Observer):
         # Update death time to now if birth time is more than 5 seconds ago, 
         # otherwise don't update the time to ensure death time is after birth time. 
         # This is to handle the case when streaming is not ended cleanly.
-        if (datetime.now() - datetime.fromisoformat(birth_payload["time"]["birth"])) > timedelta(seconds=5):
+        if (datetime.now() - datetime.fromisoformat(birth_payload["time"]["birth"])) > timedelta(seconds=1.0):
             death_payload["time"]["death"] = datetime.now().isoformat()
     
         return death_payload

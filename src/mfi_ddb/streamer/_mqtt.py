@@ -32,7 +32,7 @@ class Mqtt:
             self.__topic_header = None
         
         self.__last_will_set = False
-        self.__last_will = {}
+        self.__last_will = {"topic": "", "payload": None}
         self.__data_topics = set()
     
     def __get_topic_header(self, config:dict):
@@ -157,7 +157,6 @@ class Mqtt:
         """
         Set the last will message for the MQTT client.
         """
-        
         input_values = copy.deepcopy(payload)
         input_values = self._topic_family.process_data(input_values)
 
@@ -172,7 +171,8 @@ class Mqtt:
             
         self.__last_will_set = True   
         topic = f"{topic}/{list(input_values.keys())[0]}"
-        self.__last_will = {topic: list(input_values.values())[0]}
+        self.__last_will["topic"] = topic
+        self.__last_will["payload"] = list(input_values.values())[0]
         
     def __publish_last_will(self):
         """
@@ -181,14 +181,15 @@ class Mqtt:
         print(f"CLIENT DISCONNECTED. {self._topic_family.topic_family_name}. Publishing last will message...")
         if not self.__last_will_set:         
             return
-        
-        for device, payload in self.__last_will.items():
-            topic_prefix = f"{self.__topic_header}/{device}"
-            for key in payload.keys():
-                if isinstance(payload[key], dict):
-                    payload[key] = json.dumps(payload[key])
-                self.client.publish(f"{topic_prefix}/{key}", payload[key])
-                print(f"Published last will on topic: {topic_prefix}/{key}")
+
+        payload = self.__last_will["payload"]
+        topic = f"{self.__topic_header}/{self.__last_will['topic']}"
+
+        if isinstance(payload, dict):
+            payload = json.dumps(payload)              
+        self.client.publish(topic, payload)
+        print(f"Published last will on topic: {topic}")
+
         self.__last_will_set = False
         self.__last_will = {}
     
@@ -199,8 +200,10 @@ class Mqtt:
         if not self.__last_will_set:
             return
         
-        payload = list(self.__last_will.values())[0]
-        topic = f"{self.__topic_header}/{list(self.__last_will.keys())[0]}"
-            
+        payload = self.__last_will["payload"]
+        topic = f"{self.__topic_header}/{self.__last_will['topic']}"
+  
+        if isinstance(payload, dict):
+            payload = json.dumps(payload)      
         self.client.will_set(topic, payload, qos=1, retain=False)
         print(f"Last will set on topic: {topic}")
