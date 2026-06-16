@@ -18,19 +18,20 @@ class KeyValueTopicFamily(BaseTopicFamily):
             LOGGER.error(f"Data does not match schema: {self.schema_validator.iter_errors(data)}")
             raise ValueError("Data does not match the MFI DDB key-value schema")
         
-        for key in data.keys():
-            data[key] = self.__autotype(data[key])
+        # for key in data.keys():
+        #     data[key] = self.__autotype(data[key])
             
         return {"data":data}
     
-    def __autotype(self, data):
-        if not isinstance(data, dict):
-            for cast in (int, float, str):
-                try:
-                    return cast(data)
-                except:
-                    continue    
-        return data        
+    # Removing this method for now. It might be unnecessary for key_value topic family
+    # def __autotype(self, data):
+    #     if not isinstance(data, dict):
+    #         for cast in (int, float, str):
+    #             try:
+    #                 return cast(data)
+    #             except:
+    #                 continue    
+    #     return data        
     
     @staticmethod
     def apply_defaults(data, validator = None):
