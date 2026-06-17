@@ -74,8 +74,11 @@ To be able to do the above three major classes are provided:
 * [MQTT](src/mfi_ddb/data_adapters/mqtt.py)
 * [MTConnect](src/mfi_ddb/data_adapters/mtconnect.py)
 * [gRPC](src/mfi_ddb/data_adapters/grpc.py)
+* [key_value](src/mfi_ddb/data_adapters/key_value.py)
 
 To create a new data adapter, please follow the [checklist](./src/mfi_ddb/data_adapters/README.md#new-data-adapter-checklist) and refer to the existing data adapters for implementation reference.
+
+Use the right [PR template](./.github/PULL_REQUEST_TEMPLATE/data_adapters.md) by following instructions [here](./.github/PULL_REQUEST_TEMPLATE/README.md).
 
 ### Streamer
 
