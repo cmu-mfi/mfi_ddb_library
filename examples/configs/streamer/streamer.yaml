@@ -1,4 +1,4 @@
-topic_family: kv
+topic_family: blob
 user:
   user_id: user123
   domain: ANDREW
