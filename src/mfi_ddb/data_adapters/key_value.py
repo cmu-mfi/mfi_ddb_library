@@ -1,22 +1,14 @@
-import importlib.util
-import os
-import subprocess
-import sys
-import time
-from pathlib import Path
-from typing import List, Optional, Literal
-import logging
-
-import grpc
-from google.protobuf import json_format
-from pydantic import BaseModel, Field
-from mfi_ddb.utils.exceptions import ConfigError
+from typing import List, Literal
+from pydantic import BaseModel, Field, ConfigDict
 
 from mfi_ddb.data_adapters.base import BaseDataAdapter
+from mfi_ddb.topic_families.key_value import KeyValueTopicFamily
+from mfi_ddb.utils.exceptions import ConfigError
 
 
 class _SCHEMA(BaseModel):
     class _Payload(BaseModel):
+        model_config = ConfigDict(extra='allow')
         schema_version: str = Field("mfi-v1.0", description="Version of kv schema to validate the payload.")
         msg_type: Literal['data', 'project', 'tp-tag', 'user'] = Field("data", description="OneOf('data', 'project', 'tp-tag', 'user')")
         
@@ -102,9 +94,14 @@ class KvDataAdapter(BaseDataAdapter):
             raise ConfigError(f"Invalid configuration: {e}")   
         
         self.pending_payloads = {}
+        schema_validator = KeyValueTopicFamily.get_schema_validator()
         for payload in self.cfg['payloads']:
-            # TODO: add kv.json schema validation of the paylod
-            ...
+            payload = KeyValueTopicFamily.apply_defaults(payload, schema_validator)
+            if not schema_validator.is_valid(payload):
+                self.logger.warning(f"Payload does not match schema: {schema_validator.iter_errors(payload)}")
+                self.logger.warning("Skippidng the payload...")
+                breakpoint()
+                continue
             
             if payload['msg_type']=='data' and self.cfg['trial_id']=="mfi-ddb-metadata":
                 self.logger.warning("WARNING: No trial_id provided. Payload of type 'data' is ignored.")
@@ -120,4 +117,8 @@ class KvDataAdapter(BaseDataAdapter):
         
     def get_data(self):
         for key in self._data.keys():
-            self._data[key] = self.pending_payloads[key].pop(0)
+            self.logger.info(f"sending {key} payload")
+            if len(self.pending_payloads[key])>0:
+                self._data[key] = self.pending_payloads[key].pop(0)
+            else:
+                self._data[key] = {}
