@@ -204,14 +204,24 @@ class CFSSubscriberService:
 
 # ---------------- MAIN ----------------
 def main(mqtt_cfg_file, cfs_cfg_file):
-    logger.info(f"Using MQTT config: {os.path.abspath(mqtt_cfg_file)}")
-    logger.info(f"Using CFS config: {os.path.abspath(cfs_cfg_file)}")
+    # logger.info(f"Using MQTT config: {os.path.abspath(mqtt_cfg_file)}")
+    # logger.info(f"Using CFS config: {os.path.abspath(cfs_cfg_file)}")
 
+    # with open(mqtt_cfg_file) as f:
+    #     mqtt_config = yaml.safe_load(f)
+
+    # with open(cfs_cfg_file) as f:
+    #     cfs_config = yaml.safe_load(f)
+
+    logger.info(f"Using unified config file: {os.path.abspath(mqtt_cfg_file)}")
+
+    # Load the single file
     with open(mqtt_cfg_file) as f:
-        mqtt_config = yaml.safe_load(f)
+        unified_config = yaml.safe_load(f)
 
-    with open(cfs_cfg_file) as f:
-        cfs_config = yaml.safe_load(f)
+    # Extract the separate blocks from the single dictionary
+    mqtt_config = unified_config # keeping mqtt accessible for the subscriber service
+    cfs_config = unified_config.get('config')
 
     service = CFSSubscriberService(mqtt_config, cfs_config)
 
@@ -232,9 +242,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Subscribe to MQTT topic and save blobs to local storage"
     )
-    parser.add_argument("mqtt_config_path")
-    parser.add_argument("cfs_config_path")
+    # parser.add_argument("mqtt_config_path")
+    # parser.add_argument("cfs_config_path")
+
+    parser.add_argument("config_path", help="Path to the unified config file for blob")
 
     args = parser.parse_args()
 
-    main(args.mqtt_config_path, args.cfs_config_path)
+    main(args.config_path, args.config_path)

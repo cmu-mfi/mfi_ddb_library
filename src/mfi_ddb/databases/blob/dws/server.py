@@ -1,7 +1,8 @@
 import logging
 from concurrent import futures
 import os
-from time import timezone
+# from time import timezone. #this is only an integer does not have the utc attribute
+from datetime import timezone
 
 import grpc
 import gen.models_pb2 as models_pb2
@@ -10,8 +11,10 @@ import gen.service_pb2 as service_pb2
 import gen.service_pb2_grpc as service_pb2_grpc
 from google.protobuf.timestamp_pb2 import Timestamp
 import yaml
-from mfi_ddb_library.src.mfi_ddb.databases.blob.dws.error_codes import GrpcError
-from mfi_ddb_library.src.mfi_ddb.databases.blob.dws.blobapi import BlobAPI
+# from mfi_ddb_library.src.mfi_ddb.databases.blob.dws.error_codes import GrpcError
+# from mfi_ddb_library.src.mfi_ddb.databases.blob.dws.blobapi import BlobAPI
+from error_codes import GrpcError
+from blobapi import BlobAPI
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml")
 with open(CONFIG_PATH, "r") as file:
