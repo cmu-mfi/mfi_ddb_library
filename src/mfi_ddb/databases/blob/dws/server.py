@@ -13,8 +13,8 @@ from google.protobuf.timestamp_pb2 import Timestamp
 import yaml
 # from mfi_ddb_library.src.mfi_ddb.databases.blob.dws.error_codes import GrpcError
 # from mfi_ddb_library.src.mfi_ddb.databases.blob.dws.blobapi import BlobAPI
-from src.mfi_ddb.databases.blob.dws.error_codes import GrpcError
-from src.mfi_ddb.databases.blob.dws.blobapi import BlobAPI
+from error_codes import GrpcError
+from blobapi import BlobAPI
 
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.yaml")
 with open(CONFIG_PATH, "r") as file:

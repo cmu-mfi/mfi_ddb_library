@@ -5,6 +5,7 @@ services:
       context: ../
       dockerfile: src/mfi_ddb/databases/blob/connector/Dockerfile
     container_name: mfi-blob-connector
+    image: cmumfi/mfi-ddb-blob-connector:latest
     depends_on:
       mqtt-broker:
         condition: service_started
@@ -20,6 +21,7 @@ services:
       context: ../
       dockerfile: src/mfi_ddb/databases/blob/dws/Dockerfile
     container_name: mfi-blob-dws
+    image: cmumfi/mfi-ddb-blob-dws:latest
     ports:
       - "50053:50053"
     depends_on:

@@ -27,6 +27,7 @@ services:
       context: ../
       dockerfile: src/mfi_ddb/databases/timescaledb/connector/Dockerfile
     container_name: mfi-timescaledb-connector
+    image: cmumfi/mfi-ddb-timescaledb-connector:latest
     depends_on:
       mqtt-broker:
         condition: service_started
@@ -51,4 +52,5 @@ services:
         condition: service_healthy
     networks:
       - mfi_network
+    image: cmumfi/mfi-ddb-timescaledb-dws:latest
     restart: always

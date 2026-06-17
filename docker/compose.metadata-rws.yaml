@@ -26,6 +26,7 @@ services:
       context: ../
       dockerfile: src/mfi_ddb/retrieval_api/metadata_store_pg/Dockerfile
     container_name: mfi-metadata-store-connector
+    image: cmumfi/mfi-ddb-metadata-store-connector:latest
     command: >
       python src/mfi_ddb/retrieval_api/metadata_store_pg/connector.py
       --broker_config src/mfi_ddb/retrieval_api/metadata_store_pg/broker.ini
@@ -56,4 +57,5 @@ services:
         condition: service_healthy
     networks:
       - mfi_network
+    image: cmumfi/mfi-ddb-rws-app:latest
     restart: always

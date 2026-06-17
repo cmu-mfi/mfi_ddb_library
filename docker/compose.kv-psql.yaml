@@ -26,6 +26,7 @@ services:
       context: ../
       dockerfile: src/mfi_ddb/databases/kv-psql/connector/Dockerfile
     container_name: mfi-kv-psql-connector
+    image: cmumfi/mfi-ddb-kv-psql-connector:latest
     depends_on:
       mqtt-broker:
         condition: service_started
@@ -43,6 +44,7 @@ services:
       context: ../
       dockerfile: src/mfi_ddb/databases/kv-psql/dws/Dockerfile
     container_name: mfi-kv-psql-dws
+    image: cmumfi/mfi-ddb-kv-psql-dws:latest
     ports:
       - "50051:50051"
     command: >
