@@ -18,8 +18,8 @@ class KeyValueTopicFamily(BaseTopicFamily):
             LOGGER.error(f"Data does not match schema: {self.schema_validator.iter_errors(data)}")
             raise ValueError("Data does not match the MFI DDB key-value schema")
         
-        # for key in data.keys():
-        #     data[key] = self.__autotype(data[key])
+        if set(data.keys()) == set(['schema_version','msg_type']):
+            return {}
             
         return {"data":data}
     
