@@ -57,3 +57,6 @@ jobs:
 
       - name: Run tests for MQTTDataAdapter
         run: uv run pytest tests/data_adapters/test_mqtt_adapter.py -v --tb=short
+
+      - name: Run tests for KvDataAdapter
+        run: uv run pytest tests/data_adapters/test_kv_adapter.py -v --tb=short
