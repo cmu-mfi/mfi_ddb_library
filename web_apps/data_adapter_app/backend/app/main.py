@@ -12,7 +12,28 @@ Key Features:
 - Comprehensive error handling and logging
 - Health monitoring and status endpoints
 """
+import logging
+import sys
+from pathlib import Path
+# ---------- Configure logging immediately (must be done BEFORE importing app modules) ----------
+LOG_DIR = Path("logs")
+LOG_DIR.mkdir(exist_ok=True)
 
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout),          # console
+        logging.FileHandler(LOG_DIR / "app.log"),   # file
+    ],
+)
+
+# Tune uvicorn loggers if desired
+logging.getLogger("uvicorn").setLevel(logging.DEBUG)
+logging.getLogger("uvicorn.error").setLevel(logging.DEBUG)
+logging.getLogger("uvicorn.access").setLevel(logging.INFO)
+
+# ---------- Now import the rest of your app ----------
 import os
 import uvicorn
 from fastapi import FastAPI
@@ -21,6 +42,11 @@ from fastapi.staticfiles import StaticFiles
 
 # Import configuration router and application lifespan manager
 from app.api.v0.router import router
+
+
+logger = logging.getLogger(__name__)
+logger.warning("MAIN STARTED: if you see this, logging is live")
+
 
 # FastAPI application instance with metadata and lifecycle management
 app = FastAPI(

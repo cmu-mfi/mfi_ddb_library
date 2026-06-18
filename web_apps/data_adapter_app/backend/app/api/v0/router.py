@@ -45,6 +45,11 @@ router = APIRouter()
 # Connection: conn_id -> AdapterFactory instance
 active_connections: Dict[str, AdapterFactory] = {}
 
+@router.get("/__debug__/connections")
+async def debug_list_connections() -> Dict:
+    """Returns the current in-process connection IDs for this worker/process."""
+    logger.warning("Debug endpoint called; returning active_connections keys")
+    return {"active_connections": list(active_connections.keys())}
 
 @router.get("/adapters")
 async def list_adapters() -> List[Dict]:
@@ -240,7 +245,9 @@ async def connect_endpoint(
         try:
             connection.connect_and_stream()
             active_connections[conn_id] = connection
+            logger.info("Stored connection: conn_id=%s keys_now=%s", conn_id, list(active_connections.keys()))
         except Exception as err:
+            logger.exception("connect_and_stream failed for conn_id=%s", conn_id)
             raise HTTPException(status_code=502, detail=f"Connection failed: {err}")
 
     elif not connection.is_streaming:
@@ -328,11 +335,14 @@ async def disconnect_endpoint(
 @router.get("/streaming-status/{conn_id}")
 async def streaming_status_endpoint(conn_id: str = FastAPIPath(...)) -> dict:
     """Structured status for UI polling."""
+    logger.debug(active_connections)
     if conn_id not in active_connections:
+        logger.debug(f"active_connections.keys(): {list(active_connections.keys())}")
         raise HTTPException(status_code=404, detail="Connection not found")
 
     connection = active_connections[conn_id]
 
+    
     return {
         "adapter_name": connection.adp_name,
         "streaming_mode": "polling" if connection.is_polling else "callback",
