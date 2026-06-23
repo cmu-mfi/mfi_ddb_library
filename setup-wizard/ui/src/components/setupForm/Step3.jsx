@@ -25,39 +25,45 @@ const triggerDeploymentPipeline = () => {
     setLogs(prev => [...prev, `[INFO] Modules targeted for compilation: [${selectedList.join(', ')}]`]);
     setLogs(prev => [...prev, "[INFO] Connecting stream pipelines directly to daemon sockets..."]);
 
+    // Create an object to remember which index in our logs array belongs to which Docker Layer ID
+    const layerIndices = {};
+
     const pipelinePayload = {
       selectedServices: selectedList,
       configs: formValues
     };
 
-    // Invoke our cross-platform streaming engine client
     const closeActiveStream = hostPlatform.streamPipelineLogs(
       pipelinePayload,
       
-      // Callback 1: Smart Log Chunk Appended
+      // Callback 1: Smart Log Line Appended
       (incomingLine) => {
-        // Check if the incoming string has a Carriage Return (\r)
-        if (incomingLine.includes('\r')) {
-          // Clean up the text by extracting the very last string segment after the last \r
-          const parts = incomingLine.split('\r');
-          const cleanText = parts[parts.length - 1].trim();
+        const line = incomingLine.trim();
+        if (!line) return;
 
-          if (cleanText) {
-            setLogs((prev) => {
-              // Create a shallow copy of the logs history array
-              const newLogs = [...prev];
-              // Overwrite the last item in the log list with the new live progress status
-              if (newLogs.length > 0) {
-                newLogs[newLogs.length - 1] = cleanText;
-              } else {
-                newLogs.push(cleanText);
-              }
-              return newLogs;
-            });
-          }
+        // Regular expression matching Docker layer updates: e.g., "c30732a3612c Downloading..." or "0c7392fd90b8 Extracting..."
+        const dockerLayerMatch = line.match(/^([a-f0-9]{12})\s+(Downloading|Extracting|Waiting|Download complete|Pull complete|Already exists)/i);
+
+        if (dockerLayerMatch) {
+          const layerId = dockerLayerMatch[1]; // e.g. "c30732a3612c"
+          
+          setLogs((prev) => {
+            const newLogs = [...prev];
+            
+            if (layerId in layerIndices) {
+              // We've seen this layer before! Overwrite its previous line to prevent flooding
+              const targetIndex = layerIndices[layerId];
+              newLogs[targetIndex] = line;
+            } else {
+              // First time seeing this layer. Push it and remember its index position
+              newLogs.push(line);
+              layerIndices[layerId] = newLogs.length - 1;
+            }
+            return newLogs;
+          });
         } else {
-          // Standard line output (Newlines) -> Simply append to history normally
-          setLogs((prev) => [...prev, incomingLine.trim()]);
+          // Standard system output (e.g., "Creating network", "Container starting")
+          setLogs((prev) => [...prev, line]);
         }
       },
       
