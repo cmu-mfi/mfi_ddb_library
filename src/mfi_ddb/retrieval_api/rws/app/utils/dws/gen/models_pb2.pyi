@@ -1,8 +1,11 @@
+import datetime
+
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from google.protobuf import struct_pb2 as _struct_pb2
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from typing import ClassVar as _ClassVar, Mapping as _Mapping, Optional as _Optional, Union as _Union
+from collections.abc import Mapping as _Mapping
+from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
@@ -34,4 +37,4 @@ class Datapoint(_message.Message):
     string_value: str
     json_value: _struct_pb2.Struct
     file_value: file_value
-    def __init__(self, topic: _Optional[str] = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ..., int_value: _Optional[int] = ..., float_value: _Optional[float] = ..., string_value: _Optional[str] = ..., json_value: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., file_value: _Optional[_Union[file_value, _Mapping]] = ...) -> None: ...
+    def __init__(self, topic: _Optional[str] = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., int_value: _Optional[int] = ..., float_value: _Optional[float] = ..., string_value: _Optional[str] = ..., json_value: _Optional[_Union[_struct_pb2.Struct, _Mapping]] = ..., file_value: _Optional[_Union[file_value, _Mapping]] = ...) -> None: ...

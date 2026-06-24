@@ -43,9 +43,7 @@ class MqttSpb:
         mqtt_port = int(mqtt_cfg['broker_port']) if 'broker_port' in mqtt_cfg.keys() else 1883
         mqtt_user = mqtt_cfg['username'] if 'username' in mqtt_cfg.keys() else None
         mqtt_pass = mqtt_cfg['password'] if 'password' in mqtt_cfg.keys() else None
-        if 'password' in mqtt_cfg.keys():
-            del self.cfg['mqtt']['password']  # Remove password from config for security reasons
-                    
+
         mqtt_tls_enabled = mqtt_cfg['tls_enabled'] if 'tls_enabled' in mqtt_cfg.keys() else False
         debug = mqtt_cfg['debug'] if 'debug' in mqtt_cfg.keys() else False
                 
@@ -67,10 +65,10 @@ class MqttSpb:
                     time.sleep(3)
 
             self._components[component_id] = spb_component
-            data_topic = "%s/%s/DBIRTH/%s/%s" % (spb_component._spb_namespace,
+            data_topic = "%s/%s/%s/%s/#" % (spb_component._spb_namespace,
                                                 spb_component._spb_domain_name,
                                                 spb_component._spb_eon_name,
-                                                spb_component._spb_eon_device_name)            
+                                                spb_component._spb_eon_device_name)
             self.__data_topics.add(data_topic)
 
         print("All SPB components connected to broker") 

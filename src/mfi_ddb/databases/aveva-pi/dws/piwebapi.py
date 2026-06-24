@@ -8,7 +8,7 @@ import logging
 from datetime import timezone
 from dateutil.parser import parse as parse_date
 sys.path.insert(0, os.path.dirname(__file__))
-from error_codes import GrpcError
+from error_codes import GrpcError, InternalError, InvalidArgumentError
 
 class PIWebAPI:
     def __init__(self, secrets: dict):        
@@ -73,7 +73,7 @@ class PIWebAPI:
         self.logger.debug(f"Time range: {iso_start_time} -> {iso_end_time}, page_size={page_size}, page_token={page_token}")
         
         if iso_start_time >= iso_end_time:
-            raise GrpcError.InvalidArgumentError("start_time must be less than end_time")
+            raise InvalidArgumentError("start_time must be less than end_time")
         
         token_map = json.loads(page_token) if page_token else {}
         
@@ -228,5 +228,5 @@ class PIWebAPI:
         
         if response.status_code != 200:
             self.logger.error(f"GET request failed. URL: {url}, Status Code: {response.status_code}, Response: {response.text}")
-            raise GrpcError.InternalError(f"GET request failed. Status Code: {response.status_code}")
+            raise InternalError(f"GET request failed. Status Code: {response.status_code}")
         return response.json()

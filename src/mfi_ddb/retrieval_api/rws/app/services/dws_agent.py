@@ -6,6 +6,7 @@ from typing import List, Optional, Union, Dict
 
 import grpc
 import yaml
+from google.protobuf.json_format import MessageToDict
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from app.utils.dws.gen.models_pb2 import Datapoint
@@ -72,7 +73,7 @@ class __DwsAgent:
                 logger.info(f"Retrieving data for topics: {topic_family_map[topic_family]} from server: {server['name']} at {server['url']}")
                 response: GetDataRangeResponse = self._call_dws_server(server['url'], request)
                 raw_data = response.datapoints
-                
+
                 while response.next_page_token != "":
                     request = copy.deepcopy(request)
                     request.page_token = response.next_page_token
@@ -93,15 +94,16 @@ class __DwsAgent:
             # CONVERT TO KEY VALUE PAIRS
             for dp in unique_data_points:
                 value = None
-                if dp.int_value != 0:
+                value_field = dp.WhichOneof("value")
+                if value_field == "int_value":
                     value = dp.int_value
-                elif dp.float_value != 0.0:
+                elif value_field == "float_value":
                     value = dp.float_value
-                elif dp.string_value != "":
+                elif value_field == "string_value":
                     value = dp.string_value
-                elif dp.json_value != {}:
-                    value = dp.json_value
-                elif dp.file_value != b"":
+                elif value_field == "json_value":
+                    value = MessageToDict(dp.json_value)
+                elif value_field == "file_value":
                     value = dp.file_value.filename
                     logger.warning(f"File value found for topic {dp.topic} at timestamp {dp.timestamp.seconds}. Returning filename '{value}' instead of file content.")
                 

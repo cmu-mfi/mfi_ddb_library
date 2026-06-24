@@ -18,6 +18,9 @@ pi_client = PIWebAPI(secrets)
 
 
 class DataService(service_pb2_grpc.DataServiceServicer):
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+
     def __handle_exception(self, e, context):
 
         if type(e) in GrpcError.__subclasses__():
@@ -51,7 +54,6 @@ class DataService(service_pb2_grpc.DataServiceServicer):
             return models_pb2.Datapoint(topic=item["topic"], timestamp=ts, string_value=str(value))
         
     def GetDataPoint(self, request, context):
-        self.logger = logging.getLogger(__name__)
         try:
             item = pi_client.get_data_point(
                 request.topic,

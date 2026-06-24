@@ -334,7 +334,7 @@ class Streamer(Observer):
                 "attributes": self.__data_adp.attributes,
                 "sample_data": sample_data,
             },
-            "broker": self.cfg["mqtt"],
+            "broker": {k: v for k, v in self.cfg["mqtt"].items() if k != "password"},
             "data_topics": list(self.__client.get_data_topics())
         }         
         
