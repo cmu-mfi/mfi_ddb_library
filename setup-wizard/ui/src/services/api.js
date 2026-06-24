@@ -12,6 +12,8 @@ export const deployPipeline = async (formValues) => {
       MQTT_PASSWORD: formValues.MQTT_PASSWORD || ""
     },
     kv: {
+      KV_DEPLOYMENT: formValues.KV_DEPLOYMENT,
+      KV_DB_HOST: formValues.KV_DB_HOST,
       KV_DB_HOST_PORT: parseInt(formValues.KV_DB_HOST_PORT, 10),
       KV_DB_USER: formValues.KV_DB_USER,
       KV_DB_PASSWORD: formValues.KV_DB_PASSWORD,
@@ -21,6 +23,8 @@ export const deployPipeline = async (formValues) => {
       KV_DWS_PORT: parseInt(formValues.KV_DWS_PORT, 10)
     },
     ts: {
+      TS_DEPLOYMENT: formValues.TS_DEPLOYMENT,
+      TS_DB_HOST: formValues.TS_DB_HOST,
       TS_DB_HOST_PORT: parseInt(formValues.TS_DB_HOST_PORT, 10),
       TS_DB_USER: formValues.TS_DB_USER,
       TS_DB_PASSWORD: formValues.TS_DB_PASSWORD,
@@ -35,6 +39,8 @@ export const deployPipeline = async (formValues) => {
       BLOB_TOPIC_SUBSCRIPTION: formValues.BLOB_TOPIC_SUBSCRIPTION
     },
     rws: {
+      RWS_DEPLOYMENT: formValues.RWS_DEPLOYMENT,
+      MDS_DB_HOST: formValues.MDS_DB_HOST,
       RWS_API_PORT: parseInt(formValues.RWS_API_PORT, 10),
       MDS_DB_HOST_PORT: parseInt(formValues.MDS_DB_HOST_PORT, 10),
       MDS_DB_USER: formValues.MDS_DB_USER,
