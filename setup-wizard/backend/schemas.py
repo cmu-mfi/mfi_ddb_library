@@ -9,6 +9,8 @@ class InfraConfig(BaseModel):
     MQTT_PASSWORD: str = ""
 
 class KVConfig(BaseModel):
+    KV_DEPLOYMENT: str = "internal"
+    KV_DB_HOST: str = "kv-psql-db"
     KV_DB_HOST_PORT: int = 5431
     KV_DB_USER: str = "mfi"
     KV_DB_PASSWORD: str = "mfiddb"
@@ -18,6 +20,8 @@ class KVConfig(BaseModel):
     KV_DWS_PORT: int = 50051
 
 class TSConfig(BaseModel):
+    TS_DEPLOYMENT: str = "internal"
+    TS_DB_HOST: str = "timescaledb-db"
     TS_DB_HOST_PORT: int = 5432
     TS_DB_USER: str = "tsdb"
     TS_DB_PASSWORD: str = "timescale"
@@ -32,6 +36,8 @@ class BlobConfig(BaseModel):
     BLOB_TOPIC_SUBSCRIPTION: str = "mfi-v1.0-blob/#"
 
 class RWSConfig(BaseModel):
+    RWS_DEPLOYMENT: str = "internal"
+    MDS_DB_HOST: str = "metadata-store-db"
     RWS_API_PORT: int = 8000
     MDS_DB_HOST_PORT: int = 5430
     MDS_DB_USER: str = "mfi"
