@@ -3,6 +3,11 @@ import ServiceCard from './ServiceCard';
 
 const SERVICES_REGISTRY = [
   {
+    id: "infra",
+    title: "MQTT Broker Node",
+    description: "Provides a lightweight, high-performance EMQX MQTT broker. It enables publish-subscribe messaging, supporting real-time data streaming and communication across the DDB pipeline."
+  },
+  {
     id: "kv",
     title: "Key-Value DB Node",
     description: "Deploys containerized PostgreSQL to store data of type KV. Features a pre-configured database web service and an initialized connector out-of-the-box for low-latency operational telemetry."
