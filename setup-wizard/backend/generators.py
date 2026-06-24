@@ -154,6 +154,8 @@ services:
       - "{infra.MQTT_DASHBOARD_PORT}:18083"
     environment:
       - EMQX_NAME=mfi_broker
+    profiles:
+      - "broker"
     volumes:
       - emqx_data:/opt/emqx/data
       - emqx_log:/opt/emqx/log
@@ -177,6 +179,8 @@ services:
     depends_on:
       mqtt-broker:
         condition: service_healthy
+    profiles:
+      - "blob"
     volumes:
       - "{resolved_blob_path}:/data/blob_storage"
     networks:
@@ -190,6 +194,8 @@ services:
       - "{blob.BLOB_DWS_PORT}:50053"
     depends_on:
       - blob-connector
+    profiles:
+      - "blob"
     volumes:
       - "{resolved_blob_path}:/data/blob_storage:ro"
     networks:
@@ -215,6 +221,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    profiles:
+      - "kv"
     networks:
       - mfi_network
     restart: always
@@ -229,6 +237,8 @@ services:
         condition: service_healthy
     networks:
       - mfi_network
+    profiles:
+      - "kv"
     volumes:
       - ./runtime_configs/kv_psql_connector.yaml:/app/config.yaml:ro
     restart: on-failure
@@ -244,6 +254,8 @@ services:
     depends_on:
       kv-psql-db:
         condition: service_healthy
+    profiles:
+      - "kv"
     networks:
       - mfi_network
     restart: always
@@ -269,6 +281,8 @@ services:
       retries: 5
     networks:
       - mfi_network
+    profiles:
+      - "rws"
     restart: always
 
   metadata-store-connector:
@@ -285,6 +299,8 @@ services:
         condition: service_healthy
     networks:
       - mfi_network
+    profiles:
+      - "rws"
     volumes:
       - ./runtime_configs/metadata_broker.ini:/app/src/mfi_ddb/retrieval_api/metadata_store_pg/broker.ini:ro
       - ./runtime_configs/metadata_pg.ini:/app/src/mfi_ddb/retrieval_api/metadata_store_pg/pg_database.ini:ro
@@ -307,6 +323,8 @@ services:
     volumes:
       - ./runtime_configs/rws_endpoints.yaml:/app/src/mfi_ddb/retrieval_api/rws/app/config/dws.endpoints.yaml:ro
       - ./runtime_configs/rws_pg.ini:/app/src/mfi_ddb/retrieval_api/rws/app/config/pg_database.ini:ro
+    profiles:
+      - "rws"
     restart: always
 
   # ==========================================
@@ -328,6 +346,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    profiles:
+      - "ts"
     networks:
       - mfi_network
     restart: always
@@ -342,6 +362,8 @@ services:
         condition: service_healthy
     volumes:
       - ./runtime_configs/timescale_connector.yaml:/app/config.yaml:ro
+    profiles:
+      - "ts"
     networks:
       - mfi_network
     restart: on-failure
@@ -354,6 +376,8 @@ services:
     depends_on:
       timescaledb-db:
         condition: service_healthy
+    profiles:
+      - "ts"
     networks:
       - mfi_network
     restart: always
