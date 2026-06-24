@@ -8,7 +8,7 @@ import Step3Monitor from './components/setupForm/Step3';
 export default function App() {
   const [step, setStep] = useState(0); 
   const [selectedServices, setSelectedServices] = useState({
-    infra: true, kv: false, ts: false, blob: false, rws: false
+    infra: false, kv: false, ts: false, blob: false, rws: false
   });
   
   const [formValues, setFormValues] = useState(() => {
