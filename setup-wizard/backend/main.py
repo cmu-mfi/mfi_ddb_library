@@ -58,49 +58,53 @@ async def deploy_pipeline(payload: MasterConfigPayload):
         )
     
 @app.get("/api/deploy/stream")
-async def stream_deployment_logs():
+async def stream_deployment_logs(services: str = ""): # Read the incoming query line
     """
     Step 2: Real-time Orchestration Loop.
-    Instructs Docker to pull and execute the configurations live while streaming metrics back.
+    Instructs Docker to boot specific configuration profiles requested by Step 1.
     """
     async def generate_logs():
-        # Ensure we point to the precise cross-platform string path destination
         compose_str_path = str(COMPOSE_FILE_PATH)
 
         if not os.path.exists(compose_str_path):
             yield f"data: [ERROR] Layout manifest not found at {compose_str_path}. Staging must be run first.\n\n"
             return
 
-        # Trigger execution loop directly via asynchronous subprocess
-        # Note: We omit --build because your images are pulled purely from Docker Hub!
-        cmd = [
-            "docker", "compose", 
-            "-f", compose_str_path, 
-            "up", "-d"
-        ]
+        # Parse out active layout selections. (e.g. services="infra,kv")
+        active_profiles = [s.strip() for s in services.split(",") if s.strip()]
+
+        # Build command dynamically including active compose profiles
+        cmd = ["docker", "compose", "-f", compose_str_path]
         
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT
-        )
-
-        # Continually capture standard output blocks and pass them through to EventSource
-        while True:
-            line = await process.stdout.readline()
-            if not line:
-                break
+        for profile in active_profiles:
+            cmd.extend(["--profile", profile])
             
-            text = line.decode("utf-8").strip()
-            if text:
-                yield f"data: {text}\n\n"
-            
-        await process.wait()
+        cmd.extend(["up", "-d"])
+        
+        yield f"data: [SYSTEM] Orchestrating profiles: {active_profiles}\n\n"
+        
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT
+            )
 
-        # Check process return code to confirm successful setup execution
-        if process.returncode == 0:
-            yield "data: [DEPLOYMENT_COMPLETE]\n\n"
-        else:
-            yield f"data: [ERROR] Docker engine returned abnormal code termination: {process.returncode}\n\n"
+            while True:
+                line = await process.stdout.readline()
+                if not line:
+                    break
+                text = line.decode("utf-8").strip()
+                if text:
+                    yield f"data: {text}\n\n"
+                
+            await process.wait()
+
+            if process.returncode == 0:
+                yield "data: [DEPLOYMENT_COMPLETE]\n\n"
+            else:
+                yield f"data: [ERROR] Docker engine returned abnormal code termination: {process.returncode}\n\n"
+        except Exception as e:
+            yield f"data: [ERROR] Runtime exception executing subprocess loop: {str(e)}\n\n"
 
     return StreamingResponse(generate_logs(), media_type="text/event-stream")
