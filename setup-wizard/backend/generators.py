@@ -1,8 +1,6 @@
 import os
 from pathlib import Path
 
-from mfi_ddb.topic_families import blob
-
 def write_runtime_configs(config_dir: Path, payload) -> None:
     """
     Accepts an initialized file system directory path and a validated 
@@ -25,7 +23,7 @@ def write_runtime_configs(config_dir: Path, payload) -> None:
         f"  topics:\n"
         f"    - \"{kv.KV_TOPIC_SUBSCRIPTION}\"\n\n"
         f"postgres:\n"
-        f"  host: \"mfi-kv-psql-db\"\n"
+        f"  host: \"{kv.KV_DB_HOST}\"\n"
         f"  port: 5432\n"
         f"  database: \"{kv.KV_DB_NAME}\"\n"
         f"  user: \"{kv.KV_DB_USER}\"\n"
@@ -44,7 +42,7 @@ def write_runtime_configs(config_dir: Path, payload) -> None:
         f"  username: \"{infra.MQTT_USERNAME}\"\n"
         f"  password: \"{infra.MQTT_PASSWORD}\"\n\n"
         f"timescaledb:\n"
-        f"  host: \"mfi-timescaledb-db\"\n"
+        f"  host: \"{ts.TS_DB_HOST}\"\n"
         f"  port: 5432\n"
         f"  user: \"{ts.TS_DB_USER}\"\n"
         f"  password: \"{ts.TS_DB_PASSWORD}\"\n"
@@ -56,23 +54,29 @@ def write_runtime_configs(config_dir: Path, payload) -> None:
     # ==========================================
     # 3. RETRIEVAL API ROUTING RULES (.yaml)
     # ==========================================
-    # Strips out trailing wildfire patterns '/#' so your API matches base route targets cleanly
     kv_family_base = kv.KV_TOPIC_SUBSCRIPTION.replace("/#", "")
     ts_family_base = ts.TS_TOPIC_SUBSCRIPTION.replace("/#", "")
     blob_family_base = blob.BLOB_TOPIC_SUBSCRIPTION.replace("/#", "")
 
+    # Compute the URLs cleanly before formatting the block
+    if kv.KV_DEPLOYMENT == "external":
+        kv_routing_url = f"http://{kv.KV_DB_HOST}:{kv.KV_DWS_PORT}"
+    else:
+        kv_routing_url = f"http://mfi-kv-psql-dws:{kv.KV_DWS_PORT}"
+
+    if ts.TS_DEPLOYMENT == "external":
+        ts_routing_url = f"http://{ts.TS_DB_HOST}:{ts.TS_DWS_PORT}"
+    else:
+        ts_routing_url = f"http://mfi-timescaledb-dws:{ts.TS_DWS_PORT}"
+
     rws_endpoints_content = (
         f"services:\n"
-        f"  metadata_service:\n"
-        f"    url: \"http://mfi-metadata-store-db:5432\"\n"
-        f"    topic_families:\n"
-        f"    - \"{kv_family_base}\"\n"
         f"  kv_service:\n"
-        f"    url: \"http://mfi-kv-psql-dws:{kv.KV_DWS_PORT}\"\n"
+        f"    url: \"{kv_routing_url}\"\n"
         f"    topic_families:\n"
         f"    - \"{kv_family_base}\"\n"
         f"  historian_service:\n"
-        f"    url: \"http://mfi-timescaledb-dws:{ts.TS_DWS_PORT}\"\n"
+        f"    url: \"{ts_routing_url}\"\n"
         f"    topic_families:\n"
         f"    - \"{ts_family_base}\"\n"
         f"  cfs_service:\n"
@@ -81,7 +85,6 @@ def write_runtime_configs(config_dir: Path, payload) -> None:
         f"    - \"{blob_family_base}\"\n"
     )
     (config_dir / "rws_endpoints.yaml").write_text(rws_endpoints_content)
-
     # ==========================================
     # 4. METADATA BROKER SUBSCRIPTIONS (.ini)
     # ==========================================
@@ -104,22 +107,20 @@ def write_runtime_configs(config_dir: Path, payload) -> None:
     # ==========================================
     metadata_db_content = (
         f"[postgresql]\n"
-        f"host=mfi-metadata-store-db\n"
+        f"host={rws.MDS_DB_HOST}\n"
         f"port=5432\n"
         f"database={rws.MDS_DB_NAME}\n"
         f"user={rws.MDS_DB_USER}\n"
         f"password={rws.MDS_DB_PASSWORD}\n"
     )
-    # Maps directly across both systemic consumers cleanly
     (config_dir / "metadata_pg.ini").write_text(metadata_db_content)
     (config_dir / "rws_pg.ini").write_text(metadata_db_content)
 
 
 def generate_master_compose(runtime_dir: Path, payload) -> None:
     """
-    Accepts the runtime root directory path and the validated Pydantic payload,
-    generating a pristine, production-grade docker-compose.yaml file 
-    fully matching the structural behavior of the original separate stack layers.
+    Generates a decoupled, robust docker-compose.yaml architecture
+    where services can run in pure isolation without hard dependency failures.
     """
     infra = payload.infra
     kv = payload.kv
@@ -128,6 +129,39 @@ def generate_master_compose(runtime_dir: Path, payload) -> None:
     rws = payload.rws
 
     resolved_blob_path = os.path.abspath(os.path.expanduser(blob.MFI_BLOB_HOST_PATH))
+
+# Dynamic loopback string generation logic
+    extra_hosts_block = ""
+    if getattr(kv, 'KV_DB_HOST', '') == "host.docker.internal" or getattr(ts, 'TS_DB_HOST', '') == "host.docker.internal":
+        extra_hosts_block = (
+            "\n    extra_hosts:"
+            "\n      - \"host.docker.internal:host-gateway\""
+        )
+
+    # Note the explicit prepended newline and consistent block indentations
+    kv_depends_on = ""
+    if kv.KV_DB_HOST in ["kv-psql-db", "mfi-kv-psql-db"]:
+        kv_depends_on = (
+            "\n    depends_on:"
+            "\n      kv-psql-db:"
+            "\n        condition: service_healthy"
+        )
+
+    ts_depends_on = ""
+    if ts.TS_DB_HOST in ["timescaledb-db", "mfi-timescaledb-db"]:
+        ts_depends_on = (
+            "\n    depends_on:"
+            "\n      timescaledb-db:"
+            "\n        condition: service_healthy"
+        )
+
+    rws_depends_on = ""
+    if rws.MDS_DB_HOST in ["metadata-store-db", "mfi-metadata-store-db"]:
+        rws_depends_on = (
+            "\n    depends_on:"
+            "\n      metadata-store-db:"
+            "\n        condition: service_healthy"
+        )
 
     compose_content = f"""networks:
   mfi_network:
@@ -143,7 +177,7 @@ volumes:
 
 services:
   # ==========================================
-  # SHARED INFRASTRUCTURE
+  # SHARED INFRASTRUCTURE (Profile: broker)
   # ==========================================
   mqtt-broker:
     image: emqx/emqx:5.8.0
@@ -171,14 +205,11 @@ services:
     restart: always
 
   # ==========================================
-  # BLOB DATABASE LAYER
+  # BLOB DATABASE LAYER (Profile: blob)
   # ==========================================
   blob-connector:
     image: cmumfi/mfi-ddb-blob-connector:latest
     container_name: mfi-blob-connector
-    depends_on:
-      mqtt-broker:
-        condition: service_healthy
     profiles:
       - "blob"
     volumes:
@@ -192,8 +223,6 @@ services:
     container_name: mfi-blob-dws
     ports:
       - "{blob.BLOB_DWS_PORT}:50053"
-    depends_on:
-      - blob-connector
     profiles:
       - "blob"
     volumes:
@@ -203,7 +232,7 @@ services:
     restart: always
 
   # ==========================================
-  # KEY-VALUE POSTGRESQL LAYER
+  # KEY-VALUE POSTGRESQL LAYER (Profile: kv)
   # ==========================================
   kv-psql-db:
     image: postgres:15-alpine
@@ -229,12 +258,9 @@ services:
 
   kv-psql-connector:
     image: cmumfi/mfi-ddb-kv-psql-connector:latest
-    container_name: mfi-kv-psql-connector
-    depends_on:
-      mqtt-broker:
-        condition: service_healthy
-      kv-psql-db:
-        condition: service_healthy
+    container_name: mfi-kv-psql-connector{extra_hosts_block}{kv_depends_on}
+    environment:
+      - DB_HOST={kv.KV_DB_HOST}
     networks:
       - mfi_network
     profiles:
@@ -247,13 +273,10 @@ services:
     image: cmumfi/mfi-ddb-kv-psql-dws:latest
     container_name: mfi-kv-psql-dws
     ports:
-      - "{kv.KV_DWS_PORT}:50051"
+      - "{kv.KV_DWS_PORT}:50051"{kv_depends_on}
     command: >
-      sh -c "python -m mfi_ddb.databases.kv-psql.dws.init_db && 
+      sh -c "python -m mfi_ddb.databases.kv-psql.dws.init_db --host {kv.KV_DB_HOST} && 
              python -m mfi_ddb.databases.kv-psql.dws.server"
-    depends_on:
-      kv-psql-db:
-        condition: service_healthy
     profiles:
       - "kv"
     networks:
@@ -261,7 +284,7 @@ services:
     restart: always
 
   # ==========================================
-  # RETRIEVAL API & METADATA LAYER
+  # RETRIEVAL API & METADATA LAYER (Profile: rws)
   # ==========================================
   metadata-store-db:
     image: postgres:15-alpine
@@ -291,12 +314,7 @@ services:
     command: >
       python src/mfi_ddb/retrieval_api/metadata_store_pg/connector.py
       --broker_config src/mfi_ddb/retrieval_api/metadata_store_pg/broker.ini
-      --pg_config src/mfi_ddb/retrieval_api/metadata_store_pg/pg_database.ini
-    depends_on:
-      mqtt-broker:
-        condition: service_healthy
-      metadata-store-db:
-        condition: service_healthy
+      --pg_config src/mfi_ddb/retrieval_api/metadata_store_pg/pg_database.ini{rws_depends_on}
     networks:
       - mfi_network
     profiles:
@@ -310,14 +328,7 @@ services:
     image: cmumfi/mfi-ddb-rws-app:latest
     container_name: mfi-rws-app
     ports:
-      - "{rws.RWS_API_PORT}:8000"
-    depends_on:
-      metadata-store-db:
-        condition: service_healthy
-      kv-psql-db:
-        condition: service_healthy
-      timescaledb-db:
-        condition: service_healthy
+      - "{rws.RWS_API_PORT}:8000"{rws_depends_on}
     networks:
       - mfi_network
     volumes:
@@ -328,7 +339,7 @@ services:
     restart: always
 
   # ==========================================
-  # TIMESCALEDB METRICS LAYER
+  # TIMESCALEDB METRICS LAYER (Profile: ts)
   # ==========================================
   timescaledb-db:
     image: timescale/timescaledb:latest-pg16
@@ -354,12 +365,9 @@ services:
 
   timescaledb-connector:
     image: cmumfi/mfi-ddb-timescaledb-connector:latest
-    container_name: mfi-timescaledb-connector
-    depends_on:
-      mqtt-broker:
-        condition: service_healthy
-      timescaledb-db:
-        condition: service_healthy
+    container_name: mfi-timescaledb-connector{extra_hosts_block}{ts_depends_on}
+    environment:
+      - DB_HOST={ts.TS_DB_HOST}
     volumes:
       - ./runtime_configs/timescale_connector.yaml:/app/config.yaml:ro
     profiles:
@@ -372,10 +380,9 @@ services:
     image: cmumfi/mfi-ddb-timescaledb-dws:latest
     container_name: mfi-timescaledb-dws
     ports:
-      - "{ts.TS_DWS_PORT}:50052"
-    depends_on:
-      timescaledb-db:
-        condition: service_healthy
+      - "{ts.TS_DWS_PORT}:50052"{ts_depends_on}
+    command: >
+      sh -c "python -m mfi_ddb.databases.timescaledb.dws.server --host {ts.TS_DB_HOST}"
     profiles:
       - "ts"
     networks:
