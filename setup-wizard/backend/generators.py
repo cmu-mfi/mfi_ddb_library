@@ -189,7 +189,7 @@ services:
     environment:
       - EMQX_NAME=mfi_broker
     profiles:
-      - "broker"
+      - "infra"
     volumes:
       - emqx_data:/opt/emqx/data
       - emqx_log:/opt/emqx/log
@@ -267,7 +267,7 @@ services:
       - "kv"
     volumes:
       - ./runtime_configs/kv_psql_connector.yaml:/app/config.yaml:ro
-    restart: on-failure
+    restart: always
 
   kv-psql-dws:
     image: cmumfi/mfi-ddb-kv-psql-dws:latest
@@ -322,7 +322,7 @@ services:
     volumes:
       - ./runtime_configs/metadata_broker.ini:/app/src/mfi_ddb/retrieval_api/metadata_store_pg/broker.ini:ro
       - ./runtime_configs/metadata_pg.ini:/app/src/mfi_ddb/retrieval_api/metadata_store_pg/pg_database.ini:ro
-    restart: on-failure
+    restart: always
 
   rws-app:
     image: cmumfi/mfi-ddb-rws-app:latest
