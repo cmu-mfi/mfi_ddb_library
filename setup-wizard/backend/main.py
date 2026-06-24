@@ -58,10 +58,10 @@ async def deploy_pipeline(payload: MasterConfigPayload):
         )
     
 @app.get("/api/deploy/stream")
-async def stream_deployment_logs(services: str = ""): # Read the incoming query line
+async def stream_deployment_logs(services: str = ""):
     """
-    Step 2: Real-time Orchestration Loop.
-    Instructs Docker to boot specific configuration profiles requested by Step 1.
+    Step 2: Real-time Orchestration & Health Verification Loop.
+    Spins up selected container profiles and monitors lifecycle state stability.
     """
     async def generate_logs():
         compose_str_path = str(COMPOSE_FILE_PATH)
@@ -70,18 +70,17 @@ async def stream_deployment_logs(services: str = ""): # Read the incoming query 
             yield f"data: [ERROR] Layout manifest not found at {compose_str_path}. Staging must be run first.\n\n"
             return
 
-        # Parse out active layout selections. (e.g. services="infra,kv")
+        # Parse out active profile selections
         active_profiles = [s.strip() for s in services.split(",") if s.strip()]
 
-        # Build command dynamically including active compose profiles
+        # 1. Start Orchestration Phase
+        yield "data: [SYSTEM] Preparing isolated deployment topology...\n\n"
         cmd = ["docker", "compose", "-f", compose_str_path]
-        
         for profile in active_profiles:
             cmd.extend(["--profile", profile])
-            
         cmd.extend(["up", "-d"])
         
-        yield f"data: [SYSTEM] Orchestrating profiles: {active_profiles}\n\n"
+        yield f"data: [SYSTEM] Executing: docker compose up -d (Profiles: {active_profiles})\n\n"
         
         try:
             process = await asyncio.create_subprocess_exec(
@@ -90,6 +89,7 @@ async def stream_deployment_logs(services: str = ""): # Read the incoming query 
                 stderr=asyncio.subprocess.STDOUT
             )
 
+            # Stream the raw docker engine pulling/starting logs live
             while True:
                 line = await process.stdout.readline()
                 if not line:
@@ -100,11 +100,60 @@ async def stream_deployment_logs(services: str = ""): # Read the incoming query 
                 
             await process.wait()
 
+            # 2. Start Verification Phase
             if process.returncode == 0:
-                yield "data: [DEPLOYMENT_COMPLETE]\n\n"
+                yield "data: \n\n"
+                yield "data: [SYSTEM] 🔍 VERIFICATION STARTED: Checking runtime stack stability...\n\n"
+                
+                failure_counter = 0
+                MAX_ALLOWED_FAILURES = 5  # Must fail 5 times consecutively to trip the alarm
+                unstable_detected = False
+                
+                for i in range(20, 0, -1):
+                    yield f"data: [SYSTEM] Monitoring container health stability... ({i}s remaining)\n\n"
+                    
+                    # Take a live snapshot right now
+                    check_cmd = ["docker", "compose", "-f", compose_str_path, "ps", "--format", "json"]
+                    check_proc = await asyncio.create_subprocess_exec(
+                        *check_cmd,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.STDOUT
+                    )
+                    stdout, _ = await check_proc.communicate()
+                    status_output = stdout.decode("utf-8").lower()
+                    
+                    # Inspect for crash signatures
+                    if "restarting" in status_output or "exited" in status_output or "dead" in status_output:
+                        failure_counter += 1
+                        yield f"data: [SYSTEM] Microservice instability observed. Evaluating persistence threshold ({failure_counter}/{MAX_ALLOWED_FAILURES})...\n\n"
+                    else:
+                        # Reset counter if services temporarily normalize
+                        if failure_counter > 0:
+                            failure_counter = max(0, failure_counter - 1)
+                    
+                    # Trip wire check
+                    if failure_counter >= MAX_ALLOWED_FAILURES:
+                        unstable_detected = True
+                        break
+                        
+                    await asyncio.sleep(1)
+
+                # Final Evaluation based on our continuous tracking
+                if unstable_detected:
+                    yield "data: \n\n"
+                    yield "data: [SYSTEM_WARN] ❌ STABILITY VERIFICATION FAILED!\n\n"
+                    yield "data: [SYSTEM_WARN] One or more connectors are persistently failing network handshakes.\n\n"
+                    yield "data: [ERROR] Pipeline deployment halted due to unstable service runtimes.\n\n"
+                else:
+                    yield "data: \n\n"
+                    yield "data: [SYSTEM] ✅ STABILITY VERIFICATION SUCCESSFUL!\n\n"
+                    yield "data: [SYSTEM] All selected microservices have sustained a stable running status throughout the window.\n\n"
+                    yield "data: [DEPLOYMENT_COMPLETE]\n\n"
+                    
             else:
                 yield f"data: [ERROR] Docker engine returned abnormal code termination: {process.returncode}\n\n"
+                
         except Exception as e:
-            yield f"data: [ERROR] Runtime exception executing subprocess loop: {str(e)}\n\n"
+            yield f"data: [ERROR] Runtime exception executing orchestration loop: {str(e)}\n\n"
 
     return StreamingResponse(generate_logs(), media_type="text/event-stream")
