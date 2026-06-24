@@ -17,17 +17,17 @@ def write_runtime_configs(config_dir: Path, payload) -> None:
     # ==========================================
     kv_yaml_content = (
         f"mqtt:\n"
-        f"  broker: \"{infra.MQTT_BROKER_HOST}\"\n"
+        f"  broker: {infra.MQTT_BROKER_HOST}\n"
         f"  port: {infra.MQTT_BROKER_PORT}\n"
-        f"  client_id: \"{kv.KV_CONNECTOR_CLIENT_ID}\"\n"
+        f"  client_id: {kv.KV_CONNECTOR_CLIENT_ID}\n"
         f"  topics:\n"
-        f"    - \"{kv.KV_TOPIC_SUBSCRIPTION}\"\n\n"
+        f"    - {kv.KV_TOPIC_SUBSCRIPTION}\n\n"
         f"postgres:\n"
-        f"  host: \"{kv.KV_DB_HOST}\"\n"
+        f"  host: {kv.KV_DB_HOST}\n"
         f"  port: 5432\n"
-        f"  database: \"{kv.KV_DB_NAME}\"\n"
-        f"  user: \"{kv.KV_DB_USER}\"\n"
-        f"  password: \"{kv.KV_DB_PASSWORD}\"\n"
+        f"  database: {kv.KV_DB_NAME}\n"
+        f"  user: {kv.KV_DB_USER}\n"
+        f"  password: {kv.KV_DB_PASSWORD}\n"
     )
     (config_dir / "kv_psql_connector.yaml").write_text(kv_yaml_content)
 
@@ -36,18 +36,18 @@ def write_runtime_configs(config_dir: Path, payload) -> None:
     # ==========================================
     ts_yaml_content = (
         f"mqtt:\n"
-        f"  broker_address: \"{infra.MQTT_BROKER_HOST}\"\n"
+        f"  broker_address: {infra.MQTT_BROKER_HOST}\n"
         f"  broker_port: {infra.MQTT_BROKER_PORT}\n"
-        f"  topic: \"{ts.TS_TOPIC_SUBSCRIPTION}\"\n"
-        f"  username: \"{infra.MQTT_USERNAME}\"\n"
-        f"  password: \"{infra.MQTT_PASSWORD}\"\n\n"
+        f"  topic: {ts.TS_TOPIC_SUBSCRIPTION}\n"
+        f"  username: {infra.MQTT_USERNAME}\n"
+        f"  password: {infra.MQTT_PASSWORD}\n\n"
         f"timescaledb:\n"
-        f"  host: \"{ts.TS_DB_HOST}\"\n"
+        f"  host: {ts.TS_DB_HOST}\n"
         f"  port: 5432\n"
-        f"  user: \"{ts.TS_DB_USER}\"\n"
-        f"  password: \"{ts.TS_DB_PASSWORD}\"\n"
-        f"  dbname: \"{ts.TS_DB_NAME}\"\n\n"
-        f"component_id: \"{ts.TS_COMPONENT_ID}\"\n"
+        f"  user: {ts.TS_DB_USER}\n"
+        f"  password: {ts.TS_DB_PASSWORD}\n"
+        f"  dbname: {ts.TS_DB_NAME}\n\n"
+        f"component_id: {ts.TS_COMPONENT_ID}\n"
     )
     (config_dir / "timescale_connector.yaml").write_text(ts_yaml_content)
 
@@ -58,7 +58,6 @@ def write_runtime_configs(config_dir: Path, payload) -> None:
     ts_family_base = ts.TS_TOPIC_SUBSCRIPTION.replace("/#", "")
     blob_family_base = blob.BLOB_TOPIC_SUBSCRIPTION.replace("/#", "")
 
-    # Compute the URLs cleanly before formatting the block
     if kv.KV_DEPLOYMENT == "external":
         kv_routing_url = f"http://{kv.KV_DB_HOST}:{kv.KV_DWS_PORT}"
     else:
@@ -72,19 +71,20 @@ def write_runtime_configs(config_dir: Path, payload) -> None:
     rws_endpoints_content = (
         f"services:\n"
         f"  kv_service:\n"
-        f"    url: \"{kv_routing_url}\"\n"
+        f"    url: {kv_routing_url}\n"
         f"    topic_families:\n"
-        f"    - \"{kv_family_base}\"\n"
+        f"    - {kv_family_base}\n"
         f"  historian_service:\n"
-        f"    url: \"{ts_routing_url}\"\n"
+        f"    url: {ts_routing_url}\n"
         f"    topic_families:\n"
-        f"    - \"{ts_family_base}\"\n"
+        f"    - {ts_family_base}\n"
         f"  cfs_service:\n"
-        f"    url: \"http://mfi-blob-dws:{blob.BLOB_DWS_PORT}\"\n"
+        f"    url: http://mfi-blob-dws:{blob.BLOB_DWS_PORT}\n"
         f"    topic_families:\n"
-        f"    - \"{blob_family_base}\"\n"
+        f"    - {blob_family_base}\n"
     )
     (config_dir / "rws_endpoints.yaml").write_text(rws_endpoints_content)
+
     # ==========================================
     # 4. METADATA BROKER SUBSCRIPTIONS (.ini)
     # ==========================================
