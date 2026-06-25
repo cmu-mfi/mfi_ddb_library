@@ -45,6 +45,7 @@ services:
       context: ../../
       dockerfile: src/mfi_ddb/databases/timescaledb/dws/Dockerfile
     container_name: mfi-timescaledb-dws
+    image: cmumfi/mfi-ddb-timescaledb-dws:latest
     ports:
       - "50052:50052"
     depends_on:

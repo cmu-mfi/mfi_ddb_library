@@ -46,6 +46,7 @@ services:
       context: ../../
       dockerfile: src/mfi_ddb/retrieval_api/rws/Dockerfile
     container_name: mfi-rws-app
+    image: cmumfi/mfi-ddb-rws-app:latest
     ports:
       - "8000:8000"
     depends_on:
