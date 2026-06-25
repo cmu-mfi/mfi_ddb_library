@@ -18,7 +18,7 @@ services:
   blob-dws:
     platform: linux/amd64
     build:
-      context: ../
+      context: ../../
       dockerfile: src/mfi_ddb/databases/blob/dws/Dockerfile
     container_name: mfi-blob-dws
     image: cmumfi/mfi-ddb-blob-dws:latest

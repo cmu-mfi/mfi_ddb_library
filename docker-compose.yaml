@@ -11,10 +11,10 @@ volumes:
   emqx_log:
 
 include:
-  - path: docker/compose.timescale.yaml
-  - path: docker/compose.kv-psql.yaml
-  - path: docker/compose.metadata-rws.yaml
-  - path: docker/compose.blob.yaml
+  - path: docker/timescale/compose.yaml
+  - path: docker/kv-sql/compose.yaml
+  - path: docker/retrieval-api/compose.yaml
+  - path: docker/blob/compose.yaml
 
 services:
   # SHARED INFRASTRUCTURE
