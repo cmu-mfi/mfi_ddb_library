@@ -116,6 +116,38 @@ def write_runtime_configs(config_dir: Path, payload) -> None:
     (config_dir / "metadata_pg.ini").write_text(metadata_db_content)
     (config_dir / "rws_pg.ini").write_text(metadata_db_content)
 
+    # ==========================================
+    # 6. BLOB CONNECTOR UNIFIED CONFIGURATION (.yaml)
+    # ==========================================
+    blob_connector_content = (
+        f"mqtt:\n"
+        f"  broker_address: \"{infra.MQTT_BROKER_HOST}\"\n"
+        f"  broker_port: {infra.MQTT_BROKER_PORT}\n"
+        f"  username: \"{infra.MQTT_USERNAME}\"\n"
+        f"  password: \"{infra.MQTT_PASSWORD}\"\n"
+        f"  tls_enabled: false\n"
+        f"  debug: false\n\n"
+        f"config:\n"
+        f"  save_directory: \"/data/blob_storage\"\n"
+        f"  topic:\n"
+        f"    version: \"{rws.MDS_TOPIC_VERSION}\"\n"
+        f"    topic_family: \"{blob.BLOB_TOPIC_SUBSCRIPTION.replace('/#', '')}\"\n"
+        f"    enterprise: \"{rws.MDS_ENTERPRISE}\"\n"
+        f"    site: null\n"
+        f"    area: null\n"
+        f"    device: null\n"
+    )
+    (config_dir / "blob_connector.yaml").write_text(blob_connector_content)
+
+    # ==========================================
+    # 7. BLOB DWS CONFIGURATION (.yaml)
+    # ==========================================
+    blob_dws_content = (
+        f"config:\n"
+        f"  blob_dir: \"/data/blob_storage\"\n"
+        f"  index_path: \"/data/blob_storage/index.jsonl\"\n"
+    )
+    (config_dir / "blob_dws.yaml").write_text(blob_dws_content)
 
 def generate_master_compose(runtime_dir: Path, payload) -> None:
     """
@@ -204,16 +236,19 @@ services:
           - "{infra.MQTT_BROKER_HOST}"
     restart: always
 
-  # ==========================================
+# ==========================================
   # BLOB DATABASE LAYER (Profile: blob)
   # ==========================================
   blob-connector:
     image: cmumfi/mfi-ddb-blob-connector:latest
     container_name: mfi-blob-connector
+    command: >
+      python src/mfi_ddb/databases/blob/connector/connector.py /app/src/mfi_ddb/databases/blob/connector/config.yaml
     profiles:
       - "blob"
     volumes:
       - "{resolved_blob_path}:/data/blob_storage"
+      - ./runtime_configs/blob_connector.yaml:/app/src/mfi_ddb/databases/blob/connector/config.yaml:ro
     networks:
       - mfi_network
     restart: on-failure
@@ -223,10 +258,13 @@ services:
     container_name: mfi-blob-dws
     ports:
       - "{blob.BLOB_DWS_PORT}:50053"
+    command: >
+      python -m mfi_ddb.databases.blob.dws.server --config /app/src/mfi_ddb/databases/blob/dws/config.yaml
     profiles:
       - "blob"
     volumes:
       - "{resolved_blob_path}:/data/blob_storage:ro"
+      - ./runtime_configs/blob_dws.yaml:/app/src/mfi_ddb/databases/blob/dws/config.yaml:ro
     networks:
       - mfi_network
     restart: always
@@ -253,7 +291,9 @@ services:
     profiles:
       - "kv"
     networks:
-      - mfi_network
+      mfi_network:
+        aliases:
+          - "{kv.KV_DB_HOST}"
     restart: always
 
   kv-psql-connector:
@@ -266,7 +306,7 @@ services:
     profiles:
       - "kv"
     volumes:
-      - ./runtime_configs/kv_psql_connector.yaml:/app/config.yaml:ro
+      - ./runtime_configs/kv_psql_connector.yaml:/app/src/mfi_ddb/databases/kv-psql/connector/config.yaml:ro
     restart: always
 
   kv-psql-dws:
@@ -303,7 +343,9 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - mfi_network
+      mfi_network:
+        aliases:
+          - "{rws.MDS_DB_HOST}"
     profiles:
       - "rws"
     restart: always
@@ -360,7 +402,9 @@ services:
     profiles:
       - "ts"
     networks:
-      - mfi_network
+      mfi_network:
+        aliases:
+          - "{ts.TS_DB_HOST}"
     restart: always
 
   timescaledb-connector:
@@ -369,7 +413,7 @@ services:
     environment:
       - DB_HOST={ts.TS_DB_HOST}
     volumes:
-      - ./runtime_configs/timescale_connector.yaml:/app/config.yaml:ro
+      - ./runtime_configs/timescale_connector.yaml:/app/src/mfi_ddb/databases/timescaledb/connector/config.yaml:ro
     profiles:
       - "ts"
     networks:
