@@ -24,7 +24,7 @@ services:
   timescaledb-connector:
     platform: linux/amd64
     build:
-      context: ../
+      context: ../../
       dockerfile: src/mfi_ddb/databases/timescaledb/connector/Dockerfile
     container_name: mfi-timescaledb-connector
     image: cmumfi/mfi-ddb-timescaledb-connector:latest
@@ -42,7 +42,7 @@ services:
   timescaledb-dws:
     platform: linux/amd64
     build:
-      context: ../
+      context: ../../
       dockerfile: src/mfi_ddb/databases/timescaledb/dws/Dockerfile
     container_name: mfi-timescaledb-dws
     ports:

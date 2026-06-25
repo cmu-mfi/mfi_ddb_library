@@ -2,7 +2,7 @@ services:
   blob-connector:
     platform: linux/amd64
     build:
-      context: ../
+      context: ../../
       dockerfile: src/mfi_ddb/databases/blob/connector/Dockerfile
     container_name: mfi-blob-connector
     image: cmumfi/mfi-ddb-blob-connector:latest
