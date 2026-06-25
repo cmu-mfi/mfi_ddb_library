@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pathlib import Path
+import uvicorn
 
 from schemas import MasterConfigPayload
 from generators import write_runtime_configs, generate_master_compose
@@ -157,3 +158,13 @@ async def stream_deployment_logs(services: str = ""):
             yield f"data: [ERROR] Runtime exception executing orchestration loop: {str(e)}\n\n"
 
     return StreamingResponse(generate_logs(), media_type="text/event-stream")
+
+
+if __name__ == "__main__":
+    uvicorn.run(
+        app, 
+        host="127.0.0.1", 
+        port=8000, 
+        reload=False,
+        workers=1
+    )

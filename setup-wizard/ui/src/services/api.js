@@ -52,7 +52,7 @@ export const deployPipeline = async (formValues) => {
     }
   };
 
-  const response = await fetch(`${API_BASE_URL}/api/deploy`, {
+  const response = await fetch(`http://localhost:8000/api/deploy`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
