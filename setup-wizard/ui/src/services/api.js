@@ -1,4 +1,8 @@
-const API_BASE_URL = 'http://localhost:8000';
+// const API_BASE_URL = 'http://localhost:8000';
+// Make the URL dynamic so that the frontend can be served from any host machine to reach either local for app or remote for web server
+const API_BASE_URL = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+  ? `http://${window.location.hostname}:8000`
+  : 'http://localhost:8000';
 
 export const deployPipeline = async (formValues) => {
   // Transform flat frontend form state into the structured JSON payload our Pydantic schema demands
@@ -52,7 +56,7 @@ export const deployPipeline = async (formValues) => {
     }
   };
 
-  const response = await fetch(`http://localhost:8000/api/deploy`, {
+  const response = await fetch(`${API_BASE_URL}/api/deploy`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -97,7 +101,7 @@ export const hostPlatform = {
     } else {
       // Web Server: Make a REST API request to the lightweight Express container running on the host
       try {
-        const response = await fetch(`/api/check-port?port=${port}`);
+        const response = await fetch(`${API_BASE_URL}/api/check-port?port=${port}`);
         if (!response.ok) throw new Error("Network status error response");
         const data = await response.json();
         return !!data.available;
@@ -126,7 +130,7 @@ export const hostPlatform = {
     } else {
       // Web Server: Submit the payload as an HTTP POST JSON block to the deployment server
       try {
-        const response = await fetch('/api/launch', {
+        const response = await fetch(`${API_BASE_URL}/api/launch`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
