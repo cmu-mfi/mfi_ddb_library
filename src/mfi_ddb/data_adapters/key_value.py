@@ -100,7 +100,6 @@ class KvDataAdapter(BaseDataAdapter):
             if not schema_validator.is_valid(payload):
                 self.logger.warning(f"Payload does not match schema: {schema_validator.iter_errors(payload)}")
                 self.logger.warning("Skippidng the payload...")
-                breakpoint()
                 continue
             
             if payload['msg_type']=='data' and self.cfg['trial_id']=="mfi-ddb-metadata":
