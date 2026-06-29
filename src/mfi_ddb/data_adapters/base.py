@@ -1,4 +1,5 @@
 import threading
+import logging
 
 from pydantic import BaseModel
 
@@ -58,6 +59,8 @@ class BaseDataAdapter:
         #   * default trial_id will be None if not set.
 
         self._observers = []  # List of observers (listeners)
+        
+        self.logger = logging.getLogger(self.__class__.__name__)
 
     def disconnect(self):
         """

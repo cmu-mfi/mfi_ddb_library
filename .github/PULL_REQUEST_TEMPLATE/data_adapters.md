@@ -1,34 +1,37 @@
-# Data Adapters
+## 🔌 Data Adapter
 
-```mermaid
-flowchart LR;
-    A[Data Source] --> B[Data Adapter];
-    D[Streamer] --> M[MQTT Client];
-    B --> D;
-    C[Topic Family] --> D;
-    M-->X[MQTT Broker];    
+### Brief Description
+> Provide a short, 2-line description of the contribution.
 
-    classDef highlight fill:#094d57
-    class B highlight
-```
+...
 
-Data Adapters are the objects that represent the data that needs to be streamed. These objects are responsible for converting the data to mfi_ddb ingestible structure.
+### Details
 
-[\[More Info\]](../../../README.md#concept)
+* ...
 
-## Available Data Adapters
+* **reference relevant weblinks to understand the implementation**
+  * ...
+  * ...
 
-* [ROS](src/mfi_ddb/data_adapters/mtconnect.py)
-* [ROS Files](src/mfi_ddb/data_adapters/ros_files.py)
-* [Local Files](src/mfi_ddb/data_adapters/local_files.py)
-* [MQTT](src/mfi_ddb/data_adapters/mqtt.py)
-* [MTConnect](src/mfi_ddb/data_adapters/mtconnect.py)
-* [gRPC](src/mfi_ddb/data_adapters/grpc.py)
-* [key_value](src/mfi_ddb/data_adapters/key_value.py)
+* **additional details**
+  * ...
 
-## New Data Adapter Checklist
+### Potential failure points
+> List at least 3 potential failure scenarios or edge cases where the code might break or not perform as expected.
 
-When writing a new data adapter, please make sure to follow the checklist below:
+* ...
+* ...
+* ...
+
+
+### Potential improvement
+> If you had more time and resources, how would you improve the current implementation? Provide at least 1 suggestion for improvement or future work.
+
+* ...
+
+
+---
+### Checklist
 
 - [ ] Inherit from `mfi_ddb.data_adapters.base.BaseDataAdapter`
 
@@ -48,3 +51,4 @@ When writing a new data adapter, please make sure to follow the checklist below:
 
 - [ ] Write unit tests for the new data adapter and add them to [`tests/data_adapters`](../tests/data_adapters)
 
+- [ ] Update necessary sections in `/README.md` and `/src/mfi_ddb/data_adapters/README.md`
