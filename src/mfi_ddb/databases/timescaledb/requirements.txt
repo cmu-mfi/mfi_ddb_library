@@ -1,0 +1,6 @@
+grpcio==1.81.1
+paho_mqtt==2.1.0
+protobuf==7.35.1
+psycopg2_binary==2.9.12
+pytest==9.0.3
+PyYAML==6.0.3

@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package dws.models;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+message file_value {
+  string filename = 1;
+  string filetype = 2;
+  bytes content = 3;
+  optional string sha256 = 4; // For integrity verification
+}
+
+message Datapoint {
+  string topic = 1;
+  // TODO: is the user_id necessary?? Discuss.
+  // string user_id = 2;
+  google.protobuf.Timestamp timestamp = 3;
+
+  oneof value {
+    int64 int_value = 4;
+    double float_value = 5;
+    string string_value = 6;
+    google.protobuf.Struct json_value = 7;
+        
+    file_value file_value = 8;
+  }
+}
+
+
+// USE GRPC STATUS CODES INSTEAD OF BELOW
+// REF: https://grpc.github.io/grpc/core/md_doc_statuscodes.html
+
+// message ServiceStatus {
+//   StatusCode code = 1;
+//   optional string message = 2;
+//   optional string topic_context = 3; // return the topic that caused the error
+// }
+
+// enum StatusCode {
+//   SUCCESS = 0;
+//   ERROR_UNSPECIFIED = 1;
+//   ERROR_TOPIC_NOT_FOUND = 2;
+//   ERROR_EMPTY_RESULT = 3;
+//   ERROR_NOT_IMPLEMENTED = 4;
+// }

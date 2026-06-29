@@ -1,0 +1,15 @@
+grpcio>=1.81.1
+protobuf>=7.35.1
+psycopg2_binary>=2.9.12
+PyYAML>=6.0.3
+pydantic>=2.13.4
+numpy>=2.4.6
+watchdog>=6.0.0
+paho_mqtt>=2.1.0
+omegaconf>=2.3.1
+requests>=2.34.2
+xmltodict>=1.0.4
+open3d>=0.19.0
+opencv_python>=4.13.0.92
+ping3>=5.1.5
+grpcio>=1.81.1

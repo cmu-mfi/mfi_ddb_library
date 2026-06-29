@@ -6,6 +6,7 @@ dist/
 wheels/
 web_apps/data_adapter_app/frontend/node_modules/
 *.egg-info
-
+secrets_local.yaml
 # Virtual environments
 .venv
+
