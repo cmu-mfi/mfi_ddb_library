@@ -91,8 +91,7 @@ class AdapterFactory:
     def connect_and_stream(self) -> None:
         if not self.validate_configs():
             self.logger.error("Configuration validation failed. Aborting connection.")
-            print("ABORT ABORT ABORT")
-            return
+            raise ValueError("Invalid configuration for adapter or streamer.")
 
         self.data_adapter = self.adp_class(self.adp_cfg)
         

@@ -1,322 +1,236 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Pencil, Play, Pause, Trash2, Square } from "lucide-react";
 import { ConnectionManager } from "./ConnectionManager";
-import { pauseConnection, resumeConnection } from "../api";
-import { connectConnection } from "../api";
-import { fetchStreamingStatus } from "../api";
+import { pauseConnection, resumeConnection, connectConnection, disconnectConnection, fetchStreamingStatus } from "../api";
 
-export default function ConnectionItem({
-  connection,
-  onEdit,
-  onTerminate,
-  onPause,
-  onResume,
-}) {
+const bannerBg = {
+  green:    "bg-gradient-to-br from-green-100 to-green-200 border-l-4 border-green-500",
+  yellow:   "bg-gradient-to-br from-yellow-100 to-yellow-200 border-l-4 border-yellow-400",
+  red:      "bg-gradient-to-br from-red-100 to-red-200 border-l-4 border-red-500",
+  checking: "bg-gradient-to-br from-gray-100 to-gray-200 border-l-4 border-gray-500",
+  grey:     "bg-gradient-to-br from-gray-100 to-gray-200 border-l-4 border-gray-400",
+};
+
+const titleColor = {
+  green:    "text-green-800",
+  yellow:   "text-yellow-700",
+  red:      "text-red-800",
+  checking: "text-gray-700",
+  grey:     "text-gray-600",
+};
+
+const detailColor = {
+  green:    "text-green-700",
+  yellow:   "text-yellow-600",
+  red:      "text-red-700",
+  checking: "text-gray-600",
+  grey:     "text-gray-500",
+};
+
+export default function ConnectionItem({ connection, onEdit, onTerminate, onPause, onResume }) {
   const [streamingStatus, setStreamingStatus] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [localState, setLocalState] = useState("streaming");
-  const [autoReconnectAttempted, setAutoReconnectAttempted] = useState(false);
   const statusCheckIntervalRef = useRef(null);
 
-  // Auto-reconnection logic
-  const attemptAutoReconnect = useCallback(async () => {
-    if (autoReconnectAttempted) return;
+  const isCallback = connection.isPolling === false;
 
-    const savedState = ConnectionManager.getConnectionState(connection.id);
-    const targetState = savedState?.state || "streaming";
+  // ─── Status polling ───────────────────────────────────────────────────────
 
-    if (localState !== targetState) {
-      console.log(`No need to auto-reconnect ${connection.id} - already in ${localState}`);
-      return;
-    }
-    
-    console.log(`Auto-reconnecting ${connection.id} to ${targetState} state`);
-
-    try {
-      if (localState === "inactive") {
-        const connectResponse = await connectConnection(
-          connection.id,
-          connection.adapter,
-          connection.adapterConfig,
-          connection.streamerConfig
-        );
-
-        if (!connectResponse.ok) {
-          console.error(`Failed to auto-reconnect ${connection.id}`);
-          return;
-        }
-      } else if (localState === "paused" && targetState === "streaming") {
-        const success = await resumeConnection(connection.id);
-        if (!success) {
-          console.error(`Failed to auto-resume ${connection.id}`);
-          return;
-        } else {
-          console.log(`Auto-resumed ${connection.id} after reconnection`);
-        }
-      } else if (localState === "streaming" && targetState === "paused") {
-        const is_paused = await pauseConnection(connection.id);
-        if (!is_paused) {
-          console.error(`Failed to auto-pause ${connection.id}`);
-          return;
-        } else {
-          console.log(`Auto-paused ${connection.id} after reconnection`);
-        }
-      } else {
-        console.log(`Unknown state ${localState} for ${connection.id}, or ${targetState} target state`);
-      }
-
-    } catch (error) {
-      console.error(`Auto-reconnect failed for ${connection.id}:`, error);
-    }
-
-    setAutoReconnectAttempted(true);
-  }, [connection, autoReconnectAttempted, localState]);
-
-  // FIXED: Enhanced status checking - don't auto-save state changes
   const checkStatus = useCallback(async () => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-
+    // Don't poll the backend if we know the connection is intentionally stopped
+    if (localState === "stopped") return;
     try {
       const response = await fetchStreamingStatus(connection.id);
-      console.log(`Fetched streaming status for ${connection.id}:`, response);
-      clearTimeout(timeoutId);
-      
       setStreamingStatus(response);
-
-      // Reset auto-reconnect flag on successful status check
-      setAutoReconnectAttempted(false);
-      if (response.is_streaming) {
-        setLocalState("streaming");
-      } else {
-        setLocalState("paused");
-      }
-
+      setLocalState(response.is_streaming ? "streaming" : "paused");
     } catch (error) {
       console.error(`Failed to check streaming status for ${connection.id}:`, error);
-      setStreamingStatus({
-        streaming_mode: "inactive",
-        is_connected: false,
-        is_streaming: false,
-      });
+      setStreamingStatus({ streaming_mode: "inactive", is_connected: false, is_streaming: false });
     }
-  }, [connection.id, autoReconnectAttempted, attemptAutoReconnect]);
+  }, [connection.id, localState]);
 
-  // FIXED: Pause handler - ONLY user action saves to localStorage
-  const handlePause = async (e) => {
-    e.stopPropagation();
-    setIsProcessing(true);
-
-    const is_paused = await pauseConnection(connection.id);
-
-    if (is_paused) {
-      setLocalState("paused");
-      // FIXED: Only save user-triggered pause
-      ConnectionManager.saveConnectionState(connection.id, "paused", "user");
-      if (onPause) onPause(connection.id);
-      console.log(`User successfully paused ${connection.id}`);
-    }
-    setIsProcessing(false);
-  };
-
-  // FIXED: Resume handler - ONLY user action saves to localStorage
-  const handleResume = async (e) => {
-    e.stopPropagation();
-    setIsProcessing(true);
-
-    const is_resumed = await resumeConnection(connection.id);
-
-    if (is_resumed) {
-      setLocalState("streaming");
-      // FIXED: Only save user-triggered resume
-      ConnectionManager.saveConnectionState(connection.id, "streaming", "user");
-      if (onResume) onResume(connection.id);
-      console.log(`User successfully resumed ${connection.id}`);
-    }
-    setIsProcessing(false);
-  };
-
-  // Terminate connection
-  const handleDelete = async (e) => {
-    e.stopPropagation();
-
-    if (
-      window.confirm(
-        `Are you sure you want to remove connection?\n${connection.id} - ${connection.adapter}`
-      )
-    ) {
-      onTerminate(connection.id);
-    }
-  };
-
-  const getBannerStatus = () => {
-    if (!streamingStatus) {
-      return {
-        color: "grey",
-        text: "Checking status...",
-        detail: "Initializing connection",
-      };
-    }
-
-    const {
-      streaming_mode,
-      is_connected,
-      is_streaming
-    } = streamingStatus;
-
-    if(is_connected && is_streaming) {
-      return {
-        color: "green",
-        text: `Connection ${connection.id} - ${connection.adapter}`,
-        detail: `Streaming in ${streaming_mode} mode`,
-      };
-    }
-    else if(is_connected && !is_streaming) {
-      return {
-        color: "yellow",
-        text: `Connection ${connection.id} - ${connection.adapter}`,
-        detail: `Connected but not streaming`,
-      };
-    }
-    else if (!is_connected && streaming_mode !== "inactive") {
-      return {
-        color: "red",
-        text: `Connection ${connection.id} - ${connection.adapter}`,
-        detail: `Not connected`,
-      };
-    } else {
-      return {
-        color: "checking",
-        text: `Connection ${connection.id} - ${connection.adapter}`,
-        detail: "Status unknown. Trying ...",
-      };
-    }
-  };
-
-  const bannerStatus = getBannerStatus();
-  const isPaused = localState === "paused";
-  const isActive =
-    streamingStatus?.is_streaming &&
-    streamingStatus?.is_connected &&
-    !isPaused;
-  const canPause = isActive && !isProcessing;
-  const canResume = isPaused && !isProcessing;
-
-  // Load saved connection state from localStorage
   useEffect(() => {
     const savedState = ConnectionManager.getConnectionState(connection.id);
-    const initialState = savedState?.state || "streaming";
-    setLocalState(initialState);
-    console.log(`Loaded initial state for ${connection.id}: ${initialState}`);
+    setLocalState(savedState?.state || "streaming");
   }, [connection.id]);
-
 
   useEffect(() => {
     checkStatus();
     const intervalRef = setInterval(checkStatus, 5000);
     statusCheckIntervalRef.current = intervalRef;
-
-    return () => {
-      if (statusCheckIntervalRef.current) {
-        clearInterval(statusCheckIntervalRef.current);
-      }
-    };
+    return () => clearInterval(statusCheckIntervalRef.current);
   }, [checkStatus]);
 
+  // ─── Actions ──────────────────────────────────────────────────────────────
+
+  const handlePause = async (e) => {
+    e.stopPropagation();
+    setIsProcessing(true);
+    const ok = await pauseConnection(connection.id);
+    if (ok) {
+      setLocalState("paused");
+      ConnectionManager.saveConnectionState(connection.id, "paused", "user");
+      if (onPause) onPause(connection.id);
+    }
+    setIsProcessing(false);
+  };
+
+  const handleResume = async (e) => {
+    e.stopPropagation();
+    setIsProcessing(true);
+    const ok = await resumeConnection(connection.id);
+    if (ok) {
+      setLocalState("streaming");
+      ConnectionManager.saveConnectionState(connection.id, "streaming", "user");
+      if (onResume) onResume(connection.id);
+    }
+    setIsProcessing(false);
+  };
+
+  // Stop: disconnect from backend but keep config in localStorage
+  const handleStop = async (e) => {
+    e.stopPropagation();
+    setIsProcessing(true);
+    const ok = await disconnectConnection(connection.id);
+    if (ok) {
+      setStreamingStatus({ streaming_mode: "inactive", is_connected: false, is_streaming: false });
+      setLocalState("stopped");
+      ConnectionManager.saveConnectionState(connection.id, "stopped", "user");
+      if (onPause) onPause(connection.id);
+    }
+    setIsProcessing(false);
+  };
+
+  // Reconnect: re-establish using saved config, no localStorage change
+  const handleReconnect = async (e) => {
+    e.stopPropagation();
+    setIsProcessing(true);
+    try {
+      const response = await connectConnection(
+        connection.id,
+        connection.adapter,
+        connection.adapterConfig,
+        connection.streamerConfig,
+        connection.isPolling !== false,
+        connection.pollingRateHz ?? 1
+      );
+      if (response.ok) {
+        setLocalState("streaming");
+        ConnectionManager.saveConnectionState(connection.id, "streaming", "user");
+        if (onResume) onResume(connection.id);
+        // Let checkStatus pick up the real state
+        setTimeout(checkStatus, 500);
+      } else {
+        console.error(`Reconnect failed for ${connection.id}: ${response.status}`);
+      }
+    } catch (err) {
+      console.error(`Reconnect error for ${connection.id}:`, err);
+    }
+    setIsProcessing(false);
+  };
+
+  const handleDelete = async (e) => {
+    e.stopPropagation();
+    if (window.confirm(`Are you sure you want to remove connection?\n${connection.id} - ${connection.adapter}`)) {
+      onTerminate(connection.id);
+    }
+  };
+
+  // ─── Derived state ────────────────────────────────────────────────────────
+
+  const isPaused  = localState === "paused";
+  const isStopped = localState === "stopped";
+  const isActive  = streamingStatus?.is_streaming && streamingStatus?.is_connected;
+
+  const canPause     = isActive && !isPaused && !isCallback && !isProcessing;
+  const canResume    = isPaused && !isCallback && !isProcessing;
+  const canStop      = isActive && isCallback && !isProcessing;
+  const canReconnect = isStopped && isCallback && !isProcessing;
+
+  // ─── Banner ───────────────────────────────────────────────────────────────
+
+  const getBannerStatus = () => {
+    if (isStopped) {
+      return { color: "grey", text: `Connection ${connection.id} - ${connection.adapter}`, detail: "Disconnected — click Reconnect to resume" };
+    }
+    if (!streamingStatus) {
+      return { color: "grey", text: "Checking status...", detail: "Initializing connection" };
+    }
+    const { streaming_mode, is_connected, is_streaming } = streamingStatus;
+    if (is_connected && is_streaming) {
+      return { color: "green", text: `Connection ${connection.id} - ${connection.adapter}`, detail: `Streaming in ${streaming_mode} mode` };
+    } else if (is_connected && !is_streaming) {
+      return { color: "yellow", text: `Connection ${connection.id} - ${connection.adapter}`, detail: "Connected but not streaming" };
+    } else if (!is_connected) {
+      return { color: "red", text: `Connection ${connection.id} - ${connection.adapter}`, detail: "Not connected" };
+    }
+    return { color: "checking", text: `Connection ${connection.id} - ${connection.adapter}`, detail: "Status unknown. Trying..." };
+  };
+
+  const bannerStatus = getBannerStatus();
+
+  const actionBtn = "bg-white/90 border border-black/10 p-2 rounded-md cursor-pointer text-gray-500 transition-all min-w-[40px] h-10 flex items-center justify-center backdrop-blur-sm hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none";
+
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className={`connection-item ${bannerStatus.color}`}>
-      <div className={`connection-banner ${bannerStatus.color}`}>
-        <div className="banner-content">
-          <div className="banner-main">
-            <div className="banner-left">
-              <span className="banner-title">{bannerStatus.text}</span>
-              <span className="banner-detail">{bannerStatus.detail}</span>
-              {autoReconnectAttempted && (
-                <span className="banner-reconnect">
-                  Auto-reconnection attempted
-                </span>
-              )}
-            </div>
-            <div className="banner-actions">
-              <button
-                className="action-button edit-button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(connection);
-                }}
-                title="Edit Connection"
-                disabled={isProcessing}
-              >
-                <svg
-                  className="edit-icon"
-                  viewBox="0 0 20 20"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                </svg>
-              </button>
+    <div className={`rounded-lg overflow-hidden mb-3 shadow transition-all hover:-translate-y-px hover:shadow-md ${bannerBg[bannerStatus.color] || bannerBg.grey}`}>
+      <div className="w-full px-5 py-4">
+        <div className="flex justify-between items-center">
+          <div className="flex flex-col gap-0.5">
+            <span className={`text-base font-semibold ${titleColor[bannerStatus.color] || titleColor.grey}`}>
+              {bannerStatus.text}
+            </span>
+            <span className={`text-[13px] font-medium ${detailColor[bannerStatus.color] || detailColor.grey}`}>
+              {bannerStatus.detail}
+            </span>
+          </div>
 
-              {isPaused ? (
-                <button
-                  className="action-button play-button"
-                  onClick={handleResume}
-                  title="Resume Streaming"
-                  disabled={!canResume}
-                >
-                  <svg
-                    className="play-icon"
-                    viewBox="0 0 20 20"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  {isProcessing ? "Resuming..." : ""}
+          <div className="flex gap-3 items-center ml-5">
+            <button
+              className={actionBtn}
+              onClick={(e) => { e.stopPropagation(); onEdit(connection); }}
+              title="Edit Connection"
+              disabled={isProcessing}
+            >
+              <Pencil size={16} />
+            </button>
+
+            {/* Polling: Pause / Resume */}
+            {!isCallback && (
+              isPaused ? (
+                <button className={actionBtn} onClick={handleResume} title="Resume Streaming" disabled={!canResume}>
+                  <Play size={16} />
                 </button>
               ) : (
-                <button
-                  className="action-button pause-button"
-                  onClick={handlePause}
-                  title="Pause Streaming"
-                  disabled={!canPause}
-                >
-                  <svg
-                    className="pause-icon"
-                    viewBox="0 0 20 20"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  {isProcessing ? "Pausing..." : ""}
+                <button className={actionBtn} onClick={handlePause} title="Pause Streaming" disabled={!canPause}>
+                  <Pause size={16} />
                 </button>
-              )}
+              )
+            )}
 
-              <button
-                className="action-button terminate-button"
-                onClick={handleDelete}
-                title="Remove Connection"
-                disabled={isProcessing}
-              >
-                <svg
-                  className="delete-icon"
-                  viewBox="0 0 20 20"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </button>
-            </div>
+            {/* Callback: Stop / Reconnect */}
+            {isCallback && (
+              isStopped ? (
+                <button className={actionBtn} onClick={handleReconnect} title="Reconnect" disabled={!canReconnect}>
+                  <Play size={16} />
+                </button>
+              ) : (
+                <button className={actionBtn} onClick={handleStop} title="Stop (disconnect, keep config)" disabled={!canStop}>
+                  <Square size={16} />
+                </button>
+              )
+            )}
+
+            <button
+              className={`${actionBtn} bg-red-50/90 border-red-500 text-red-500 hover:bg-red-500 hover:text-white`}
+              onClick={handleDelete}
+              title="Remove Connection"
+              disabled={isProcessing}
+            >
+              <Trash2 size={16} />
+            </button>
           </div>
         </div>
       </div>
