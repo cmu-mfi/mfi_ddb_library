@@ -2,8 +2,8 @@ services:
   blob-connector:
     platform: linux/amd64
     build:
-      context: ../../
-      dockerfile: src/mfi_ddb/databases/blob/connector/Dockerfile
+      context: ../
+      dockerfile: mfi_ddb_database_nodes/blob/connector/Dockerfile
     container_name: mfi-blob-connector
     image: cmumfi/mfi-ddb-blob-connector:latest
     depends_on:
@@ -18,8 +18,8 @@ services:
   blob-dws:
     platform: linux/amd64
     build:
-      context: ../../
-      dockerfile: src/mfi_ddb/databases/blob/dws/Dockerfile
+      context: ../
+      dockerfile: mfi_ddb_database_nodes/blob/dws/Dockerfile
     container_name: mfi-blob-dws
     image: cmumfi/mfi-ddb-blob-dws:latest
     ports:

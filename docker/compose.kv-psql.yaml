@@ -23,7 +23,7 @@ services:
   kv-psql-connector:
     platform: linux/amd64
     build:
-      context: ../../
+      context: ../
       dockerfile: src/mfi_ddb/databases/kv-psql/connector/Dockerfile
     container_name: mfi-kv-psql-connector
     image: cmumfi/mfi-ddb-kv-psql-connector:latest
@@ -41,7 +41,7 @@ services:
   kv-psql-dws:
     platform: linux/amd64
     build:
-      context: ../../
+      context: ../
       dockerfile: src/mfi_ddb/databases/kv-psql/dws/Dockerfile
     container_name: mfi-kv-psql-dws
     image: cmumfi/mfi-ddb-kv-psql-dws:latest

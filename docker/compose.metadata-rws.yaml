@@ -23,7 +23,7 @@ services:
   metadata-store-connector:
     platform: linux/amd64
     build:
-      context: ../../
+      context: ../
       dockerfile: src/mfi_ddb/retrieval_api/metadata_store_pg/Dockerfile
     container_name: mfi-metadata-store-connector
     image: cmumfi/mfi-ddb-metadata-store-connector:latest
@@ -43,7 +43,7 @@ services:
   rws-app:
     platform: linux/amd64
     build:
-      context: ../../
+      context: ../
       dockerfile: src/mfi_ddb/retrieval_api/rws/Dockerfile
     container_name: mfi-rws-app
     image: cmumfi/mfi-ddb-rws-app:latest
@@ -58,5 +58,4 @@ services:
         condition: service_healthy
     networks:
       - mfi_network
-    image: cmumfi/mfi-ddb-rws-app:latest
     restart: always
