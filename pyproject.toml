@@ -11,6 +11,8 @@ maintainers = [
 license = "BSD-3-Clause"
 dependencies = [
     "cmake>=4.0.3",
+    "grpcio>=1.70.0",
+    "grpcio-tools>=1.70.0",
     "numpy>=1.24.4",
     "omegaconf>=2.3.0",
     "open3d>=0.19.0",
@@ -32,3 +34,8 @@ dependencies = [
 [build-system]
 requires = ["uv_build>=0.8.4,<0.9.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+]

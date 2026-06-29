@@ -1,0 +1,30 @@
+server_address: localhost
+server_port: 50051
+certificate_path: /full/path/to/cert.pem
+trial_id: exp1
+protobufs_dir: /full/path/to/protos
+compiled_protos_dir: /full/path/to/compiled_protos
+components:
+- component_id: sensor.temperature
+  attributes:
+    description: something something
+    unit: Celsius
+  proto_rel_path: relative/path/to/temperature.proto
+  stub_class: TemperatureServiceStub
+  request_class: TemperatureRequest
+  request:
+    key1: value1
+    key2:
+    - 1
+    - 2
+    - 3
+- component_id: sensor.humidity
+  attributes:
+    description: something something
+    unit: Percentage
+  trial_id: exp1_parallelA
+  proto_rel_path: relative/path/to/humidity.proto
+  stub_class: HumidityServiceStub
+  request_class: HumidityRequest
+  request:
+    threshold: 75

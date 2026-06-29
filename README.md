@@ -68,12 +68,14 @@ To be able to do the above three major classes are provided:
 
 ### Data Adapters
 
-* [BaseDataAdapter](mfi_ddb/data_adapters/base.py)
-* [RosDataAdapter](mfi_ddb/data_adapters/mtconnect.py)
-* [RosFilesDataAdapter](mfi_ddb/data_adapters/ros_files.py)
-* [LocalFilesDataAdapter](mfi_ddb/data_adapters/local_files.py)
-* [MqttDataAdapter](mfi_ddb/data_adapters/mqtt.py)
-* [MTconnectDataAdapter](mfi_ddb/data_adapters/mtconnect.py)
+* [ROS](src/mfi_ddb/data_adapters/mtconnect.py)
+* [ROS Files](src/mfi_ddb/data_adapters/ros_files.py)
+* [Local Files](src/mfi_ddb/data_adapters/local_files.py)
+* [MQTT](src/mfi_ddb/data_adapters/mqtt.py)
+* [MTConnect](src/mfi_ddb/data_adapters/mtconnect.py)
+* [gRPC](src/mfi_ddb/data_adapters/grpc.py)
+
+To create a new data adapter, please follow the [checklist](./src/mfi_ddb/data_adapters/README.md#new-data-adapter-checklist) and refer to the existing data adapters for implementation reference.
 
 ### Streamer
 
