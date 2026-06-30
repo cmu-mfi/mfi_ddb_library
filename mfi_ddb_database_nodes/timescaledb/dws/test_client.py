@@ -7,11 +7,7 @@ import sys
 import grpc
 from google.protobuf.timestamp_pb2 import Timestamp
 
-if __package__ in {None, ""}:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
-    from mfi_ddb.databases.timescaledb.dws.gen import service_pb2, service_pb2_grpc
-else:
-    from .gen import service_pb2, service_pb2_grpc
+from gen import service_pb2, service_pb2_grpc
 
 DWS_ADDR = "localhost:50051"
 TOPIC = "mfi-v1.0-historian/CMU/DDATA/Machine Shop/robot-arm-1"

@@ -2,18 +2,18 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Ensure absolute monorepo imports remain functional
-ENV PYTHONPATH=/app:/app/src
-
+# 1. Install build dependencies, compile what's needed, then immediately clean up
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Assuming there is a shared or local requirements file; adjust path if needed
-COPY src/mfi_ddb/databases/blob/connector/requirements.txt .
+# 2. Copy only the requirements file first to leverage Docker layer caching
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY src/ ./src/
+# 3. Copy the rest of your self-contained connector directory files
+COPY . .
 
-# Run the connector script, passing the configuration file as an argument
-CMD ["python", "src/mfi_ddb/databases/blob/connector/connector.py", "src/mfi_ddb/databases/blob/connector/config.yaml"]
+# 4. Since everything is sitting in the root of /app inside the container, 
+# your paths are simplified down to the local directory.
+CMD ["python", "connector.py", "config.yaml"]

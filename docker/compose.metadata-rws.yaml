@@ -23,14 +23,12 @@ services:
   metadata-store-connector:
     platform: linux/amd64
     build:
-      context: ../
-      dockerfile: src/mfi_ddb/retrieval_api/metadata_store_pg/Dockerfile
+      context: ../mfi_ddb_retrieval_api/metadata_store_pg
+      dockerfile: Dockerfile
     container_name: mfi-metadata-store-connector
     image: cmumfi/mfi-ddb-metadata-store-connector:latest
     command: >
-      python src/mfi_ddb/retrieval_api/metadata_store_pg/connector.py
-      --broker_config src/mfi_ddb/retrieval_api/metadata_store_pg/broker.ini
-      --pg_config src/mfi_ddb/retrieval_api/metadata_store_pg/pg_database.ini
+      python -u connector.py --broker_config broker.ini --pg_config pg_database.ini
     depends_on:
       mqtt-broker:
         condition: service_started
@@ -43,8 +41,8 @@ services:
   rws-app:
     platform: linux/amd64
     build:
-      context: ../
-      dockerfile: src/mfi_ddb/retrieval_api/rws/Dockerfile
+      context: ../mfi_ddb_retrieval_api/rws
+      dockerfile: Dockerfile
     container_name: mfi-rws-app
     image: cmumfi/mfi-ddb-rws-app:latest
     ports:

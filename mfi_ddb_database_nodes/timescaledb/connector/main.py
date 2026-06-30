@@ -12,7 +12,7 @@ from paho.mqtt.enums import CallbackAPIVersion
 from datetime import datetime, timezone
 from mqtt_spb_wrapper.spb_base import SpbPayloadParser
 
-from .db import TimeScaleWriter
+from db import TimeScaleWriter
 
 # Configuration and initialization
 def load_config(path: Path):

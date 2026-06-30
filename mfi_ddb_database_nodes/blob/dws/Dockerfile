@@ -2,20 +2,20 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-ENV PYTHONPATH=/app:/app/src:/app/src/mfi_ddb/databases/blob/dws
-
+# 1. Install build dependencies, compile what's needed, then immediately clean up
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY src/mfi_ddb/databases/blob/dws/requirements.txt .
+# 2. Copy only requirements first to maximize layer caching
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY src/ ./src/
+# 3. Copy the rest of your self-contained DWS node folder (server.py, proto/, gen/, etc.)
+COPY . .
 
-# Expose the standard gRPC port assigned to this service (e.g., 50053)
+# 4. Expose the assigned gRPC port
 EXPOSE 50053
 
-WORKDIR /app/src/mfi_ddb/databases/blob/dws
-
+# 5. Run the gRPC server directly from the root of /app
 CMD ["python", "server.py"]

@@ -1,26 +1,21 @@
-# Use a lightweight Python base image
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install system compilation packages for psycopg2 variants if needed
+# 1. Install build dependencies and immediately clean up
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements from the repository layout context path
-COPY src/mfi_ddb/databases/kv-psql/dws/requirements.txt ./
+# 2. Copy only requirements first to optimize layer caching
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the entire source directory to satisfy top-level absolute paths
-COPY src/ /app/src/
+# 3. Copy the localized DWS node files (server.py, init_db.py, proto/, gen/, etc.)
+COPY . .
 
-# Instruct Python where to begin finding root modules
-# FIX: Added the nested dws folder so 'from gen import ...' resolves perfectly
-ENV PYTHONPATH=/app/src:/app/src/mfi_ddb/databases/kv-psql/dws
-
-# Expose the internal gRPC execution port
+# 4. Expose the internal gRPC execution port
 EXPOSE 50051
 
-# Execute the Key-Value Data Web Service gRPC engine wrapper module
-CMD ["python", "-m", "mfi_ddb.databases.kv-psql.dws.server"]
+# 5. Clean default runtime instruction (can be overridden by Compose command)
+CMD ["python", "server.py"]

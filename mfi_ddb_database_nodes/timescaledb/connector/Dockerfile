@@ -1,24 +1,21 @@
-# Use a lightweight Python base image
 FROM python:3.12-slim
 
-# Set working directory inside the container
 WORKDIR /app
 
-# Install system dependencies if required
+# 1. Install lean build dependencies and clean up
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first to leverage Docker layer caching
-COPY src/mfi_ddb/databases/timescaledb/connector/requirements.txt ./
+# 2. Copy requirements first to leverage Docker layer caching
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the entire source tree so internal relative package imports resolve perfectly
-COPY src/ /app/src/
+# 3. Copy the localized connector files (main.py, db.py, config.yaml, etc.)
+COPY . .
 
-# FIX: Added the nested timescaledb directory to the PYTHONPATH
-ENV PYTHONPATH=/app/src:/app/src/mfi_ddb/databases/timescaledb
+# 4. Retain unbuffered logs configuration for neat streaming profiles
 ENV PYTHONUNBUFFERED=1
 
-# Run the ingestion client module with unbuffered output
-CMD ["python", "-u", "-m", "mfi_ddb.databases.timescaledb.connector.main"]
+# 5. Execute the connector script directly from the local workspace root
+CMD ["python", "-u", "main.py"]

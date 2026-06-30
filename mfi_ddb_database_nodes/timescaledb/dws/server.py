@@ -10,8 +10,8 @@ import yaml
 from google.protobuf.timestamp_pb2 import Timestamp
 from google.protobuf.struct_pb2 import Struct
 
-from .db import TimeScaleReader
-from .gen import models_pb2, service_pb2, service_pb2_grpc
+from db import TimeScaleReader
+from gen import models_pb2, service_pb2, service_pb2_grpc
 
 def load_config(path: Path):
     """Load YAML config for TimeScaleDB connection settings."""

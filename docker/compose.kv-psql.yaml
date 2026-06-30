@@ -23,8 +23,8 @@ services:
   kv-psql-connector:
     platform: linux/amd64
     build:
-      context: ../
-      dockerfile: src/mfi_ddb/databases/kv-psql/connector/Dockerfile
+      context: ../mfi_ddb_database_nodes/kv-psql/connector
+      dockerfile: Dockerfile
     container_name: mfi-kv-psql-connector
     image: cmumfi/mfi-ddb-kv-psql-connector:latest
     depends_on:
@@ -35,21 +35,20 @@ services:
     networks:
       - mfi_network
     volumes:
-      - ../src/mfi_ddb/databases/kv-psql/connector/config.yaml:/app/config.yaml:ro
-    restart: on-failure
+      - ../mfi_ddb_database_nodes/kv-psql/connector/config.yaml:/app/config.yaml:ro
+    restart: always
 
   kv-psql-dws:
     platform: linux/amd64
     build:
-      context: ../
-      dockerfile: src/mfi_ddb/databases/kv-psql/dws/Dockerfile
+      context: ../mfi_ddb_database_nodes/kv-psql/dws
+      dockerfile: Dockerfile
     container_name: mfi-kv-psql-dws
     image: cmumfi/mfi-ddb-kv-psql-dws:latest
     ports:
       - "50051:50051"
     command: >
-      sh -c "python -m mfi_ddb.databases.kv-psql.dws.init_db && 
-             python -m mfi_ddb.databases.kv-psql.dws.server"
+      sh -c "python init_db.py && python server.py"
     depends_on:
       kv-psql-db:
         condition: service_healthy
