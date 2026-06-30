@@ -3,7 +3,7 @@ name: Update uv.lock
 on:
   pull_request:
     paths:
-      - 'pyproject.toml'
+      - 'mfi_ddb_package/pyproject.toml'
   workflow_dispatch:
   
 
@@ -13,6 +13,10 @@ permissions:
 jobs:
   check-lockfile:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mfi_ddb_package    
+
     steps:
       - name: 1. checkout repository
         uses: actions/checkout@v5
