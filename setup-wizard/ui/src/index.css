@@ -1,9 +1,0 @@
-@import 'tailwindcss';
-
-@theme {
-  --color-cmu-red: #C41230;
-  --color-cmu-red-hover: #A30F26;
-  --color-mfi-dark: #111111;
-  --color-mfi-card: #1A1A1A;
-  --color-mfi-border: #2E2E2E;
-}
