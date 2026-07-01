@@ -10,3 +10,4 @@ secrets_local.yaml
 # Virtual environments
 .venv
 .DS_Store
+.data
