@@ -2,14 +2,6 @@ networks:
   mfi_network:
     driver: bridge
 
-volumes:
-  timescale_storage:
-  kv_psql_storage:
-  blob_storage:
-  mds_storage:
-  emqx_data:
-  emqx_log:
-
 include:
   - path: kv-psql/compose.kv-psql.yaml
   - path: timescale/compose.timescale.yaml
@@ -27,8 +19,8 @@ services:
       - "8083:8083"     # MQTT websockets port
       - "18083:18083"   # EMQX dashboard UI
     volumes:
-      - emqx_data:/opt/emqx/data
-      - emqx_log:/opt/emqx/log
+      - ./.data/emqx/data:/opt/emqx/data
+      - ./.data/emqx/log:/opt/emqx/log
     environment:
       - EMQX_NAME=mfi_broker
     networks:
