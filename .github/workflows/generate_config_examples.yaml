@@ -31,7 +31,9 @@ jobs:
         
       - name: 4. Install the mfi_ddb package using uv
         # Installs the package from the current repository using uv pip install
-        run: uv sync
+        run: |
+          git submodule update --init --recursive
+          uv sync
         
       - name: 5. Create output directory for configs if it doesn't exist
         run: mkdir -p examples/configs

@@ -56,7 +56,9 @@ jobs:
         uses: astral-sh/setup-uv@v6
 
       - name: Install dependencies
-        run: uv sync --locked --all-extras --dev
+        run: |
+          git submodule update --init --recursive
+          uv sync --locked --all-extras --dev
 
       - name: Run tests for LocalFilesDataAdapter
         run: uv run pytest tests/data_adapters/test_local_files_adapter.py -v --tb=short
