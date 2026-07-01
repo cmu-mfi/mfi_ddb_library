@@ -5,6 +5,7 @@ services:
       context: ../../mfi_ddb_data_adapter/data_adapter_app/backend
       dockerfile: Dockerfile
     container_name: mfi-data-adapter-backend
+    image: cmumfi/mfi-ddb-data-adapter-backend:latest
     ports:
       - "8001:8000"  # Exposes the FastAPI backend to your host machine on port 8001
     depends_on:
@@ -20,6 +21,7 @@ services:
       context: ../../mfi_ddb_data_adapter/data_adapter_app/frontend
       dockerfile: Dockerfile
     container_name: mfi-data-adapter-frontend
+    image: cmumfi/mfi-ddb-data-adapter-frontend:latest
     ports:
       - "3001:80"    # Maps Nginx's internal port 80 to your host machine on port 3001
     depends_on:
