@@ -10,6 +10,7 @@ include:
   - path: metadata-rws/compose.metadata-rws.yaml
   - path: blob/compose.blob.yaml
   - path: data-adapter-app/compose.data-adapter-app.yaml
+  - path: aveva/compose.aveva.yaml
 
 services:
   # SHARED INFRASTRUCTURE

@@ -11,7 +11,7 @@ from error_codes import GrpcError
 from piwebapi import PIWebAPI
 from gen import models_pb2, service_pb2, service_pb2_grpc
 
-with open("./dws/config.yaml", "r") as file:
+with open("./config.yaml", "r") as file:
     secrets = yaml.safe_load(file)
 
 pi_client = PIWebAPI(secrets)
