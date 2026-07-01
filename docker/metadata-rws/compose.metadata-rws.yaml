@@ -34,6 +34,9 @@ services:
         condition: service_started
       metadata-store-db:
         condition: service_healthy
+    volumes:
+      - ./mds-broker.ini:/app/broker.ini:ro
+      - ./mds-pg_database.ini:/app/pg_database.ini:ro    
     networks:
       - mfi_network
     restart: on-failure
@@ -54,6 +57,9 @@ services:
         condition: service_healthy
       timescaledb-db:
         condition: service_healthy
+    volumes:
+      - ./rws-dws-endpoints.yaml:/app/app/config/dws.endpoints.yaml:ro
+      - ./rws-pg_database.ini:/app/app/config/pg_database.ini:ro
     networks:
       - mfi_network
     restart: always

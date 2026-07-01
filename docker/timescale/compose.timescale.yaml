@@ -34,7 +34,7 @@ services:
       timescaledb-db:
         condition: service_healthy
     volumes:
-      - ../../mfi_ddb_database_nodes/timescaledb/connector/config.yaml:/app/config.yaml:ro
+      - ./connector-config.yaml:/app/config.yaml:ro
     networks:
       - mfi_network
     restart: on-failure
@@ -51,6 +51,8 @@ services:
     depends_on:
       timescaledb-db:
         condition: service_healthy
+    volumes:
+      - ./dws-config.yaml:/app/config.yaml:ro
     networks:
       - mfi_network
     restart: always
