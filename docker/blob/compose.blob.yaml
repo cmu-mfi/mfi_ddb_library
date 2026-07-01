@@ -2,7 +2,7 @@ services:
   blob-connector:
     platform: linux/amd64
     build:
-      context: ../mfi_ddb_database_nodes/blob/connector
+      context: ../../mfi_ddb_database_nodes/blob/connector
       dockerfile: Dockerfile
     container_name: mfi-blob-connector
     image: cmumfi/mfi-ddb-blob-connector:latest
@@ -18,7 +18,7 @@ services:
   blob-dws:
     platform: linux/amd64
     build:
-      context: ../mfi_ddb_database_nodes/blob/dws
+      context: ../../mfi_ddb_database_nodes/blob/dws
       dockerfile: Dockerfile
     container_name: mfi-blob-dws
     image: cmumfi/mfi-ddb-blob-dws:latest

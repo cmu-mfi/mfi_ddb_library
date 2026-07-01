@@ -23,7 +23,7 @@ services:
   kv-psql-connector:
     platform: linux/amd64
     build:
-      context: ../mfi_ddb_database_nodes/kv-psql/connector
+      context: ../../mfi_ddb_database_nodes/kv-psql/connector
       dockerfile: Dockerfile
     container_name: mfi-kv-psql-connector
     image: cmumfi/mfi-ddb-kv-psql-connector:latest
@@ -35,13 +35,13 @@ services:
     networks:
       - mfi_network
     volumes:
-      - ../mfi_ddb_database_nodes/kv-psql/connector/config.yaml:/app/config.yaml:ro
+      - ../../mfi_ddb_database_nodes/kv-psql/connector/config.yaml:/app/config.yaml:ro
     restart: always
 
   kv-psql-dws:
     platform: linux/amd64
     build:
-      context: ../mfi_ddb_database_nodes/kv-psql/dws
+      context: ../../mfi_ddb_database_nodes/kv-psql/dws
       dockerfile: Dockerfile
     container_name: mfi-kv-psql-dws
     image: cmumfi/mfi-ddb-kv-psql-dws:latest
