@@ -47,5 +47,5 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "CI: Auto-generate configuration examples"
-          file_pattern: "examples/configs/*.yaml"
+          file_pattern: "mfi_ddb_package/examples/configs/*.yaml"
           branch: ${{ github.head_ref || github.ref_name }}
