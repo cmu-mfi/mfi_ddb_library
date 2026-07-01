@@ -1,3 +1,5 @@
+name: mfi-ddb-pipeline
+
 networks:
   mfi_network:
     driver: bridge
