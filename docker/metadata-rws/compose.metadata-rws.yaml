@@ -39,7 +39,7 @@ services:
       - ./mds-pg_database.ini:/app/pg_database.ini:ro    
     networks:
       - mfi_network
-    restart: on-failure
+    restart: always
 
   rws-app:
     platform: linux/amd64
