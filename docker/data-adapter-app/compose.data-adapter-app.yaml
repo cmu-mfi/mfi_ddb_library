@@ -20,6 +20,8 @@ services:
     build:
       context: ../../mfi_ddb_data_adapter/data_adapter_app/frontend
       dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:8001
     container_name: mfi-data-adapter-frontend
     image: cmumfi/mfi-ddb-data-adapter-frontend:latest
     ports:

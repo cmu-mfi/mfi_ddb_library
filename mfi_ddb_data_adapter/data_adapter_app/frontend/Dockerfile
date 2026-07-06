@@ -1,6 +1,10 @@
 # Stage 1: Build the React/Vite application
 FROM node:22-alpine AS builder
 
+# Args for the api url
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
 WORKDIR /app
 
 # Copy package files first to take advantage of Docker layer caching
