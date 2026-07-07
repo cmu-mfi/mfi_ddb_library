@@ -178,7 +178,26 @@ def db_batch_writer_worker(
 def main():
     """Start the background batch worker, connect to broker, and process events."""
     # 1. Create DB writer instance and spin up the background consumer thread
-    db_writer = TimeScaleWriter(cfg["timescaledb"])
+    
+    # db_writer = TimeScaleWriter(cfg["timescaledb"])
+
+    # adding retries to ensure that the db is up and the schema is initialized before we start the MQTT client and worker thread
+    # max of a 45 second wait before application gives up and exits.
+    db_writer = None
+    retry_count = 0
+    max_retries = 15
+    
+    print("Connecting to TimescaleDB and validating/initializing schema...")
+    while db_writer is None:
+        try:
+            db_writer = TimeScaleWriter(cfg["timescaledb"])
+        except Exception as e:
+            retry_count += 1
+            if retry_count > max_retries:
+                print("CRITICAL: Could not connect to TimescaleDB or verify schema. Exiting application.")
+                raise e
+            print(f"Database/Schema not ready yet ({e}). Retrying in 3 seconds... ({retry_count}/{max_retries})")
+            time.sleep(3)
 
     worker_thread = threading.Thread(
         target=db_batch_writer_worker,
