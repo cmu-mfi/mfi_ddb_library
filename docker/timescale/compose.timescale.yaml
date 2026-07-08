@@ -46,7 +46,7 @@ services:
     container_name: mfi-timescaledb-dws
     image: cmumfi/mfi-ddb-timescaledb-dws:latest
     ports:
-      - "50052:50052"
+      - "50052:50051"
     depends_on:
       timescaledb-db:
         condition: service_healthy
