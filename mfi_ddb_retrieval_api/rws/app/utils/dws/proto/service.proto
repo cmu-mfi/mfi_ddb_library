@@ -25,6 +25,7 @@ message GetDataPointRequest {
   // TODO: is the user_id necessary?? Discuss.
   // string user_id = 2; 
   google.protobuf.Timestamp timestamp = 2;
+  bool do_closest_past = 3;
 }
 
 message GetDataPointResponse {
