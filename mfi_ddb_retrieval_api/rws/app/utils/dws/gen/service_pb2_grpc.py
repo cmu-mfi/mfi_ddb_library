@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-import service_pb2 as service__pb2
+from . import service_pb2 as service__pb2
 
 GRPC_GENERATED_VERSION = '1.81.1'
 GRPC_VERSION = grpc.__version__
@@ -26,7 +26,9 @@ if _version_not_supported:
 
 
 class DataServiceStub:
-    """The Data Retrieval Service definition
+    """import "app/utils/dws/proto/models.proto";
+
+    The Data Retrieval Service definition
     """
 
     def __init__(self, channel):
@@ -53,7 +55,9 @@ class DataServiceStub:
 
 
 class DataServiceServicer:
-    """The Data Retrieval Service definition
+    """import "app/utils/dws/proto/models.proto";
+
+    The Data Retrieval Service definition
     """
 
     def GetDataPoint(self, request, context):
@@ -104,7 +108,9 @@ def add_DataServiceServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class DataService:
-    """The Data Retrieval Service definition
+    """import "app/utils/dws/proto/models.proto";
+
+    The Data Retrieval Service definition
     """
 
     @staticmethod

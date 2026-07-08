@@ -5,6 +5,8 @@ package dws.service;
 import "google/protobuf/timestamp.proto";
 import "models.proto";
 
+//import "app/utils/dws/proto/models.proto";
+
 // The Data Retrieval Service definition
 service DataService {
   
