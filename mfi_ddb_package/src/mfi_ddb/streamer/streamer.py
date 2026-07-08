@@ -141,6 +141,7 @@ class Streamer(Observer):
         blob_topic_family = globals()[TOPIC_CLIENTS['blob'][1]]()
         self.__kv_client = globals()[TOPIC_CLIENTS['kv'][0]](copy.deepcopy(config), kv_topic_family)
         self.__blob_client = globals()[TOPIC_CLIENTS['blob'][0]](copy.deepcopy(config), blob_topic_family)
+        self.__kv_birth_payload = {}
         self.__reset_stream()
         
         self.__last_poll_update = 0
@@ -154,7 +155,7 @@ class Streamer(Observer):
     def disconnect(self):
         try:
             trial_id = str(self.__data_adp.cfg.get('trial_id', None))
-            kv_birth_payload = self.__generate_birth_kv_payload()
+            kv_birth_payload = self.__kv_birth_payload
             kv_death_payload = self.__generate_death_kv_payload(kv_birth_payload)
             blob_death_payload = get_blob_json_payload_from_dict(
                 data = kv_death_payload,
@@ -271,6 +272,7 @@ class Streamer(Observer):
         self.__blob_client = globals()[TOPIC_CLIENTS['blob'][0]](copy.deepcopy(self.cfg), blob_topic_family)
 
         kv_birth_payload = self.__generate_birth_kv_payload()
+        self.__kv_birth_payload = kv_birth_payload
         kv_death_payload = self.__generate_death_kv_payload(kv_birth_payload)
         blob_birth_payload = get_blob_json_payload_from_dict(data = kv_birth_payload,
                                                              file_name = f'{trial_id}_metadata_birth.json',
