@@ -5,6 +5,7 @@ import time
 import queue
 import threading
 from pathlib import Path
+from unicodedata import name
 import yaml
 from typing import Any, List, Tuple, Optional
 import paho.mqtt.client as mqtt
@@ -135,10 +136,14 @@ def on_message(client, userdata, msg):
 
             # prepend the message type context into the existing metric string
             tracked_metric_name = f"{msg_type}/{name}"
+            
+            clean_name = name.lstrip("DATA/") if name.startswith("DATA/") else name
+
+            full_topic_path = f"{clean_topic}/{clean_name}"
 
             # Persist each metric as a separate row keyed by topic + component + metric.
             rows.append(
-                (t, clean_topic, cfg["component_id"], tracked_metric_name, value_num, value_text, value_json)
+                (t, full_topic_path, cfg["component_id"], tracked_metric_name, value_num, value_text, value_json)
             )
         if rows:
             # writer.insert_rows(rows) --> would overwhelm the DB if we do it directly in the MQTT thread; instead, push to the queue for the background worker to consume
