@@ -10,7 +10,7 @@ from typing import Any, List, Tuple, Optional
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
 from datetime import datetime, timezone
-from mqtt_spb_wrapper.spb_base import SpbPayloadParser
+from mqtt_spb_wrapper.spb_base import SpbPayloadParser, SpbTopic
 
 from db import TimeScaleWriter
 
@@ -100,14 +100,45 @@ def on_connect(client, userdata, flags, rc, properties=None):
 def on_message(client, userdata, msg):
     """MQTT callback: decode payload and batch insert into TimeScaleDB."""
     try:
+        # initialize topic parser
+        # spb_topic = SpbTopic(msg.topic)
+        
+        # not using the sbptopic parser since it is harcoded to expect a namespace
+        # instead I can drop the namespace directly from the array
+        topic_fields = msg.topic.split("/")
+
+        if len(topic_fields) < 3:
+            raise ValueError(f"Malformed MQTT topic structure: {msg.topic}")
+
+        # extract the message type string
+        msg_type = topic_fields[2]
+
+        # delete the message type from the array
+        del topic_fields[2]
+
+        # assembling the topic path, leaving out message type folder
+        # clean_fields = [spb_topic.namespace, spb_topic.domain_name]
+
+        # if spb_topic.eon_name:
+        #     clean_fields.append(spb_topic.eon_name)
+        # if spb_topic.eon_device_name:
+        #     clean_fields.append(spb_topic.eon_device_name)
+        
+        clean_topic = "/".join(topic_fields)
+        
         metrics = decode_sparkplug(msg.payload)
         rows = []
         for name, value, ts_ms in metrics:
             t = to_ts(ts_ms)
+            
             value_num, value_text, value_json = classify_value(value)
+
+            # prepend the message type context into the existing metric string
+            tracked_metric_name = f"{msg_type}/{name}"
+
             # Persist each metric as a separate row keyed by topic + component + metric.
             rows.append(
-                (t, msg.topic, cfg["component_id"], name, value_num, value_text, value_json)
+                (t, clean_topic, cfg["component_id"], tracked_metric_name, value_num, value_text, value_json)
             )
         if rows:
             # writer.insert_rows(rows) --> would overwhelm the DB if we do it directly in the MQTT thread; instead, push to the queue for the background worker to consume
