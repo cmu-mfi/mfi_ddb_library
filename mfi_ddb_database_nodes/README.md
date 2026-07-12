@@ -59,13 +59,14 @@ flowchart BT
 ```
 
 ## Compatible Database Nodes
-The following database nodes are currently compatible with the MFI-DDB framework. More details about the compatible payloads can be found in the [MFI DDB Schema V1.0](../../../schema/README.md).
+The following database nodes are currently compatible with the MFI-DDB framework. More details about the compatible payloads can be found in the [MFI DDB Schema V1.0](/mfi_ddb_package/src/mfi_ddb/topic_families/schema/README.md).
 
-| Database Node  | Database Type | Compatible Payloads |
-|--------------------------------|---------------|----------|
-| [cfs](./cfs/)        | Cloud File Storage  | blob, kv     |
-| [pg](./pg/)              | PostgreSQL           | kv       |
-| [aveva-pi](./aveva-pi/)| [Aveva PI](https://www.aveva.com/en/products/aveva-pi-system/)| historian |
+| Database Node             | Database Type         | Compatible Payloads |
+|---------------------------|-----------------------|----------|
+| [blob](./blob/)           | Cloud File Storage    | blob, kv |
+| [kv-psql](./kv-psql/)     | PostgreSQL            | kv       |
+| [aveva-pi](./aveva-pi/)   | [Aveva PI](https://www.aveva.com/en/products/aveva-pi-system/)| historian |
+| [timescaledb](./timescaledb/)| TimescaleDB        | historian|
 
 ## Node specifications
 Each database node has specific requirements and specifications for its components. Below are the general specifications for each component.
@@ -78,8 +79,3 @@ Each database node exposes a [gRPC](https://grpc.io/docs/what-is-grpc/core-conce
 | **`GetDataPoint`** | Unary | Retrieves a **single** datapoint for a specific topic at an exact timestamp. | Auditing specific events or checking system state at a past moment. |
 | **`GetDataRange`** | Unary | Retrieves a list of datapoints between a `start_time` and `end_time`. Supports **pagination** via tokens. | Generating historical charts, trend analysis, or bulk data export. |
 | **`StreamData`** | Server Stream | Opens a persistent connection. The server pushes new datapoints to the client in **real-time** as they occur. | Live dashboards, active monitoring, and immediate alerting. |
-
-### Connector Configuration
-Each database node requires specific configuration settings for the connector to interface with the MFI-DDB broker. The configuration parameters are as follows:
-
-TODO
