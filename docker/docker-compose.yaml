@@ -11,6 +11,7 @@ include:
   - path: blob/compose.blob.yaml
   - path: data-adapter-app/compose.data-adapter-app.yaml
   - path: aveva/compose.aveva.yaml
+  - path: dev-tools/compose.dev-tools.yaml
 
 services:
   # SHARED INFRASTRUCTURE

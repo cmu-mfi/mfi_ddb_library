@@ -110,6 +110,13 @@ Each database node consists of three services: a database, a connector (MQTT-to-
 | `data-adapter-backend` | 8001 | Data adapter FastAPI backend | `daa` |
 | `data-adapter-frontend` | 3001 | Data adapter frontend (Nginx) | `daa` |
 
+
+### Development & Management Tools
+
+| Service | Port(s) | Description | Profile |
+|---------|---------|-------------|---------|
+| `portainer` | 9000, 9443 | Portainer CE Docker management web UI | `dev-tools` |
+
 ## Quick Start
 
 Start all services:
