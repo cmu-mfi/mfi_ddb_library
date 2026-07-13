@@ -1,0 +1,15 @@
+opcua:
+  endpoint: OPC UA server endpoint URL, e.g. opc.tcp://localhost:4840/freeopcua/server/
+  publishing_interval: '(optional) Subscription publishing interval in ms (default:
+    500)'
+  username: (optional) Username for OPC UA server authentication
+  password: (optional) Password for OPC UA server authentication
+  timeout: '(optional) Timeout in seconds for connecting to the OPC UA server (default:
+    5.0)'
+trial_id: Trial ID for the system. No spaces or special characters allowed.
+queue_size: '(optional) Maximum number of buffered updates per component before the
+  oldest is dropped. (default: 10)'
+nodes: List of OPC UA nodes to subscribe to. Each node needs a 'component_id' and
+  exactly one of 'node_id' (a single variable, with optional 'key') or 'browse_root'
+  (an object to recursively browse; every variable found underneath is auto-subscribed,
+  keyed by its browse path). Optionally 'trial_id' can be provided.

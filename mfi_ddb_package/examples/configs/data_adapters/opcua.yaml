@@ -1,0 +1,12 @@
+opcua:
+  endpoint: opc.tcp://localhost:4840/freeopcua/server/
+  publishing_interval: 500
+trial_id: trial_001
+queue_size: 10
+nodes:
+- component_id: robot-arm-1
+  node_id: ns=2;s=RobotArm1.Temperature
+  key: temperature
+- component_id: machine-a
+  browse_root: ns=2;s=MachineA
+  trial_id: trial_001

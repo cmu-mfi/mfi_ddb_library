@@ -23,6 +23,7 @@ Data Adapters are the objects that represent the data that needs to be streamed.
 * [Local Files](src/mfi_ddb/data_adapters/local_files.py)
 * [MQTT](src/mfi_ddb/data_adapters/mqtt.py)
 * [MTConnect](src/mfi_ddb/data_adapters/mtconnect.py)
+* [OPC UA](src/mfi_ddb/data_adapters/opcua.py)
 * [gRPC](src/mfi_ddb/data_adapters/grpc.py)
 * [key_value](src/mfi_ddb/data_adapters/key_value.py)
 
