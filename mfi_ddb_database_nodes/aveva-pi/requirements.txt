@@ -1,6 +1,0 @@
-grpcio
-PyYAML
-flask
-requests
-python-dateutil
-protobuf

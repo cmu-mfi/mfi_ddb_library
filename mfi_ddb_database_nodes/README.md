@@ -72,7 +72,7 @@ The following database nodes are currently compatible with the MFI-DDB framework
 Each database node has specific requirements and specifications for its components. Below are the general specifications for each component.
 
 ### Database Web Service (DWS)
-Each database node exposes a [gRPC](https://grpc.io/docs/what-is-grpc/core-concepts/) web service for data retrieval. The following services are made available:
+Each database node exposes a [gRPC](https://grpc.io/docs/what-is-grpc/core-concepts/) web service for data retrieval. The following services are made available. Proto files can be found in [dws](./dws/proto/) directory.
 
 | Method | Type | Description | Use Case |
 | :--- | :--- | :--- | :--- |
