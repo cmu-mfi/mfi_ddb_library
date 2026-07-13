@@ -6,6 +6,8 @@ services:
       dockerfile: Dockerfile
     container_name: mfi-blob-connector
     image: cmumfi/mfi-ddb-blob-connector:latest
+    profiles:
+      - "blob"
     depends_on:
       mqtt-broker:
         condition: service_started
@@ -23,6 +25,8 @@ services:
       dockerfile: Dockerfile
     container_name: mfi-blob-dws
     image: cmumfi/mfi-ddb-blob-dws:latest
+    profiles:
+      - "blob"
     ports:
       - "50053:50053"
     depends_on:

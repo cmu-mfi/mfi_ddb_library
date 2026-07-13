@@ -9,6 +9,8 @@ services:
       - POSTGRES_DB=mds
     ports:
       - "5430:5432"
+    profiles:
+      - "mds"
     volumes:
       - ../.data/mds_storage:/var/lib/postgresql/data
     networks:
@@ -29,6 +31,8 @@ services:
     image: cmumfi/mfi-ddb-metadata-store-connector:latest
     command: >
       python -u connector.py --broker_config broker.ini --pg_config pg_database.ini
+    profiles:
+      - "mds"
     depends_on:
       mqtt-broker:
         condition: service_started
@@ -50,6 +54,8 @@ services:
     image: cmumfi/mfi-ddb-rws-app:latest
     ports:
       - "8000:8000"
+    profiles:
+      - "rws"
     depends_on:
       metadata-store-db:
         condition: service_healthy

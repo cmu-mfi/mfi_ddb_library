@@ -9,6 +9,8 @@ services:
       - POSTGRES_DB=mfi_kv
     ports:
       - "5431:5432"
+    profiles:
+      - kv
     volumes:
       - ../.data/kv_psql_storage:/var/lib/postgresql/data
     networks:
@@ -27,6 +29,8 @@ services:
       dockerfile: Dockerfile
     container_name: mfi-kv-psql-connector
     image: cmumfi/mfi-ddb-kv-psql-connector:latest
+    profiles:
+      - kv
     depends_on:
       mqtt-broker:
         condition: service_started
@@ -45,6 +49,8 @@ services:
       dockerfile: Dockerfile
     container_name: mfi-kv-psql-dws
     image: cmumfi/mfi-ddb-kv-psql-dws:latest
+    profiles:
+      - kv
     ports:
       - "50051:50051"
     command: >

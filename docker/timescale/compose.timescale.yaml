@@ -11,6 +11,8 @@ services:
       - "5432:5432"
     volumes:
       - ../.data/timescale_storage:/var/lib/postgresql/data
+    profiles:
+      - "ts"
     networks:
       - mfi_network
     restart: always
@@ -27,6 +29,8 @@ services:
       dockerfile: Dockerfile
     container_name: mfi-timescaledb-connector
     image: cmumfi/mfi-ddb-timescaledb-connector:latest
+    profiles:
+      - "ts"
     depends_on:
       mqtt-broker:
         condition: service_started
@@ -45,6 +49,8 @@ services:
       dockerfile: Dockerfile
     container_name: mfi-timescaledb-dws
     image: cmumfi/mfi-ddb-timescaledb-dws:latest
+    profiles:
+      - "ts"
     ports:
       - "50052:50051"
     depends_on:

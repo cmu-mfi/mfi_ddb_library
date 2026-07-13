@@ -18,6 +18,8 @@ services:
     image: emqx/emqx:5.8.0
     container_name: mfi-mqtt-broker
     user: "0:0"
+    profiles:
+      - "mqtt-broker"
     ports:
       - "1883:1883"     # MQTT TCP port
       - "8083:8083"     # MQTT websockets port
