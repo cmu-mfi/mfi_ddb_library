@@ -1,4 +1,3 @@
-[TODO]
 # MFI DDB Library
 
 Library to stream data to Digital Data Backend (DDB) for the MFI project. It can be installed using pip. [https://pypi.org/project/mfi-ddb/](https://pypi.org/project/mfi-ddb/) 
@@ -79,6 +78,7 @@ To be able to do the above three major classes are provided:
 * [MTConnect](src/mfi_ddb/data_adapters/mtconnect.py)
 * [gRPC](src/mfi_ddb/data_adapters/grpc.py)
 * [key_value](src/mfi_ddb/data_adapters/key_value.py)
+* [ROS2](src/mfi_ddb/data_adapters/ros2.py)
 
 To create a new data adapter, please follow the [checklist](./src/mfi_ddb/data_adapters/README.md#new-data-adapter-checklist) and refer to the existing data adapters for implementation reference.
 

@@ -6,3 +6,4 @@ from .ros_files import RosFilesDataAdapter
 from .ros import RosDataAdapter
 from .grpc import GrpcDataAdapter
 from .key_value import KvDataAdapter
+from .ros2 import Ros2DataAdapter
