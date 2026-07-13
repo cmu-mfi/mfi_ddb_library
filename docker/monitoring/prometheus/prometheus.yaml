@@ -17,4 +17,4 @@ scrape_configs:
   - job_name: "emqx"
     metrics_path: "/api/v5/prometheus/stats"
     static_configs:
-      - targets: ["emqx-broker:18083"]
+      - targets: ["mqtt-broker:18083"]
