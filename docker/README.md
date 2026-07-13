@@ -57,9 +57,9 @@ flowchart BT
 
 ### Shared Infrastructure
 
-| Service | Port(s) | Description |
-|---------|---------|-------------|
-| `mqtt-broker` | 1883, 8083, 18083 | EMQX MQTT broker with WebSocket and dashboard |
+| Service | Port(s) | Description | Profile |
+|---------|---------|-------------|---------|
+| `mqtt-broker` | 1883, 8083, 18083 | EMQX MQTT broker with WebSocket and dashboard | `mqtt-broker` |
 
 ### Database Nodes
 
@@ -72,43 +72,43 @@ Each database node consists of three services: a database, a connector (MQTT-to-
 | **Metadata RWS** | 5430 | - | Metadata store (mds) with connector + RWS API |
 
 #### KV-PSQL Node
-| Service | Description |
-|---------|-------------|
-| `kv-psql-db` | PostgreSQL database (port 5431) |
-| `kv-psql-connector` | Reads MQTT, writes to KV PostgreSQL |
-| `kv-psql-dws` | gRPC service (port 50051) |
+| Service | Description | Profile |
+|---------|-------------|---------|
+| `kv-psql-db` | PostgreSQL database (port 5431) | `kv`, `dbn`|
+| `kv-psql-connector` | Reads MQTT, writes to KV PostgreSQL | `kv`, `dbn`|
+| `kv-psql-dws` | gRPC service (port 50051) | `kv`, `dbn`|
 
 #### TimescaleDB Node
-| Service | Description |
-|---------|-------------|
-| `timescaledb-db` | PostgreSQL/TimescaleDB database (port 5432) |
-| `timescaledb-connector` | Reads MQTT, writes to TimescaleDB |
-| `timescaledb-dws` | gRPC service (port 50052) |
+| Service | Description | Profile |
+|---------|-------------|---------|
+| `timescaledb-db` | PostgreSQL/TimescaleDB database (port 5432) | `ts`, `dbn` |
+| `timescaledb-connector` | Reads MQTT, writes to TimescaleDB | `ts`, `dbn` |
+| `timescaledb-dws` | gRPC service (port 50052) | `ts`, `dbn` |
 
 #### Metadata RWS Node
-| Service | Description |
-|---------|-------------|
-| `metadata-store-db` | PostgreSQL metadata database (port 5430) |
-| `metadata-store-connector` | Reads MQTT, writes to metadata store |
-| `rws-app` | REST API service (port 8000) |
+| Service | Description | Profile |
+|---------|-------------|---------|
+| `metadata-store-db` | PostgreSQL metadata database (port 5430) | `retrieval` |
+| `metadata-store-connector` | Reads MQTT, writes to metadata store | `retrieval` |
+| `rws-app` | REST API service (port 8000) | `retrieval` |
 
 #### Blob Storage Node
-| Service | Description |
-|---------|-------------|
-| `blob-connector` | Stores binary data from MQTT to blob storage |
-| `blob-dws` | gRPC service for blob access (port 50053) |
+| Service | Description | Profile |
+|---------|-------------|---------|
+| `blob-connector` | Stores binary data from MQTT to blob storage | `blob`, `dbn` |
+| `blob-dws` | gRPC service for blob access (port 50053) | `blob`, `dbn` |
 
 #### Database-Specific Services
-| Service | Port | Description |
-|---------|------|-------------|
-| `aveva-pi-dws` | 50054 | Aveva PI integration via PI Web API gRPC service |
+| Service | Port | Description | Profile |
+|---------|------|-------------|---------|
+| `aveva-pi-dws` | 50054 | Aveva PI integration via PI Web API gRPC service | `aveva`, `dbn` |
 
 ### Web Applications
 
-| Service | Port | Description |
-|---------|------|-------------|
-| `data-adapter-backend` | 8001 | Data adapter FastAPI backend |
-| `data-adapter-frontend` | 3001 | Data adapter frontend (Nginx) |
+| Service | Port | Description | Profile |
+|---------|------|-------------|---------|
+| `data-adapter-backend` | 8001 | Data adapter FastAPI backend | `daa` |
+| `data-adapter-frontend` | 3001 | Data adapter frontend (Nginx) | `daa` |
 
 ## Quick Start
 
@@ -116,6 +116,11 @@ Start all services:
 ```bash
 cd docker
 docker compose up -d
+```
+
+Start a particular service. Can add multiple profile names of only one of them.
+```bash
+docker compose up --profile <profile-name> <profile-name> -d
 ```
 
 View logs:
