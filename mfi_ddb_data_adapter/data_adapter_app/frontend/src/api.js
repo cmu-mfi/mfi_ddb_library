@@ -109,6 +109,16 @@ export async function fetchAdapters() {
   }
 }
 
+export async function fetchStreamerConfig() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/connections/streamer`);
+    if (!res.ok) throw new Error("Failed to fetch streamer config");
+    return await res.json();
+  } catch (e) {
+    throw new Error(`Failed to fetch streamer config: ${e.message}`);
+  }
+}
+
 export async function validateAdapterConfig(adapter_name, adapter_cfg) {
   try {
     const adp_form = new FormData();

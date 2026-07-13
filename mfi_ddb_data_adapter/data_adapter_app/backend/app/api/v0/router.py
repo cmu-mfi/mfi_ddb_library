@@ -32,6 +32,7 @@ from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional, Tuple
 
 import app.utils.utils as utils
+import mfi_ddb
 import yaml
 from app.services.adapter_factory import AdapterFactory
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -98,6 +99,37 @@ async def list_adapters() -> List[Dict]:
         )
 
     return response
+
+
+@router.get("/streamer")
+async def get_streamer_config() -> Dict:
+    """
+    Return Streamer configuration metadata (example, help text, and schema).
+
+    Mirrors the /adapters endpoint's shape so the UI can populate the streamer
+    configuration field from the same source of truth as the adapter fields,
+    instead of hardcoding a default configuration in the frontend.
+
+    Returns:
+        Dictionary with keys:
+        - configHelpText: Flattened help text for tooltips
+        - configExample: YAML and raw configuration examples
+        - configSchema: JSON schema for validation
+    """
+    config_example = getattr(mfi_ddb.Streamer, "CONFIG_EXAMPLE", {})
+    config_help = getattr(mfi_ddb.Streamer, "CONFIG_HELP", {})
+
+    example_yaml = ""
+    if config_example:
+        example_yaml = yaml.dump(
+            config_example, default_flow_style=False, sort_keys=False
+        )
+
+    return {
+        "configHelpText": yaml.dump(config_help),
+        "configExample": {"configuration": example_yaml, "raw": config_example},
+        "configSchema": mfi_ddb.Streamer.SCHEMA.model_json_schema(),
+    }
 
 
 @router.get("/health")

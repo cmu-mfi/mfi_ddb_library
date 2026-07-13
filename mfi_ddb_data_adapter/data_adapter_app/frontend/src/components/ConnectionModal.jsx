@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Modal from "./Modal";
 import { ConnectionManager } from "./ConnectionManager";
-import { makeDefaultStreamerConfig } from "../data/defaults";
 import { getConnCtr, setConnCtr } from "../state/conn_ctr";
 import {
   connectConnection,
   disconnectConnection,
   fetchAdapters,
+  fetchStreamerConfig,
   validateAdapterConfig,
   validateStreamerConfig,
 } from "../api";
@@ -63,7 +63,8 @@ const generateHelpNodes = (helpData) => {
 export default function ConnectionModal({ isOpen, onClose, onSave, initialData = {} }) {
   const [connectionType, setConnectionType] = useState("");
   const [configuration, setConfiguration] = useState("");
-  const [streamerConfig, setStreamerConfig] = useState(makeDefaultStreamerConfig());
+  const [streamerExample, setStreamerExample] = useState("");
+  const [streamerConfig, setStreamerConfig] = useState("");
   const [adapters, setAdapters] = useState([]);
   const [step, setStep] = useState("");
   const [validationError, setValidationError] = useState("");
@@ -108,12 +109,12 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
     const t = e.target.value;
     setConnectionType(t);
     setConfiguration(exampleConfigMap[t] || "");
-    setStreamerConfig(makeDefaultStreamerConfig());
+    setStreamerConfig(streamerExample);
     setIsPolling(true);
     setPollingRateHz("1");
     setValidationError("");
     lastValidatedRef.current = "";
-  }, [exampleConfigMap]);
+  }, [exampleConfigMap, streamerExample]);
 
   const handleFileUpload = useCallback((e) => {
     const f = e.target.files?.[0];
@@ -217,13 +218,16 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
 
   useEffect(() => {
     fetchAdapters().then(setAdapters).catch(console.error);
+    fetchStreamerConfig()
+      .then((data) => setStreamerExample(data?.configExample?.configuration || ""))
+      .catch(console.error);
   }, []);
 
   useEffect(() => {
     if (!isOpen) return;
     setConnectionType(initialData.adapter || "");
     setConfiguration(initialData.adapterConfig || "");
-    setStreamerConfig(initialData.streamerConfig || makeDefaultStreamerConfig());
+    setStreamerConfig(initialData.streamerConfig || streamerExample);
     setIsPolling(typeof initialData.isPolling === "boolean" ? initialData.isPolling : true);
     setPollingRateHz(initialData.pollingRateHz != null ? String(initialData.pollingRateHz) : "1");
     setStep("");
@@ -232,7 +236,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
     setIsSubmitting(false);
     lastValidatedRef.current = "";
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [isOpen, initialData]);
+  }, [isOpen, initialData, streamerExample]);
 
   useEffect(() => {
     if (!isOpen || !connectionType || !configuration.trim()) { setValidationError(""); return; }
