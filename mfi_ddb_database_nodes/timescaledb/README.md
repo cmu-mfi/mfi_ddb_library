@@ -106,7 +106,32 @@ timescaledb/
 
 ---
 
-## Getting Started
+# Getting Started Using Docker
+
+### Running the Historian Using Docker:
+
+1. Configure your target database environment variables and broker targets inside `mfi_ddb_library/docker/timescale/connector-config.yaml`
+2. Run the following docker compose commands with profile tag:
+
+```
+docker compose --profile ts up -d
+```
+3. Check your docker processes either using ui or the following command:
+
+```
+docker ps
+```
+
+4. Manual Database Query Verification\
+*Change configs in command if other than default is chosen
+
+```
+docker exec -it mfi-timescaledb-db psql -U tsdb -d ddb_ts \
+    -c "SELECT time, topic, metric, value_num, value_text FROM timeseries_data ORDER BY time DESC LIMIT 10;"
+```
+
+
+# Getting Started Locally
 
 ### 1. Start TimeScaleDB Engine
 
@@ -138,20 +163,20 @@ SELECT create_hypertable('timeseries_data', 'time', if_not_exists => TRUE);
 
 ```
 
-Although it may not happen, but if prompted for a password during db setup, you can find the password in timescale_build.sh
+Although it may not happen, but if prompted for a password during db setup, you can find the password in timescale_build.sh or connector config in docker folder
 
 ### 2. Start MQTT Broker Infrastructure
 
 Spin up a localized isolated Eclipse-Mosquitto engine instance to route your industrial network messaging:
 
 ```bash
-docker run -d --name mqtt -p 1883:1883 eclipse-mosquitto:2
+docker run -d --name mqtt -p 1883:1883 emqx/emqx:5.8.0
 
 ```
 
 ---
 
-## Service Operations
+# Service Operations
 
 ### TimescaleDB Node All Dependencies Download
 
@@ -173,7 +198,7 @@ pip install -r connector/requirements.txt
 
 3. Run the worker process:
 ```bash
-cd src/mfi_ddb/databases/timescaledb
+cd mfi_ddb_database_nodes/timescaledb
 PYTHONPATH=. python -m connector.main
 
 ```
@@ -191,7 +216,7 @@ pip install -r dws/requirements.txt
 
 3. Execute the service module from inside the `timescaledb/` directory so relative imports resolve cleanly:
 ```bash
-cd src/mfi_ddb/databases/timescaledb
+cd mfi_ddb_database_nodes/timescaledb
 PYTHONPATH=. python -m dws.server
 
 ```
@@ -199,7 +224,7 @@ PYTHONPATH=. python -m dws.server
 
 ---
 
-## Verification & Testing
+# Verification & Testing
 
 ### Executing the Test Suite
 
@@ -207,7 +232,7 @@ The testing engine is designed to run isolated from the larger monolithic reposi
 
 
 ```bash
-cd src/mfi_ddb/databases/timescaledb
+cd mfi_ddb_library/mfi_ddb_database_nodes/timescaledb
 
 ```
 
