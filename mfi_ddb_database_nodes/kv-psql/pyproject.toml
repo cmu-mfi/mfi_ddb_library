@@ -1,0 +1,17 @@
+[project]
+name = "kv-psql"
+version = "0.1.0"
+description = "This directory contains the PostgreSQL-based key-value store database node for the MFI-DDB framework."
+readme = "README.md"
+license = "BSD-3-Clause"
+requires-python = ">=3.8, <3.13"
+dependencies = [
+    "grpcio>=1.51.0",
+    "grpcio-tools>=1.51.0",
+    "paho-mqtt>=1.6.1",
+    "protobuf>=3.20.0",
+    "psycopg2-binary>=2.9.6",
+    "pytest>=7.4.0",
+    "python-dateutil>=2.8.2",
+    "pyyaml>=6.0",
+]

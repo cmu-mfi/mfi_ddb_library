@@ -1,4 +1,4 @@
-name: CI Checks
+name: MFI-DDB Package CI Checks
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ main ]
     paths:
-      - 'src/**'
+      - 'mfi_ddb_package/src/**'
   workflow_dispatch:
 
 jobs:
@@ -16,6 +16,9 @@ jobs:
       matrix:
         os: [ ubuntu-latest, windows-latest ]
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: mfi_ddb_package    
 
     steps:
       - uses: actions/checkout@v5
@@ -30,6 +33,9 @@ jobs:
   streaming-check:
     needs: installation-check
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mfi_ddb_package    
 
     services:
       emqx:
@@ -51,7 +57,9 @@ jobs:
         uses: astral-sh/setup-uv@v6
 
       - name: Install dependencies
-        run: uv sync --locked --all-extras --dev
+        run: |
+          git submodule update --init --recursive
+          uv sync --locked --all-extras --dev
 
       - name: Run tests for LocalFilesDataAdapter
         run: uv run pytest tests/data_adapters/test_local_files_adapter.py -v --tb=short
@@ -59,7 +67,11 @@ jobs:
       - name: Run tests for MQTTDataAdapter
         run: uv run pytest tests/data_adapters/test_mqtt_adapter.py -v --tb=short
 
+      - name: Run tests for KvDataAdapter
+        run: uv run pytest tests/data_adapters/test_kv_adapter.py -v --tb=short
+
+
   # JOB 3: Run ROS2 tests
   ros2-check:
     needs: installation-check
-    uses: ./tests/workflows/data_adapters/ros2.yaml
+    uses: ./mfi_ddb_package/tests/workflows/data_adapters/ros2.yaml

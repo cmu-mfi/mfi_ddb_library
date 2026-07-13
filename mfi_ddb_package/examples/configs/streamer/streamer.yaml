@@ -1,0 +1,15 @@
+topic_family: blob
+user:
+  user_id: user123
+  domain: ANDREW
+  email: user123@example.com
+  name: User 123
+mqtt:
+  broker_address: test.mosquitto.org
+  broker_port: 1883
+  enterprise: CMU
+  site: Machine Shop
+  username: mqtt_user
+  password: mqtt_password
+  tls_enabled: false
+  debug: false

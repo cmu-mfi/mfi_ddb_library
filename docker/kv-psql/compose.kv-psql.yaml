@@ -1,0 +1,68 @@
+services:
+  kv-psql-db:
+    platform: linux/amd64
+    image: postgres:15-alpine
+    container_name: mfi-kv-psql-db
+    environment:
+      - POSTGRES_USER=mfi
+      - POSTGRES_PASSWORD=mfiddb
+      - POSTGRES_DB=mfi_kv
+    ports:
+      - "5431:5432"
+    profiles:
+      - "kv"
+      - "dbn"
+    volumes:
+      - ../.data/kv_psql_storage:/var/lib/postgresql/data
+    networks:
+      - mfi_network
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mfi -d mfi_kv"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  kv-psql-connector:
+    platform: linux/amd64
+    build:
+      context: ../../mfi_ddb_database_nodes/kv-psql/connector
+      dockerfile: Dockerfile
+    container_name: mfi-kv-psql-connector
+    image: cmumfi/mfi-ddb-kv-psql-connector:latest
+    profiles:
+      - "kv"
+      - "dbn"
+    depends_on:
+      mqtt-broker:
+        condition: service_started
+      kv-psql-db:
+        condition: service_healthy
+    networks:
+      - mfi_network
+    volumes:
+      - ./connector-config.yaml:/app/config.yaml
+    restart: always
+
+  kv-psql-dws:
+    platform: linux/amd64
+    build:
+      context: ../../mfi_ddb_database_nodes/kv-psql/dws
+      dockerfile: Dockerfile
+    container_name: mfi-kv-psql-dws
+    image: cmumfi/mfi-ddb-kv-psql-dws:latest
+    profiles:
+      - "kv"
+      - "dbn"
+    ports:
+      - "50051:50051"
+    command: >
+      sh -c "python init_db.py && python server.py"
+    depends_on:
+      kv-psql-db:
+        condition: service_healthy
+    networks:
+      - mfi_network
+    volumes:
+      - ./dws-config.yaml:/app/config.yaml
+    restart: always

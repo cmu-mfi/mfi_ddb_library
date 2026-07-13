@@ -1,0 +1,13 @@
+mqtt:
+  broker: "mqtt-broker"
+  port: 1883
+  client_id: kv-psql-connector
+  topics:
+    - "mfi-v1.0-kv/#"
+
+postgres:
+  host: "kv-psql-db"
+  port: 5432
+  database: mfi_kv
+  user: mfi
+  password: mfiddb

@@ -3,8 +3,8 @@ name: Generate Config Examples
 on:
   pull_request:
     paths:
-      - 'src/mfi_ddb/data_adapters/**'
-      - 'src/mfi_ddb/streamer/streamer.py'
+      - 'mfi_ddb_package/src/mfi_ddb/data_adapters/**'
+      - 'mfi_ddb_package/src/mfi_ddb/streamer/streamer.py'
   workflow_dispatch:
 
 
@@ -14,6 +14,9 @@ permissions:
 jobs:
   generate-configs:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mfi_ddb_package    
 
     steps:
       - name: 1. Checkout repository
@@ -28,7 +31,9 @@ jobs:
         
       - name: 4. Install the mfi_ddb package using uv
         # Installs the package from the current repository using uv pip install
-        run: uv sync
+        run: |
+          git submodule update --init --recursive
+          uv sync
         
       - name: 5. Create output directory for configs if it doesn't exist
         run: mkdir -p examples/configs
@@ -42,5 +47,5 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "CI: Auto-generate configuration examples"
-          file_pattern: "examples/configs/*.yaml"
+          file_pattern: "mfi_ddb_package/examples/configs/*.yaml"
           branch: ${{ github.head_ref || github.ref_name }}

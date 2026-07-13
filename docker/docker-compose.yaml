@@ -1,0 +1,35 @@
+name: mfi-ddb-pipeline
+
+networks:
+  mfi_network:
+    driver: bridge
+
+include:
+  - path: kv-psql/compose.kv-psql.yaml
+  - path: timescale/compose.timescale.yaml
+  - path: metadata-rws/compose.metadata-rws.yaml
+  - path: blob/compose.blob.yaml
+  - path: data-adapter-app/compose.data-adapter-app.yaml
+  - path: aveva/compose.aveva.yaml
+  - path: dev-tools/compose.dev-tools.yaml
+
+services:
+  # SHARED INFRASTRUCTURE
+  mqtt-broker:
+    image: emqx/emqx:5.8.0
+    container_name: mfi-mqtt-broker
+    user: "0:0"
+    profiles:
+      - "mqtt-broker"
+    ports:
+      - "1883:1883"     # MQTT TCP port
+      - "8083:8083"     # MQTT websockets port
+      - "18083:18083"   # EMQX dashboard UI
+    volumes:
+      - ./.data/emqx/data:/opt/emqx/data
+      - ./.data/emqx/log:/opt/emqx/log
+    environment:
+      - EMQX_NAME=mfi_broker
+    networks:
+      - mfi_network
+    restart: always

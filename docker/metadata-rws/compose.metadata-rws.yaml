@@ -1,0 +1,71 @@
+services:
+  metadata-store-db:
+    platform: linux/amd64
+    image: postgres:15-alpine
+    container_name: mfi-metadata-store-db
+    environment:
+      - POSTGRES_USER=mfi
+      - POSTGRES_PASSWORD=mfiddb
+      - POSTGRES_DB=mds
+    ports:
+      - "5430:5432"
+    profiles:
+      - "retrieval"
+    volumes:
+      - ../.data/mds_storage:/var/lib/postgresql/data
+    networks:
+      - mfi_network
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mfi -d mds"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  metadata-store-connector:
+    platform: linux/amd64
+    build:
+      context: ../../mfi_ddb_retrieval_api/metadata_store_pg
+      dockerfile: Dockerfile
+    container_name: mfi-metadata-store-connector
+    image: cmumfi/mfi-ddb-metadata-store-connector:latest
+    command: >
+      python -u connector.py --broker_config broker.ini --pg_config pg_database.ini
+    profiles:
+      - "retrieval"
+    depends_on:
+      mqtt-broker:
+        condition: service_started
+      metadata-store-db:
+        condition: service_healthy
+    volumes:
+      - ./mds-broker.ini:/app/broker.ini:ro
+      - ./mds-pg_database.ini:/app/pg_database.ini:ro    
+    networks:
+      - mfi_network
+    restart: always
+
+  rws-app:
+    platform: linux/amd64
+    build:
+      context: ../../mfi_ddb_retrieval_api/rws
+      dockerfile: Dockerfile
+    container_name: mfi-rws-app
+    image: cmumfi/mfi-ddb-rws-app:latest
+    ports:
+      - "8000:8000"
+    profiles:
+      - "retrieval"
+    depends_on:
+      metadata-store-db:
+        condition: service_healthy
+      kv-psql-db:
+        condition: service_healthy
+      timescaledb-db:
+        condition: service_healthy
+    volumes:
+      - ./rws-dws-endpoints.yaml:/app/app/config/dws.endpoints.yaml:ro
+      - ./rws-pg_database.ini:/app/app/config/pg_database.ini:ro
+    networks:
+      - mfi_network
+    restart: always
