@@ -1,0 +1,19 @@
+trial_id: trial_001
+devices:
+  device1:
+    namespace: robot_arm
+    rostopics:
+    - /joint_states
+    - /camera/image_raw
+    attributes:
+      manufacturer: RobotCorp
+      model: RobotArmX
+      description: A robotic arm for testing purposes.
+  device2:
+    namespace: machine_a
+    rostopics:
+    - /machine_a/status
+    attributes:
+      manufacturer: MachineCorp
+      version: 0.1
+      description: A machine for testing purposes.
