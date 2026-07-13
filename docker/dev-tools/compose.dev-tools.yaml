@@ -1,0 +1,15 @@
+services:
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: mfi-portainer
+    profiles:
+      - "dev-tools"
+    ports:
+      - "9000:9000"     # HTTP Web UI access
+      - "9443:9443"     # HTTPS Web UI access (Optional)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock #Internal docker socket to manage containers, checks what all is running and shows that data on the UI
+      - ./.data/portainer:/data #persistent state to store use info and container data etc. (Internally uses BoltDB, a kv db)
+    networks:
+      - mfi_network
+    restart: always

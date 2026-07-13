@@ -1,0 +1,41 @@
+services:
+  blob-connector:
+    platform: linux/amd64
+    build:
+      context: ../../mfi_ddb_database_nodes/blob/connector
+      dockerfile: Dockerfile
+    container_name: mfi-blob-connector
+    image: cmumfi/mfi-ddb-blob-connector:latest
+    profiles:
+      - "blob"
+      - "dbn"
+    depends_on:
+      mqtt-broker:
+        condition: service_started
+    volumes:
+      - ../.data/blob_storage:/data/blob_storage
+      - ./connector-config.yaml:/app/config.yaml:ro
+    networks:
+      - mfi_network
+    restart: on-failure
+
+  blob-dws:
+    platform: linux/amd64
+    build:
+      context: ../../mfi_ddb_database_nodes/blob/dws
+      dockerfile: Dockerfile
+    container_name: mfi-blob-dws
+    image: cmumfi/mfi-ddb-blob-dws:latest
+    profiles:
+      - "blob"
+      - "dbn"
+    ports:
+      - "50053:50053"
+    depends_on:
+      - blob-connector
+    volumes:
+      - ../.data/blob_storage:/data/blob_storage:ro
+      - ./dws-config.yaml:/app/config.yaml:ro
+    networks:
+      - mfi_network
+    restart: always

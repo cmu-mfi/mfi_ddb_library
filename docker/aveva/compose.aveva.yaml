@@ -1,0 +1,19 @@
+services:
+  aveva-pi-dws:
+    platform: linux/amd64
+    build:
+      context: ../../mfi_ddb_database_nodes/aveva-pi/dws
+      dockerfile: Dockerfile
+    container_name: mfi-aveva-pi-dws
+    image: cmumfi/mfi-ddb-aveva-pi-dws:latest
+    profiles:
+      - "aveva"
+      - "dbn"
+    ports:
+      - "50054:50054" # Adjust your host-facing port choice if needed
+    networks:
+      - mfi_network
+    volumes:
+      # Inject configurations directly into the container's working directory root
+      - ./config.yaml:/app/config.yaml:ro
+    restart: always

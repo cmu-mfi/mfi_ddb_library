@@ -9,4 +9,5 @@ web_apps/data_adapter_app/frontend/node_modules/
 secrets_local.yaml
 # Virtual environments
 .venv
-
+.DS_Store
+.data

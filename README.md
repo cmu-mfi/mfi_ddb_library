@@ -1,174 +1,186 @@
-# MFI DDB Library
+# MFI Digital Data Backbone (DDB) Library
 
-Library to stream data to Digital Data Backend (DDB) for the MFI project.
+A comprehensive Python-based framework for streaming data from various sources to the MFI Digital Data Backbone. This library provides tools for data ingestion, metadata storage, and retrieval services.
 
+The MFI DDB Library serves as a unified data pipeline, enabling seamless ingestion of real-time data from diverse sources—including IoT sensors, file systems, and MQTT brokers—into a central pub-sub messaging system. This architecture decouples data producers from consumers, allowing multiple downstream databases to subscribe to the broker and store data without direct integration with source systems. Data is then available through simple API calls.
 
-## Installation
+---
 
-### using uv manager
+## Architecture
 
-Pre-requisite: Install [uv manager](https://docs.astral.sh/uv/getting-started/installation/)
-
-```
-git clone --recurse-submodules https://github.com/cmu-mfi/mfi_ddb_library.git
-cd mfi_ddb_library
-uv sync
-```
-
-### using pip/venv
-
-**Linux**
-```
-git clone --recurse-submodules https://github.com/cmu-mfi/mfi_ddb_library.git
-cd mfi_ddb_library
-python -m venv .venv
-source .venv/bin/activate
-pip install .
-```
-
-**Windows CMD**
-```
-git clone --recurse-submodules https://github.com/cmu-mfi/mfi_ddb_library.git
-cd mfi_ddb_library
-python -m venv .venv
-.venv\Scripts\activate.bat
-pip install .
-```
-
-## Concept
+_Arrow direction in the diagram below shows the data flow in the framework. It doesn't represent the direction of requests._
 
 ```mermaid
-flowchart LR;
-    A[Data Source] --> B[Data Adapter];
-    D[Streamer] --> M[MQTT Client];
-    B --> D;
-    C[Topic Family] --> D;
-    M-->X[MQTT Broker];    
+flowchart BT
+    subgraph Input["."]
+        direction LR
 
-    classDef highlight fill:#094d57
-    class B,C,D highlight
+        DAA[Data</br>Adapter</br>App</br>]
+
+        subgraph Data_Sources["Data Sources"]
+            direction LR
+            DS1[Data Generator 1] --> DA1[Data Adapter 1]
+            DA1 --> S1[Streamer 1]
+            DS2[Data Generator ...] --> DA2[Data Adapter ...]
+            DA2 --> S2[Streamer 2]
+            DSn[Data Generator ...] --> DAn[Data Adapter ...]
+            DAn --> Sn[Streamer n]
+        end
+    end
+
+    MQTT[Pub-Sub Broker: MQTT]
+
+    subgraph DBN["Database Nodes"]
+        direction LR
+        KV[DBN: Key-Value Store]
+        BLOB[DBN: Blob Storage]
+        HISTORIAN[DBN: Historian/Time-Series]
+        DBNx[DBN: Other...]
+    end
+
+    subgraph Retrieval["Retrieval API"]
+        direction TB
+        MDS[Metadata Store] --> RWS[Retrieval Web Service]
+    end
+
+    S1 --> MQTT
+    S2 --> MQTT
+    Sn --> MQTT
+    MQTT --> KV
+    MQTT --> BLOB
+    MQTT --> HISTORIAN
+    MQTT --> DBNx
+    MQTT --> MDS
+    DBN --> RWS
+    RWS --> USERS[Users/Applications]
+
+    classDef layer fill:#e6f7ff,stroke:#1890ff
+    classDef highlight fill:#094d57,stroke:#0a3d4d
+    class Data_Sources,DBN,Retrieval layer
+    style Input fill:transparent,stroke:#666
 ```
 
-MFI DDB Library gives tools to write
-* "MQTT Client" which streams data from a "Data Source" to a "MQTT broker". The data source may not be generating MQTT messages directly as per [MFI-DDB schema](./schema/README.md). The library provides a way to convert the data to MQTT messages and stream them to the broker.
+---
 
-To be able to do the above three major classes are provided:
+## Components
 
-* **Data Adapter**: These are the objects that represent the data that needs to be streamed. These objects are responsible for converting the data to mfi_ddb ingestible structure.
-* **Streamer**: This is responsible for publishing MQTT messages to the broker. It uses the data from data adapters to stream the data. Streaming can be event driven using obeserver callback or polling based.
-* **Topic Family**: These classes allow streamer to convert data from adapters to MQTT payload as required by respective topic branch (`historian`, `blob`, `kv`)
+### 1. Core Library (`mfi_ddb_package`)
+The core Python package providing the foundational classes for data streaming:
+- **Data Adapters**: Convert data from various sources to MFI-DDB format
+- **Streamers**: Publish MQTT messages to the broker
+- **Topic Families**: Format data for different topic branches (historian, blob, kv)
 
-## Usage
+The core package also defines the payload schema for each topic family streaming. [schema details](./mfi_ddb_package/src/mfi_ddb/topic_families/schema/)
 
-* Review the [examples](examples) for usage.
+The core package can be installed using pip. [https://pypi.org/project/mfi-ddb/](https://pypi.org/project/mfi-ddb/1.1.0/)
 
-* **[WIP]** [mqtt_client_tutorial.ipynb](examples/mqtt_client_tutorial.ipynb) gives a step by step tutorial to write your own MQTT client for mfi_ddb franework.
+### 2. Data Adapter App (`mfi_ddb_data_adapter`)
+A web application providing a REST API interface for managing data adapters on an edge device:
+- **Backend**: FastAPI-based REST API
+- **Frontend**: React-based UI for adapter management
 
-## Available Classes
+**Available Data Adapters**
 
-### Data Adapters
+| Adapter | Description |
+|---------|-------------|
+| Local Files | Read data from local files |
+| MQTT | Subscribe to MQTT topics |
+| MTConnect | Interface with MTConnect devices |
+| ROS/ROS Files | ROS robot data |
+| gRPC | gRPC service data |
+| Key-Value | Key-value store data |
 
-* [ROS](src/mfi_ddb/data_adapters/mtconnect.py)
-* [ROS Files](src/mfi_ddb/data_adapters/ros_files.py)
-* [Local Files](src/mfi_ddb/data_adapters/local_files.py)
-* [MQTT](src/mfi_ddb/data_adapters/mqtt.py)
-* [MTConnect](src/mfi_ddb/data_adapters/mtconnect.py)
-* [gRPC](src/mfi_ddb/data_adapters/grpc.py)
-* [key_value](src/mfi_ddb/data_adapters/key_value.py)
+### 3. Database Nodes (`mfi_ddb_database_nodes`)
+Compatible database storage nodes:
+| Database Node | Type | Compatible Payloads |
+|---------------|------|---------------------|
+| [aveva-pi](./mfi_ddb_database_nodes/aveva-pi/) | Aveva PI Time-Series | historian |
+| [blob](./mfi_ddb_database_nodes/blob/) | Cloud File Storage | blob, kv |
+| [kv-psql](./mfi_ddb_database_nodes/kv-psql/) | PostgreSQL KV Store | kv |
+| [timescaledb](./mfi_ddb_database_nodes/timescaledb/) | TimescaleDB | historian |
 
-To create a new data adapter, please follow the [checklist](./src/mfi_ddb/data_adapters/README.md#new-data-adapter-checklist) and refer to the existing data adapters for implementation reference.
+### 4. Retrieval API (`mfi_ddb_retrieval_api`)
+Data retrieval services:
+- **Metadata Store (MDS)**: PostgreSQL-based metadata storage
+- **Retrieval Web Service (RWS)**: REST API for data queries
 
-Use the right [PR template](./.github/PULL_REQUEST_TEMPLATE/data_adapters.md) by following instructions [here](./.github/PULL_REQUEST_TEMPLATE/README.md).
+---
 
-### Streamer
+## Getting Started
 
-* [Streamer](mfi_ddb/streamer/streamer.py)
+### Quick Start with Docker
 
-### Topic Family
+**Single Node System**
 
-* [BaseTopicFamily](mfi_ddb/topic_families/base.py)
-* [BlobTopicFamily](mfi_ddb/topic_families/blob.py)
-* [KeyValueTopicFamily](mfi_ddb/topic_families/key_value.py)
-* [SpbTopicFamily](mfi_ddb/topic_families/time_series_spb.py)
+Run all services on single node PC.
 
-## Streaming Metadata
-
-When streaming data to the broker, the following metadata is recorded through the `mfi-ddb` stream:
-
-| Metadata | Description | Recorded as |
-|-------|-------------|-------------|
-| location context | The location context of the data being streamed, which includes the enterprise, site, area, and device. | [topic structure](./schema/README.md) |
-| attributes | Key-value pairs that provide additional information about the data being streamed. These are defined in the adapter yaml configuration file. | streamed on the same topic before data using the same topic family encoding |
-| streaming configuration | The configuration of the data stream, which includes broker information, enterprise and site details. | streamed on the `kv` and `blob` at birth and death of data streaming  |
-| adapter configuration | The configuration of the adapter that is streaming the data, which includes all the components and their attributes | streamed on the `kv` and `blob` at birth and death of data streaming |  
-
-## Executable Modules
-
-### [store_cfs.py](mfi_ddb/scripts/store_cfs.py)
-
-#### Example usage
-
+```bash
+git clone https://github.com/cmu-mfi/mfi_ddb_library.git
+cd mfi_ddb_library/docker
+docker compose up -d
 ```
-python -m mfi_ddb.scripts.store_cfs path/to/mqtt.yaml path/to/cfs.yaml
-```
+or
 
-#### Command-line arguments
-
-```
-usage: store_cfs.py [-h] mqtt_config_path cfs_config_path
-
-Subscribe to a topic and save files to Cloud File Store (CFS) based on configuration.
-
-positional arguments:
-  mqtt_config_path  Path to the MQTT configuration file (e.g., mqtt.yaml).
-  cfs_config_path   Path to the CFS configuration file (e.g., cfs.yaml).
+```bash
+curl -L -o docker-release.zip "https://github.com/cmu-mfi/mfi_ddb_library/releases/download/TAG/FILE.zip" && unzip docker-release.zip
+cd mfi_ddb_docker
+docker compose up -d
 ```
 
-### [stream_data.py](mfi_ddb/scripts/stream_data.py)
+> [!Note]
+> You can pick and choose services for multi-node setup. Make sure to use right config by editing the yaml files of respective services.
 
-#### Example usage
+---
 
-Use a configuration directory:
+## Directory Structure
+
 ```
-$ python -m mfi_ddb.scripts.stream_data --data_adapter 'MQTT' --config_dir ./configs
+mfi_ddb_library/
+├── docker/                           # Docker configurations
+│   ├── compose.yaml                  # Main Docker Compose
+│   ├── aveva/                        # Aveva PI integration
+│   ├── blob/                         # Blob storage integration
+│   ├── kv-psql/                      # PostgreSQL KV store
+│   ├── metadata-rws/                 # Metadata retrieval service
+│   └── timescale/                    # TimescaleDB integration
+├── mfi_ddb_data_adapter/             # Data adapter web app
+│   └── data_adapter_app/
+│       ├── backend/                  # FastAPI server
+│       └── frontend/                 # React UI
+├── mfi_ddb_database_nodes/           # Database node implementations
+│   ├── aveva-pi/
+│   ├── blob/
+│   ├── kv-psql/
+│   └── timescaledb/
+├── mfi_ddb_package/                  # Core library
+│   ├── src/mfi_ddb/
+│   │   ├── data_adapters/
+│   │   ├── streamer/
+│   │   └── topic_families/
+│   └── tests/
+├── mfi_ddb_retrieval_api/            # Retrieval API services
+│   ├── metadata_store_pg/            # PostgreSQL MDS
+│   └── rws/                          # REST Web Service
+└── README.md                         # This file
 ```
 
-Use specific configuration files:
-```
-$ python -m mfi_ddb.scripts.stream_data -d 'Local Files' --adapter_cfg ./configs/local_files.yaml --streamer_cfg ./configs/streamer.yaml
-```
+---
 
-Enable polling mode with a specific rate (in Hz):
-```
-$ python -m mfi_ddb.scripts.stream_data -d 'MTConnect' -a ./configs/mtconnect.yaml -s ./configs/streamer.yaml -p True -r 2
-```
+## Documentation
 
-#### Command-line arguments
-```
-usage: stream_data.py [-h] --data_adapter DATA_ADAPTER [--config_dir CONFIG_DIR]
-                      [--adapter_cfg ADAPTER_CFG] [--streamer_cfg STREAMER_CFG] [--polling POLLING]
-                      [--poll_rate POLL_RATE]
+- [Core Library](./mfi_ddb_package/README.md)
+- [Data Adapter App](./mfi_ddb_data_adapter/data_adapter_app/README.md)
+- [Database Nodes Overview](./mfi_ddb_database_nodes/README.md)
+- [Retrieval API](./mfi_ddb_retrieval_api/README.md)
 
-Stream data using MFI-DDB library.
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --data_adapter DATA_ADAPTER, -d DATA_ADAPTER
-                        Type of data adapter to use. Supported: 'Local Files', 'MTConnect', 'MQTT',
-                        'ROS', 'ROS Files'
-  --config_dir CONFIG_DIR, -cd CONFIG_DIR
-                        Directory containing the configuration files (local_files.yaml and mqtt.yaml).
-                        If --streamer_cfg or --adapter_cfg are provided, this argument is ignored.
-  --adapter_cfg ADAPTER_CFG, -a ADAPTER_CFG
-                        Path to the local files adapter configuration file (local_files.yaml).
-  --streamer_cfg STREAMER_CFG, -s STREAMER_CFG
-                        Path to the Streamer configuration file (streamer.yaml).
-  --polling POLLING, -p POLLING
-                        Enable polling mode. Default is False.
-  --poll_rate POLL_RATE, -r POLL_RATE
-                        Polling rate in Hz. Default is 1 Hz, if --polling is set to True.
-```
+---
 
 ## License
 
-This project is licensed under the BSD-3-Clause License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the BSD-3-Clause License. See the [LICENSE](./LICENSE) file for details.
+
+---
+
+## Acknowledgments
+
+This work is supported by the **Manufacturer Future Initiative (MFI)** at Carnegie Mellon University.
