@@ -10,7 +10,7 @@ services:
     ports:
       - "5430:5432"
     profiles:
-      - "mds"
+      - "retrieval"
     volumes:
       - ../.data/mds_storage:/var/lib/postgresql/data
     networks:
@@ -32,7 +32,7 @@ services:
     command: >
       python -u connector.py --broker_config broker.ini --pg_config pg_database.ini
     profiles:
-      - "mds"
+      - "retrieval"
     depends_on:
       mqtt-broker:
         condition: service_started
@@ -55,7 +55,7 @@ services:
     ports:
       - "8000:8000"
     profiles:
-      - "rws"
+      - "retrieval"
     depends_on:
       metadata-store-db:
         condition: service_healthy

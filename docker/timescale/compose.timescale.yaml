@@ -13,6 +13,7 @@ services:
       - ../.data/timescale_storage:/var/lib/postgresql/data
     profiles:
       - "ts"
+      - "dbn"
     networks:
       - mfi_network
     restart: always
@@ -31,6 +32,7 @@ services:
     image: cmumfi/mfi-ddb-timescaledb-connector:latest
     profiles:
       - "ts"
+      - "dbn"
     depends_on:
       mqtt-broker:
         condition: service_started
@@ -51,6 +53,7 @@ services:
     image: cmumfi/mfi-ddb-timescaledb-dws:latest
     profiles:
       - "ts"
+      - "dbn"
     ports:
       - "50052:50051"
     depends_on:

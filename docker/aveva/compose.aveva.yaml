@@ -8,6 +8,7 @@ services:
     image: cmumfi/mfi-ddb-aveva-pi-dws:latest
     profiles:
       - "aveva"
+      - "dbn"
     ports:
       - "50054:50054" # Adjust your host-facing port choice if needed
     networks:
