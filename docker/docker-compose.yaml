@@ -12,6 +12,7 @@ include:
   - path: data-adapter-app/compose.data-adapter-app.yaml
   - path: aveva/compose.aveva.yaml
   - path: dev-tools/compose.dev-tools.yaml
+  - path: monitoring/compose.monitoring.yaml
 
 services:
   # SHARED INFRASTRUCTURE

@@ -1,0 +1,13 @@
+# grafana provisioning, so that we dont have to manually add prometheus as a datasource every time we spin up grafana
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090  # Resolves directly to Prometheus container over mfi_network
+    isDefault: true
+    jsonData:
+      httpMethod: POST
+      timeInterval: 5s            # 5-second scraping interval

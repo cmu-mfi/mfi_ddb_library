@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  # 1. Prometheus Self-Monitoring (Tracks the health of the monitoring engine)
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["prometheus:9090"]
+
+  # 2. Host and Container system resource tracking
+  - job_name: "cadvisor"
+    static_configs:
+      - targets: ["cadvisor:8080"]
+
+  # 3. EMQX MQTT broker performance tracking
+  - job_name: "emqx"
+    metrics_path: "/api/v5/prometheus/stats"
+    static_configs:
+      - targets: ["emqx-broker:18083"]
