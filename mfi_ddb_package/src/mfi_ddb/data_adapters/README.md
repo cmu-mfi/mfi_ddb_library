@@ -21,6 +21,7 @@ Data Adapters are the objects that represent the data that needs to be streamed.
 * [ROS](src/mfi_ddb/data_adapters/mtconnect.py)
 * [ROS Files](src/mfi_ddb/data_adapters/ros_files.py)
 * [Local Files](src/mfi_ddb/data_adapters/local_files.py)
+* [Modbus](src/mfi_ddb/data_adapters/modbus.py)
 * [MQTT](src/mfi_ddb/data_adapters/mqtt.py)
 * [MTConnect](src/mfi_ddb/data_adapters/mtconnect.py)
 * [OPC UA](src/mfi_ddb/data_adapters/opcua.py)

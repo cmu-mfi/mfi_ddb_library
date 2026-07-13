@@ -1,5 +1,6 @@
 from .base import BaseDataAdapter
 from .local_files import LocalFilesDataAdapter
+from .modbus import ModbusDataAdapter
 from .mqtt import MqttDataAdapter
 from .mtconnect import MTconnectDataAdapter
 from .opcua import OpcuaDataAdapter

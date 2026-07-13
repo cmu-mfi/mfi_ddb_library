@@ -1,0 +1,14 @@
+modbus:
+  host: 192.168.1.10
+  port: 502
+trial_id: trial_001
+tags:
+- component_id: machine-a
+  register_type: holding_register
+  address: 0
+  key: temperature
+  data_type: float32
+- component_id: machine-a
+  register_type: coil
+  address: 0
+  key: running

@@ -1,0 +1,10 @@
+modbus:
+  host: Modbus TCP server host/IP address
+  port: '(optional) Modbus TCP server port (default: 502)'
+  timeout: '(optional) Connection timeout in seconds (default: 5.0)'
+  word_order: '(optional) Register (word) order for multi-register values like ''uint32''/''float32''
+    (default: big)'
+trial_id: Trial ID for the system. No spaces or special characters allowed.
+tags: List of Modbus tags to poll. Each tag needs 'component_id', 'register_type'
+  ('coil'/'discrete_input'/'input_register'/'holding_register') and 'address'. Optionally
+  'key', 'data_type', 'device_id' and 'trial_id' can be provided.
