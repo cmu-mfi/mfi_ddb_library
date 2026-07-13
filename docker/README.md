@@ -115,22 +115,22 @@ Each database node consists of three services: a database, a connector (MQTT-to-
 Start all services:
 ```bash
 cd docker
-docker-compose up -d
+docker compose up -d
 ```
 
 View logs:
 ```bash
-docker-compose logs -f
+docker compose logs -f
 ```
 
 Stop all services:
 ```bash
-docker-compose down
+docker compose down
 ```
 
 Stop and remove volumes:
 ```bash
-docker-compose down -v
+docker compose down -v
 ```
 
 ## Configuration Files
