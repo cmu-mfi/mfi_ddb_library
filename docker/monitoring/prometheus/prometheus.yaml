@@ -18,3 +18,19 @@ scrape_configs:
     metrics_path: "/api/v5/prometheus/stats"
     static_configs:
       - targets: ["mqtt-broker:18083"]
+
+  # 4. OpenTelemetry-instrumented Python services
+  - job_name: 'opentelemetry-python-services'
+    scrape_interval: 5s
+    static_configs:
+      - targets:
+          - 'mfi-aveva-pi-dws:9464'
+          - 'mfi-blob-connector:9464'
+          - 'mfi-blob-dws:9464'
+          - 'mfi-kv-psql-connector:9464'
+          - 'mfi-kv-psql-dws:9464'
+          - 'mfi-timescaledb-connector:9464'
+          - 'mfi-timescaledb-dws:9464'
+          - 'mfi-data-adapter-backend:9464'
+          - 'mfi-metadata-store-connector:9464'
+          - 'mfi-rws-app:9464'

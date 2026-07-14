@@ -11,6 +11,12 @@ services:
       - "dbn"
     ports:
       - "50054:50054" # Adjust your host-facing port choice if needed
+      - "9464:9464"   # OpenTelemetry Prometheus Metrics Port
+    command: opentelemetry-instrument python server.py
+    environment:
+      - OTEL_SERVICE_NAME=mfi-aveva-pi-dws
+      - OTEL_METRICS_EXPORTER=prometheus
+      - OTEL_EXPORTER_PROMETHEUS_PORT=9464
     networks:
       - mfi_network
     volumes:

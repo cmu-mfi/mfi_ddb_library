@@ -9,6 +9,13 @@ services:
     profiles:
       - "blob"
       - "dbn"
+    ports:
+      - "9465:9464"   # OpenTelemetry Metrics Port for Blob Connector
+    command: opentelemetry-instrument python connector.py config.yaml
+    environment:
+      - OTEL_SERVICE_NAME=mfi-blob-connector
+      - OTEL_METRICS_EXPORTER=prometheus
+      - OTEL_EXPORTER_PROMETHEUS_PORT=9464
     depends_on:
       mqtt-broker:
         condition: service_started
@@ -17,7 +24,7 @@ services:
       - ./connector-config.yaml:/app/config.yaml:ro
     networks:
       - mfi_network
-    restart: on-failure
+    restart: always
 
   blob-dws:
     platform: linux/amd64
@@ -30,7 +37,13 @@ services:
       - "blob"
       - "dbn"
     ports:
-      - "50053:50053"
+      - "50053:50053" # gRPC Port
+      - "9466:9464"   # OpenTelemetry Metrics Port for Blob DWS
+    command: opentelemetry-instrument python server.py
+    environment:
+      - OTEL_SERVICE_NAME=mfi-blob-dws
+      - OTEL_METRICS_EXPORTER=prometheus
+      - OTEL_EXPORTER_PROMETHEUS_PORT=9464
     depends_on:
       - blob-connector
     volumes:

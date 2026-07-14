@@ -29,8 +29,14 @@ services:
       dockerfile: Dockerfile
     container_name: mfi-metadata-store-connector
     image: cmumfi/mfi-ddb-metadata-store-connector:latest
+    ports:
+      - "9472:9464"   # OpenTelemetry Metrics Port for Metadata Connector
     command: >
-      python -u connector.py --broker_config broker.ini --pg_config pg_database.ini
+      opentelemetry-instrument python -u connector.py --broker_config broker.ini --pg_config pg_database.ini
+    environment:
+      - OTEL_SERVICE_NAME=mfi-metadata-store-connector
+      - OTEL_METRICS_EXPORTER=prometheus
+      - OTEL_EXPORTER_PROMETHEUS_PORT=9464
     profiles:
       - "retrieval"
     depends_on:
@@ -54,6 +60,12 @@ services:
     image: cmumfi/mfi-ddb-rws-app:latest
     ports:
       - "8000:8000"
+      - "9473:9464"   # OpenTelemetry Metrics Port for Retrieval App
+    command: opentelemetry-instrument uvicorn main:app --host 0.0.0.0 --port 8000
+    environment:
+      - OTEL_SERVICE_NAME=mfi-rws-app
+      - OTEL_METRICS_EXPORTER=prometheus
+      - OTEL_EXPORTER_PROMETHEUS_PORT=9464
     profiles:
       - "retrieval"
     depends_on:

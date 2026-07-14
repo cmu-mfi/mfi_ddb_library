@@ -33,6 +33,13 @@ services:
     profiles:
       - "ts"
       - "dbn"
+    ports:
+      - "9469:9464"   # OpenTelemetry Metrics Port for Timescale Connector
+    command: opentelemetry-instrument python -u main.py
+    environment:
+      - OTEL_SERVICE_NAME=mfi-timescaledb-connector
+      - OTEL_METRICS_EXPORTER=prometheus
+      - OTEL_EXPORTER_PROMETHEUS_PORT=9464
     depends_on:
       mqtt-broker:
         condition: service_started
@@ -56,6 +63,12 @@ services:
       - "dbn"
     ports:
       - "50052:50051"
+      - "9470:9464"   # OpenTelemetry Metrics Port for Timescale DWS
+    command: opentelemetry-instrument python server.py
+    environment:
+      - OTEL_SERVICE_NAME=mfi-timescaledb-dws
+      - OTEL_METRICS_EXPORTER=prometheus
+      - OTEL_EXPORTER_PROMETHEUS_PORT=9464      
     depends_on:
       timescaledb-db:
         condition: service_healthy

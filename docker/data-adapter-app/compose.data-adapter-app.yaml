@@ -10,6 +10,12 @@ services:
       - "daa"
     ports:
       - "8001:8000"  # Exposes the FastAPI backend to your host machine on port 8001
+      - "9471:9464"  # OpenTelemetry Metrics Port for Data Adapter Backend
+    command: opentelemetry-instrument uvicorn app.main:app --host 0.0.0.0 --port 8000
+    environment:
+      - OTEL_SERVICE_NAME=mfi-data-adapter-backend
+      - OTEL_METRICS_EXPORTER=prometheus
+      - OTEL_EXPORTER_PROMETHEUS_PORT=9464
     depends_on:
       mqtt-broker:
         condition: service_started
