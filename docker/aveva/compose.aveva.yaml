@@ -17,6 +17,7 @@ services:
       - OTEL_SERVICE_NAME=mfi-aveva-pi-dws
       - OTEL_METRICS_EXPORTER=prometheus
       - OTEL_EXPORTER_PROMETHEUS_PORT=9464
+      - OTEL_EXPORTER_PROMETHEUS_HOST=0.0.0.0
     networks:
       - mfi_network
     volumes:

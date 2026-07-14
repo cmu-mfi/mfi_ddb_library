@@ -16,6 +16,7 @@ services:
       - OTEL_SERVICE_NAME=mfi-blob-connector
       - OTEL_METRICS_EXPORTER=prometheus
       - OTEL_EXPORTER_PROMETHEUS_PORT=9464
+      - OTEL_EXPORTER_PROMETHEUS_HOST=0.0.0.0
     depends_on:
       mqtt-broker:
         condition: service_started
@@ -44,6 +45,7 @@ services:
       - OTEL_SERVICE_NAME=mfi-blob-dws
       - OTEL_METRICS_EXPORTER=prometheus
       - OTEL_EXPORTER_PROMETHEUS_PORT=9464
+      - OTEL_EXPORTER_PROMETHEUS_HOST=0.0.0.0
     depends_on:
       - blob-connector
     volumes:
