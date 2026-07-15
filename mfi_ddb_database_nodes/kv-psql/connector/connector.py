@@ -23,6 +23,19 @@ from psycopg2.extras import Json
 
 logger = logging.getLogger(__name__)
 
+
+from prometheus_client import start_http_server
+from opentelemetry.exporter.prometheus import PrometheusMetricReader
+from opentelemetry.metrics import set_meter_provider
+from opentelemetry.sdk.metrics import MeterProvider
+
+reader = PrometheusMetricReader()
+provider = MeterProvider(metric_readers=[reader])
+set_meter_provider(provider)
+start_http_server(port=9464, addr="0.0.0.0")
+print("Prometheus metrics server listening on port 9464")
+
+
 class MQTTConnector:
     def __init__(self, config: dict, debug: bool = False):
         self.config = config

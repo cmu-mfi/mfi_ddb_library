@@ -15,6 +15,17 @@ from mqtt_spb_wrapper.spb_base import SpbPayloadParser, SpbTopic
 
 from db import TimeScaleWriter
 
+from prometheus_client import start_http_server
+from opentelemetry.exporter.prometheus import PrometheusMetricReader
+from opentelemetry.metrics import set_meter_provider
+from opentelemetry.sdk.metrics import MeterProvider
+
+reader = PrometheusMetricReader()
+provider = MeterProvider(metric_readers=[reader])
+set_meter_provider(provider)
+start_http_server(port=9464, addr="0.0.0.0")
+print("Prometheus metrics server listening on port 9464")
+
 # Configuration and initialization
 def load_config(path: Path):
     """Load YAML config for MQTT and TimeScaleDB settings."""

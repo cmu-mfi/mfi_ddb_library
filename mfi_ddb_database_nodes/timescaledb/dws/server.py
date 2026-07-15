@@ -13,6 +13,18 @@ from google.protobuf.struct_pb2 import Struct
 from db import TimeScaleReader
 from gen import models_pb2, service_pb2, service_pb2_grpc
 
+
+from prometheus_client import start_http_server
+from opentelemetry.exporter.prometheus import PrometheusMetricReader
+from opentelemetry.metrics import set_meter_provider
+from opentelemetry.sdk.metrics import MeterProvider
+
+reader = PrometheusMetricReader()
+provider = MeterProvider(metric_readers=[reader])
+set_meter_provider(provider)
+start_http_server(port=9464, addr="0.0.0.0")
+print("Prometheus metrics server listening on port 9464")
+
 def load_config(path: Path):
     """Load YAML config for TimeScaleDB connection settings."""
     with path.open("r") as f:
