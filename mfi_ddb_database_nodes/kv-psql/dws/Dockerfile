@@ -5,11 +5,14 @@ WORKDIR /app
 # 1. Install build dependencies and immediately clean up
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    build-essential \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Copy only requirements first to optimize layer caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN opentelemetry-bootstrap -a install
 
 # 3. Copy the localized DWS node files (server.py, init_db.py, proto/, gen/, etc.)
 COPY . .

@@ -35,12 +35,13 @@ services:
       - "dbn"
     ports:
       - "9467:9464"   # OpenTelemetry Metrics Port for KV Connector
-    command: opentelemetry-instrument python connector.py
+    command: opentelemetry-instrument --metrics_exporter prometheus python -u connector.py
     environment:
       - OTEL_SERVICE_NAME=mfi-kv-psql-connector
       - OTEL_METRICS_EXPORTER=prometheus
       - OTEL_EXPORTER_PROMETHEUS_PORT=9464
       - OTEL_EXPORTER_PROMETHEUS_HOST=0.0.0.0
+      - PYTHONUNBUFFERED=1
     depends_on:
       mqtt-broker:
         condition: service_started
@@ -67,12 +68,13 @@ services:
       - "9468:9464"   # OpenTelemetry Metrics Port for KV DWS
     # Runs the DB setup first, then hooks the live runtime server into OpenTelemetry
     command: >
-      sh -c "python init_db.py && opentelemetry-instrument python server.py"
+      sh -c "python init_db.py && opentelemetry-instrument --metrics_exporter prometheus python -u server.py"
     environment:
       - OTEL_SERVICE_NAME=mfi-kv-psql-dws
       - OTEL_METRICS_EXPORTER=prometheus
       - OTEL_EXPORTER_PROMETHEUS_PORT=9464
       - OTEL_EXPORTER_PROMETHEUS_HOST=0.0.0.0
+      - PYTHONUNBUFFERED=1
     depends_on:
       kv-psql-db:
         condition: service_healthy

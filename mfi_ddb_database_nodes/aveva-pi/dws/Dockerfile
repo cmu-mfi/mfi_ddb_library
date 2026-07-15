@@ -5,11 +5,14 @@ WORKDIR /app
 # 1. Install lightweight build tools and clean package lists
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    build-essential \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Leverage Docker layer caching for python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN opentelemetry-bootstrap -a install
 
 # 3. Copy source code files (server.py, piwebapi.py, proto/, gen/, etc.)
 COPY . .

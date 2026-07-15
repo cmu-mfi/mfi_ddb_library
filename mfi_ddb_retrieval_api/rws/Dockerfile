@@ -5,11 +5,14 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
+    gcc \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # 1. Copy only requirements first to leverage Docker layer caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt numpy
+RUN opentelemetry-bootstrap -a install
 
 # 2. Copy the localized RWS node files (main.py, app/, schema/, services/, utils/, etc.)
 COPY . .
