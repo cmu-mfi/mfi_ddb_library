@@ -16,14 +16,37 @@ from gen import models_pb2, service_pb2, service_pb2_grpc
 
 from prometheus_client import start_http_server
 from opentelemetry.exporter.prometheus import PrometheusMetricReader
-from opentelemetry.metrics import set_meter_provider
+from opentelemetry.metrics import set_meter_provider, get_meter  # <-- 1. Added get_meter
 from opentelemetry.sdk.metrics import MeterProvider
 
-reader = PrometheusMetricReader()
-provider = MeterProvider(metric_readers=[reader])
+reader_metric = PrometheusMetricReader()
+provider = MeterProvider(metric_readers=[reader_metric])
 set_meter_provider(provider)
 start_http_server(port=9464, addr="0.0.0.0")
 print("Prometheus metrics server listening on port 9464")
+
+
+# ==========================================
+# OPENTELEMETRY CUSTOM METRICS SETUP
+# ==========================================
+meter = get_meter("mfi.timescaledb.dws")
+
+grpc_requests_counter = meter.create_counter(
+    "mfi_timescale_dws_grpc_requests_total",
+    description="Total gRPC requests processed by Timescale DWS"
+)
+
+grpc_request_duration = meter.create_histogram(
+    "mfi_timescale_dws_grpc_duration_seconds",
+    description="Duration of gRPC request processing in seconds"
+)
+
+returned_rows_histogram = meter.create_histogram(
+    "mfi_timescale_dws_returned_rows",
+    description="Number of database rows returned per retrieval request"
+)
+# ==========================================
+
 
 def load_config(path: Path):
     """Load YAML config for TimeScaleDB connection settings."""
@@ -77,21 +100,35 @@ class DataService(service_pb2_grpc.DataServiceServicer):
         The caller chooses the side with do_closest_past:
         - True: return the newest row at or before the requested timestamp.
         - False: return the oldest row at or after the requested timestamp.
-
-        The lookup is intentionally one-sided; if no row exists on the selected
-        side, the response stays empty instead of falling back to the other side.
-        Topic filters are passed through unchanged, so MQTT wildcards such as
-        '+' and '#' can be used when the underlying reader supports them.
         """
-        do_closest_past = getattr(request, "do_closest_past", True)
-        row = reader.get_point(
-            request.topic,
-            request.timestamp.ToDatetime(),
-            do_closest_past,
-        )
-        if not row:
+        start_time = time.perf_counter()  # <-- 2. Start timer
+        try:
+            do_closest_past = getattr(request, "do_closest_past", True)
+            row = reader.get_point(
+                request.topic,
+                request.timestamp.ToDatetime(),
+                do_closest_past,
+            )
+            
+            duration = time.perf_counter() - start_time  # <-- 3. Stop timer
+            grpc_request_duration.record(duration, {"method": "GetDataPoint"})
+
+            if not row:
+                grpc_requests_counter.add(1, {"method": "GetDataPoint", "status": "NOT_FOUND"})
+                return service_pb2.GetDataPointResponse()
+            
+            grpc_requests_counter.add(1, {"method": "GetDataPoint", "status": "OK"})
+            returned_rows_histogram.record(1, {"method": "GetDataPoint"})
+            return service_pb2.GetDataPointResponse(datapoint=row_to_datapoint(row))
+
+        except Exception as e:
+            duration = time.perf_counter() - start_time
+            grpc_request_duration.record(duration, {"method": "GetDataPoint"})
+            grpc_requests_counter.add(1, {"method": "GetDataPoint", "status": "ERROR"})
+            
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(f"Database error: {str(e)}")
             return service_pb2.GetDataPointResponse()
-        return service_pb2.GetDataPointResponse(datapoint=row_to_datapoint(row))
 
     def GetDataRange(self, request, context):
         """Return a page of datapoints within the requested time range.
@@ -100,19 +137,37 @@ class DataService(service_pb2_grpc.DataServiceServicer):
         handles the topic matching and keeps the existing time-based cursor
         contract for pagination.
         """
-        rows = reader.get_range(
-            request.topic,
-            request.start_time.ToDatetime(),
-            request.end_time.ToDatetime(),
-            request.page_size if request.page_size else 1000,
-            request.page_token if request.page_token else None,
-        )
-        datapoints = [row_to_datapoint(r) for r in rows]
-        next_token = rows[-1][0].isoformat() if rows else ""
-        return service_pb2.GetDataRangeResponse(
-            datapoints=datapoints,
-            next_page_token=next_token
-        )
+        start_time = time.perf_counter()  # <-- 4. Start timer
+        try:
+            rows = reader.get_range(
+                request.topic,
+                request.start_time.ToDatetime(),
+                request.end_time.ToDatetime(),
+                request.page_size if request.page_size else 1000,
+                request.page_token if request.page_token else None,
+            )
+            
+            datapoints = [row_to_datapoint(r) for r in rows]
+            next_token = rows[-1][0].isoformat() if rows else ""
+            
+            duration = time.perf_counter() - start_time  # <-- 5. Stop timer
+            grpc_request_duration.record(duration, {"method": "GetDataRange"})
+            grpc_requests_counter.add(1, {"method": "GetDataRange", "status": "OK"})
+            returned_rows_histogram.record(len(datapoints), {"method": "GetDataRange"})
+
+            return service_pb2.GetDataRangeResponse(
+                datapoints=datapoints,
+                next_page_token=next_token
+            )
+            
+        except Exception as e:
+            duration = time.perf_counter() - start_time
+            grpc_request_duration.record(duration, {"method": "GetDataRange"})
+            grpc_requests_counter.add(1, {"method": "GetDataRange", "status": "ERROR"})
+            
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(f"Database error: {str(e)}")
+            return service_pb2.GetDataRangeResponse()
 
     def StreamData(self, request, context):
         """Stream datapoints by polling the DB for new rows.
@@ -127,16 +182,27 @@ class DataService(service_pb2_grpc.DataServiceServicer):
         else:
             last_ts = datetime.now(timezone.utc)
 
-        while context.is_active():
-            rows = reader.stream_batch(request.topic, last_ts, STREAM_BATCH_SIZE)
-            if not rows:
-                # Back off briefly when no new rows are available.
-                time.sleep(STREAM_POLL_SECONDS)
-                continue
+        grpc_requests_counter.add(1, {"method": "StreamData", "status": "OK"})
 
-            for row in rows:
-                last_ts = row[0]
-                yield service_pb2.StreamDataResponse(datapoint=row_to_datapoint(row))
+        try:
+            while context.is_active():
+                rows = reader.stream_batch(request.topic, last_ts, STREAM_BATCH_SIZE)
+                if not rows:
+                    # Back off briefly when no new rows are available.
+                    time.sleep(STREAM_POLL_SECONDS)
+                    continue
+
+                # Record size of the chunks being pushed down the stream
+                returned_rows_histogram.record(len(rows), {"method": "StreamData"})
+
+                for row in rows:
+                    last_ts = row[0]
+                    yield service_pb2.StreamDataResponse(datapoint=row_to_datapoint(row))
+                    
+        except Exception as e:
+            grpc_requests_counter.add(1, {"method": "StreamData", "status": "ERROR"})
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(f"Stream error: {str(e)}")
 
 def serve():
     # Start gRPC server and register the DWS service.

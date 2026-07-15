@@ -1,128 +1,329 @@
-import copy
+"""
+Reusable utilities for fetching data from metadata store tables.
+
+Requires: psycopg2
+    pip install psycopg2-binary
+"""
+
 import logging
+import time  # <-- Added time for duration tracking
 from datetime import datetime
-from pathlib import Path
-from typing import List, Optional, Union, Dict
+from typing import Any, Dict, List, Optional, Tuple, Iterable
 
-import grpc
-import yaml
-from google.protobuf.json_format import MessageToDict
-from google.protobuf.timestamp_pb2 import Timestamp
+import psycopg2.extras
+import psycopg2.pool
+from psycopg2 import sql
 
-from app.utils.dws.gen.models_pb2 import Datapoint
-from app.utils.dws.gen.service_pb2 import (
-    GetDataPointRequest,
-    GetDataPointResponse,
-    GetDataRangeRequest,
-    GetDataRangeResponse,
+from app.services.pg_config import load_config
+
+# ==========================================
+# OPENTELEMETRY CUSTOM METRICS SETUP
+# ==========================================
+from opentelemetry.metrics import get_meter, Observation
+
+# Use the registered rws-app namespace
+meter = get_meter("mfi.rws.app")
+
+# Direct DB Query Execution Histograms
+db_query_duration = meter.create_histogram(
+    "mfi_mds_db_query_duration_seconds",
+    description="Time taken to execute an SQL query in the Metadata Store"
 )
-from app.utils.dws.gen.service_pb2_grpc import DataServiceStub
+
+# Operational Counter
+db_query_counter = meter.create_counter(
+    "mfi_mds_db_queries_total",
+    description="Total database queries executed categorized by status"
+)
+
+# Reference placeholder for connection pool to gauge active/idle connections
+_pool_ref: Optional[psycopg2.pool.ThreadedConnectionPool] = None
+
+def get_active_db_connections(options) -> Iterable[Observation]:
+    if _pool_ref is not None:
+        # Number of connections currently checked out by worker threads
+        yield Observation(len(_pool_ref._used))
+    else:
+        yield Observation(0)
+
+def get_idle_db_connections(options) -> Iterable[Observation]:
+    if _pool_ref is not None:
+        # Number of idle connections sitting waiting in pool
+        yield Observation(len(_pool_ref._pool))
+    else:
+        yield Observation(0)
+
+# Register Dynamic Gauges
+meter.create_observable_gauge(
+    "mfi_mds_db_connections_active",
+    callbacks=[get_active_db_connections],
+    description="Number of database connections currently checked out and active"
+)
+
+meter.create_observable_gauge(
+    "mfi_mds_db_connections_idle",
+    callbacks=[get_idle_db_connections],
+    description="Number of idle database connections ready in the pool"
+)
+# ==========================================
+
+_ALLOWED_TABLES = {
+    "user",
+    "project",
+    "trial",
+    "user_project_role_linking",
+    "graph_edges",
+}
+
+DEFAULT_USER = ("superadmin", "superadmin")
 
 logger = logging.getLogger(__name__)
-class __DwsAgent:
-    def __init__(self, cfg_file:str = "dws.endpoints.yaml"):
-        current_dir = Path(__file__).parent
-        dws_config_path = Path(current_dir, "../config", cfg_file)
-        
-        self.config = self._load_config(dws_config_path)
-        
-    def _load_config(self, config_file):
-        with open(config_file, 'r') as f:
-            data = yaml.safe_load(f)
-            
-        if "services" not in data:
-            raise ValueError("Invalid DWS configuration: 'services' key not found.")
-        
-        config = {}
-        for service in data['services']:
-            service_cfg = data['services'][service]
-            service_cfg['name'] = service
-            for topic_family in service_cfg['topic_families']:
-                if topic_family not in config:
-                    config[topic_family] = []
-                config[topic_family].append(service_cfg)
-        return config   
 
-    def get_data(self, topics: Union[str, List[str]], time_start: str, time_end: str) -> Dict:
-        
-        if isinstance(topics, str):
-            topics = [topics]
-            
-        topic_family_map = {}
-        for topic in topics:
-            topic_family = topic.split("/")[0]
-            topic_family_map[topic_family] = topic_family_map.get(topic_family, []) + [topic]
-        
-        result = {}
-        for topic_family in list(topic_family_map.keys()):
-            if topic_family not in self.config:
-                logger.error(f"Topic family '{topic_family}' not found in DWS configuration. Skipping data retrieval for topics: {topic_family_map[topic_family]}")
-                continue
-                        
-            request = GetDataRangeRequest(
-                topic=",".join(topic_family_map[topic_family]),
-                start_time=Timestamp(seconds=int(datetime.fromisoformat(time_start).timestamp())),
-                end_time=Timestamp(seconds=int(datetime.fromisoformat(time_end).timestamp())),
-                page_size=1000,
-                page_token=""
+
+class MdsReader:
+    def __init__(self, config_file = 'pg_database.ini'):
+        global _pool_ref
+        config = load_config(filename=config_file)
+        try:
+            self.__conn_pool = psycopg2.pool.ThreadedConnectionPool(
+                minconn=1,
+                maxconn=10,
+                **config
             )
-            
-            servers = self.config[topic_family]
-            data_points: List[Datapoint] = []
-            for server in servers:
-                logger.info(f"Retrieving data for topics: {topic_family_map[topic_family]} from server: {server['name']} at {server['url']}")
-                response: GetDataRangeResponse = self._call_dws_server(server['url'], request)
-                raw_data = response.datapoints
+            # Store pool reference globally for async gauges to monitor
+            _pool_ref = self.__conn_pool
+            logger.info("Database connection pool created successfully")
+        except Exception as error:
+            logger.error(f"Error occurred while creating connection pool: {error}. Config used: {config}")
+            raise error
+        
+    def __del__(self):
+        global _pool_ref
+        if getattr(self, '_MdsReader__conn_pool', None):
+            self.__conn_pool.closeall()
+            _pool_ref = None
+            logger.info("Database connection pool closed")
 
-                while response.next_page_token != "":
-                    request = copy.deepcopy(request)
-                    request.page_token = response.next_page_token
-                    response: GetDataRangeResponse = self._call_dws_server(server['url'], request)
-                    raw_data.extend(response.datapoints)
-                    
-                data_points.extend(raw_data)
-                    
-            # REMOVE DUPLICATES BASED ON TOPIC AND TIMESTAMP
-            seen = set()
-            unique_data_points: List[Datapoint] = []
-            for dp in data_points:
-                key = (dp.topic, dp.timestamp.seconds)
-                if key not in seen:
-                    seen.add(key)
-                    unique_data_points.append(dp)
-                                
-            # CONVERT TO KEY VALUE PAIRS
-            for dp in unique_data_points:
-                value = None
-                value_field = dp.WhichOneof("value")
-                if value_field == "int_value":
-                    value = dp.int_value
-                elif value_field == "float_value":
-                    value = dp.float_value
-                elif value_field == "string_value":
-                    value = dp.string_value
-                elif value_field == "json_value":
-                    value = MessageToDict(dp.json_value)
-                elif value_field == "file_value":
-                    value = dp.file_value.filename
-                    logger.warning(f"File value found for topic {dp.topic} at timestamp {dp.timestamp.seconds}. Returning filename '{value}' instead of file content.")
-                
-                if dp.topic in result:
-                    result[dp.topic].append({
-                        "timestamp": datetime.fromtimestamp(dp.timestamp.seconds).isoformat(),
-                        "value": value
-                    })
+    def _validate_table(self, table: str):
+        if table not in _ALLOWED_TABLES:
+            raise ValueError(
+                f"Table '{table}' is not allowed. Allowed: {sorted(_ALLOWED_TABLES)}"
+            )
+
+    def _lookup(self, table: str, conditions: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
+        """Generic lookup helper that returns rows matching the given conditions."""
+        self._validate_table(table)
+
+        if not conditions:
+            raise ValueError("Conditions cannot be empty")
+
+        where_clauses = []
+        values = []
+
+        for k, v in conditions.items():
+            col = sql.Identifier(k)
+
+            if isinstance(v, tuple):
+                op = v[0].lower()
+
+                if op in (">", "<", ">=", "<="):
+                    where_clauses.append(
+                        sql.SQL("{} {} {}").format(
+                            col,
+                            sql.SQL(op),
+                            sql.Placeholder()
+                        )
+                    )
+                    values.append(v[1])
+
+                elif op == "between":
+                    if len(v) != 3:
+                        raise ValueError(f"'between' requires exactly 2 values for {k}")
+                    where_clauses.append(
+                        sql.SQL("{} BETWEEN {} AND {}").format(
+                            col,
+                            sql.Placeholder(),
+                            sql.Placeholder()
+                        )
+                    )
+                    values.extend([v[1], v[2]])
+
                 else:
-                    result[dp.topic] = [{
-                        "timestamp": datetime.fromtimestamp(dp.timestamp.seconds).isoformat(),
-                        "value": value
-                    }]
-        return result
+                    raise ValueError(f"Unsupported operator '{op}' for column '{k}'")
+
+            else:
+                where_clauses.append(
+                    sql.SQL("{} = {}").format(col, sql.Placeholder())
+                )
+                values.append(v)
+
+        query = sql.SQL(
+            "SELECT * FROM {table} WHERE {where};"
+        ).format(
+            table=sql.Identifier(table),
+            where=sql.SQL(" AND ").join(where_clauses),
+        )
+
+        conn = None
+        start_time = time.perf_counter()
+        try:
+            conn = self.__conn_pool.getconn()
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(query, values)
+                rows = cur.fetchall()
+                
+                # Successful execution record
+                duration = time.perf_counter() - start_time
+                db_query_duration.record(duration, {"query_type": f"lookup_{table}", "status": "SUCCESS"})
+                db_query_counter.add(1, {"query_type": f"lookup_{table}", "status": "SUCCESS"})
+                
+                return [dict(row) for row in rows] if rows else []
+        except Exception as e:
+            # Failed execution record
+            duration = time.perf_counter() - start_time
+            db_query_duration.record(duration, {"query_type": f"lookup_{table}", "status": "ERROR"})
+            db_query_counter.add(1, {"query_type": f"lookup_{table}", "status": "ERROR"})
+            raise e
+        finally:
+            if conn is not None:
+                self.__conn_pool.putconn(conn)
+
+    def _validate_access_and_filter_trial_rows(self, trial_rows: Optional[List], user: Tuple[str,Optional[str]]) -> List:
+        filtered_rows = []
+        if trial_rows is None:
+            return []
         
-    def _call_dws_server(self, endpoint: str, request: GetDataRangeRequest) -> GetDataRangeResponse:
-        with grpc.insecure_channel(endpoint) as channel:
-            stub = DataServiceStub(channel)
-            response = stub.GetDataRange(request)
-            return response
+        if user == ("superadmin", "superadmin"):
+            return trial_rows
         
-DwsAgent = __DwsAgent()
+        for row in trial_rows:
+            if user == (row["user_id"], row["user_domain"]):
+                filtered_rows.append(row)
+                continue
+            if row["project_id"] is None:
+                continue
+            user_roles = self._lookup("user_project_role_linking", {
+                "project_id":row["project_id"],
+                "user_id":user[0],
+                "domain":user[1]
+            })
+            if user_roles is None or len(user_roles)==0:
+                continue
+            if len(user_roles) > 1:
+                logger.warning(f"Same user {user} has multiple roles for project {row['project_id']}.")
+
+            roles = set([u["role"] for u in user_roles])
+            if roles & {"admin", "maintainer"}:
+                filtered_rows.append(row)
+        
+        return filtered_rows           
+            
+
+    def get_trial_by_uuid(self, trial_uuid: str, user_id: str, user_domain: Optional[str]) -> Optional[Dict[str, Any]]:
+        row = self._lookup("trial", {"uuid": trial_uuid})
+        if row is None:
+            return None
+        row = self._validate_access_and_filter_trial_rows(row, (user_id,user_domain))        
+        return row[0] if row else None
+
+    def find_trials(
+        self,
+        user_id: str,        
+        user_domain: Optional[str] = None,
+        enterprise_id: Optional[str] = None,
+        time_start: Optional[datetime] = None,
+        time_end: Optional[datetime] = None,
+        site: Optional[str] = None,
+        device: Optional[str] = None,
+        trial_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        project_name: Optional[str] = None,
+        search_terms: Optional[List[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        self._validate_table("trial")
+
+        values: List[Any] = []
+        where_clauses: List[sql.SQL] = []
+        join_project = False
+
+        if project_id is not None:
+            where_clauses.append(sql.SQL("trial.project_id = %s"))
+            values.append(project_id)
+
+        if trial_id is not None:
+            where_clauses.append(sql.SQL("trial.trial_name = %s"))
+            values.append(trial_id)
+
+        if project_name is not None:
+            where_clauses.append(sql.SQL("(project.project_name = %s)"))
+            values.append(project_name)
+            join_project = True
+
+        if time_start is not None and time_end is not None:
+            where_clauses.append(
+                sql.SQL(
+                    "(trial.birth_timestamp <= %s AND (trial.death_timestamp IS NULL OR trial.death_timestamp >= %s))"
+                )
+            )
+            values.extend([time_end, time_start])
+        elif time_start is not None:
+            where_clauses.append(
+                sql.SQL("(trial.death_timestamp IS NULL OR trial.death_timestamp >= %s)")
+            )
+            values.append(time_start)
+        elif time_end is not None:
+            where_clauses.append(sql.SQL("trial.birth_timestamp <= %s"))
+            values.append(time_end)
+
+        if search_terms is not None:
+            for term in search_terms:
+                term_like = f"%{term}%"
+                where_clauses.append(
+                    sql.SQL(
+                        "(trial.trial_name ILIKE %s OR trial.metadata::text ILIKE %s)"
+                    )
+                )
+                values.extend([term_like, term_like])
+
+        trial_table = sql.Identifier("trial")
+        query = sql.SQL("SELECT {trial}.* FROM {trial}").format(trial=trial_table)
+
+        if join_project:
+            query = query + sql.SQL(
+                " LEFT JOIN {project} ON {trial}.project_id = {project}.project_id"
+            ).format(
+                project=sql.Identifier("project"),
+                trial=trial_table,
+            )
+
+        if where_clauses:
+            query = query + sql.SQL(" WHERE ") + sql.SQL(" AND ").join(where_clauses)
+
+        query = query + sql.SQL(" ORDER BY trial.birth_timestamp DESC;")
+
+        conn = None
+        start_time = time.perf_counter()
+        try:
+            conn = self.__conn_pool.getconn()
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(query, values)
+                rows = cur.fetchall()
+                
+                # Filter rows (takes place inside the timed block as it runs queries under the hood)
+                rows = self._validate_access_and_filter_trial_rows(rows, (user_id,user_domain))
+                
+                # Record metrics on success
+                duration = time.perf_counter() - start_time
+                db_query_duration.record(duration, {"query_type": "find_trials", "status": "SUCCESS"})
+                db_query_counter.add(1, {"query_type": "find_trials", "status": "SUCCESS"})
+                
+                return [dict(row) for row in rows] if rows else []
+        except Exception as e:
+            # Record metrics on failure
+            duration = time.perf_counter() - start_time
+            db_query_duration.record(duration, {"query_type": "find_trials", "status": "ERROR"})
+            db_query_counter.add(1, {"query_type": "find_trials", "status": "ERROR"})
+            raise e
+        finally:
+            if conn is not None:
+                self.__conn_pool.putconn(conn)

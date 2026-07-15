@@ -5,13 +5,66 @@ Requires: psycopg2
     pip install psycopg2-binary
 """
 
-from typing import Optional, Tuple, Dict, Any, List
 import logging
+import time  # For query latency measurements
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple, Iterable
+
+import psycopg2.extras
 import psycopg2.pool
 from psycopg2 import sql
-import psycopg2.extras
+
 from app.services.pg_config import load_config
+
+# ==============================================================================
+# OPENTELEMETRY CUSTOM METRICS SETUP
+# ==============================================================================
+from opentelemetry.metrics import get_meter, Observation
+
+# Use the registered rws-app namespace
+meter = get_meter("mfi.rws.app")
+
+# Query Performance Metrics
+db_query_duration = meter.create_histogram(
+    "mfi_mds_db_query_duration_seconds",
+    description="Time taken to execute SQL queries in the Metadata Store"
+)
+
+db_query_counter = meter.create_counter(
+    "mfi_mds_db_queries_total",
+    description="Total database queries executed by MdsReader"
+)
+
+# Reference placeholder for the connection pool to feed our async gauges
+_pool_ref: Optional[psycopg2.pool.ThreadedConnectionPool] = None
+
+def get_active_connections_count(options) -> Iterable[Observation]:
+    if _pool_ref is not None:
+        # Number of connections currently checked out by worker threads
+        yield Observation(len(_pool_ref._used))
+    else:
+        yield Observation(0)
+
+def get_idle_connections_count(options) -> Iterable[Observation]:
+    if _pool_ref is not None:
+        # Number of idle connections sitting waiting in the pool
+        yield Observation(len(_pool_ref._pool))
+    else:
+        yield Observation(0)
+
+# Register Dynamic Connection Pool Gauges
+meter.create_observable_gauge(
+    "mfi_mds_db_connections_active",
+    callbacks=[get_active_connections_count],
+    description="Number of metadata database connections currently active"
+)
+
+meter.create_observable_gauge(
+    "mfi_mds_db_connections_idle",
+    callbacks=[get_idle_connections_count],
+    description="Number of idle metadata database connections available in the pool"
+)
+# ==============================================================================
 
 _ALLOWED_TABLES = {
     "user",
@@ -25,8 +78,10 @@ DEFAULT_USER = ("superadmin", "superadmin")
 
 logger = logging.getLogger(__name__)
 
+
 class MdsReader:
     def __init__(self, config_file = 'pg_database.ini'):
+        global _pool_ref
         config = load_config(filename=config_file)
         try:
             self.__conn_pool = psycopg2.pool.ThreadedConnectionPool(
@@ -34,14 +89,18 @@ class MdsReader:
                 maxconn=10,
                 **config
             )
+            # Store pool reference globally for the async gauges to monitor
+            _pool_ref = self.__conn_pool
             logger.info("Database connection pool created successfully")
         except Exception as error:
             logger.error(f"Error occurred while creating connection pool: {error}. Config used: {config}")
             raise error
         
     def __del__(self):
+        global _pool_ref
         if getattr(self, '_MdsReader__conn_pool', None):
             self.__conn_pool.closeall()
+            _pool_ref = None
             logger.info("Database connection pool closed")
 
     def _validate_table(self, table: str):
@@ -111,14 +170,28 @@ class MdsReader:
         )
 
         conn = None
+        start_time = time.perf_counter()
         try:
             conn = self.__conn_pool.getconn()
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(query, values)
                 rows = cur.fetchall()
+                
+                # Record successful database lookup
+                duration = time.perf_counter() - start_time
+                db_query_duration.record(duration, {"query_type": f"lookup_{table}", "status": "SUCCESS"})
+                db_query_counter.add(1, {"query_type": f"lookup_{table}", "status": "SUCCESS"})
+                
                 return [dict(row) for row in rows] if rows else []
+        except Exception as e:
+            # Record failed database lookup
+            duration = time.perf_counter() - start_time
+            db_query_duration.record(duration, {"query_type": f"lookup_{table}", "status": "ERROR"})
+            db_query_counter.add(1, {"query_type": f"lookup_{table}", "status": "ERROR"})
+            raise e
         finally:
-            self.__conn_pool.putconn(conn)
+            if conn is not None:
+                self.__conn_pool.putconn(conn)
 
     def _validate_access_and_filter_trial_rows(self, trial_rows: Optional[List], user: Tuple[str,Optional[str]]) -> List:
         filtered_rows = []
@@ -186,33 +259,6 @@ class MdsReader:
             where_clauses.append(sql.SQL("trial.trial_name = %s"))
             values.append(trial_id)
 
-        '''
-        # SEARCHING METADATA FOR SPECIFIC KEY VALUES IS UNIMPLEMENTED
-        # IDEAS: 
-        # * Do RAG-like search?
-        # * Use pg_vector?
-        
-        if enterprise_id is not None:
-            where_clauses.append(
-                sql.SQL("(trial.metadata->>%s = %s OR trial.metadata->>%s = %s)")
-            )
-            values.extend(["enterprise", enterprise_id, "enterprise_id", enterprise_id])
-
-        if site is not None:
-            where_clauses.append(sql.SQL("trial.metadata->>%s = %s"))
-            values.extend(["site", site])
-
-        if device is not None:
-            where_clauses.append(sql.SQL("trial.metadata->>%s = %s"))
-            values.extend(["device", device])
-        
-        if project_name is not None:
-            where_clauses.append(
-                sql.SQL("(trial.metadata->>%s = %s OR project.name = %s)")
-            )
-            values.extend(["project_name", project_name, project_name])
-            join_project = True
-        '''
         if project_name is not None:
             where_clauses.append(sql.SQL("(project.project_name = %s)"))
             values.append(project_name)
@@ -261,13 +307,26 @@ class MdsReader:
         query = query + sql.SQL(" ORDER BY trial.birth_timestamp DESC;")
 
         conn = None
+        start_time = time.perf_counter()
         try:
             conn = self.__conn_pool.getconn()
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(query, values)
                 rows = cur.fetchall()
                 rows = self._validate_access_and_filter_trial_rows(rows, (user_id,user_domain))
+                
+                # Record successful search trials duration
+                duration = time.perf_counter() - start_time
+                db_query_duration.record(duration, {"query_type": "find_trials", "status": "SUCCESS"})
+                db_query_counter.add(1, {"query_type": "find_trials", "status": "SUCCESS"})
+                
                 return [dict(row) for row in rows] if rows else []
+        except Exception as e:
+            # Record failed search trials duration
+            duration = time.perf_counter() - start_time
+            db_query_duration.record(duration, {"query_type": "find_trials", "status": "ERROR"})
+            db_query_counter.add(1, {"query_type": "find_trials", "status": "ERROR"})
+            raise e
         finally:
             if conn is not None:
                 self.__conn_pool.putconn(conn)

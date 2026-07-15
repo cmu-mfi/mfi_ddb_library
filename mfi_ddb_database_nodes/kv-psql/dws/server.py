@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 from prometheus_client import start_http_server
 from opentelemetry.exporter.prometheus import PrometheusMetricReader
-from opentelemetry.metrics import set_meter_provider
+from opentelemetry.metrics import set_meter_provider, get_meter  # <-- 1. Added get_meter
 from opentelemetry.sdk.metrics import MeterProvider
 
 reader = PrometheusMetricReader()
@@ -43,6 +43,33 @@ provider = MeterProvider(metric_readers=[reader])
 set_meter_provider(provider)
 start_http_server(port=9464, addr="0.0.0.0")
 print("Prometheus metrics server listening on port 9464")
+
+
+# ==========================================
+# OPENTELEMETRY CUSTOM METRICS SETUP
+# ==========================================
+meter = get_meter("mfi.kv_psql.dws")
+
+grpc_requests_counter = meter.create_counter(
+    "mfi_kv_dws_grpc_requests_total",
+    description="Total gRPC requests processed by KV-PSQL DWS"
+)
+
+grpc_request_duration = meter.create_histogram(
+    "mfi_kv_dws_grpc_duration_seconds",
+    description="Duration of gRPC request processing in seconds"
+)
+
+db_connection_failures = meter.create_counter(
+    "mfi_kv_dws_db_connection_failures_total",
+    description="Total failed database connection attempts"
+)
+
+returned_rows_histogram = meter.create_histogram(
+    "mfi_kv_dws_returned_rows",
+    description="Number of database rows returned per retrieval request"
+)
+# ==========================================
 
 
 class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
@@ -58,7 +85,6 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
             raise Exception("Unable to connect to the kv database") 
         else:
             self.logger.info("kv database connection success!")
-        
         
         # Cache for database connections
         self._db_cache: dict = {}
@@ -82,6 +108,7 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
                 password=self.db_config.get('password', 'mfiddb')
             )
         except psycopg2.Error as e:
+            db_connection_failures.add(1)  # <-- 2. Record connection failures
             self.logger.error(f"Failed to connect to PostgreSQL: {e}")
             return None
     
@@ -108,9 +135,6 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
         
         # Determine payload type and set appropriately
         if isinstance(payload, dict):
-            # datapoint.json_value = payload
-            # cant overwrite the struct object, causes a pylance mismatch error for type
-            # calling update will safely read the dictionary and maps it s key value pairs direcly into that preexisting struct object.
             datapoint.json_value.update(payload)
         elif isinstance(payload, int):
             datapoint.int_value = payload
@@ -125,8 +149,15 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
     
     def GetDataPoint(self, request, context):
         """Retrieve a single datapoint for a specific topic at an exact timestamp."""
+        start_time = time.perf_counter()  # <-- 3. Start latency timer
+        
         conn = self._get_connection()
         if not conn:
+            # Record failed request (No Database Connection)
+            duration = time.perf_counter() - start_time
+            grpc_request_duration.record(duration, {"method": "GetDataPoint"})
+            grpc_requests_counter.add(1, {"method": "GetDataPoint", "status": "ERROR"})
+            
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details("Failed to connect to database")
             return service_pb2.GetDataPointResponse()
@@ -137,9 +168,6 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
             # Convert timestamp
             target_time = self._timestamp_to_datetime(request.timestamp)
             
-            # Check if topic contains wildcard
-            # topic_pattern, is_wildcard = self._topic_to_sql_pattern(request.topic)
-
             # Determine if we are doing exact matching or regex matching
             topic_clause, topic_param, is_wildcard = self._topic_clause(request.topic)
             
@@ -151,52 +179,7 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
                 order = "DESC"
                 op = "<="
 
-            # If it's a wildcard match, do not apply 'LIMIT 1' prematurely in case 
-            # we need to validate if exactly 1 unique topic matched across results.
-            
             limit_clause = "" if is_wildcard else "LIMIT 1"
-
-            # # Get exact match or closest past/future based on request
-            # if not request.do_closest_past:
-            #     # Get closest datapoint at or after the requested timestamp
-            #     if is_wildcard:
-            #         query = """
-            #             SELECT timestamp, topic, payload
-            #             FROM kv_data
-            #             WHERE topic LIKE %s AND timestamp >= %s
-            #             ORDER BY timestamp ASC
-            #         """
-            #     else:
-            #         query = """
-            #             SELECT timestamp, topic, payload
-            #             FROM kv_data
-            #             WHERE topic = %s AND timestamp >= %s
-            #             ORDER BY timestamp ASC
-            #             LIMIT 1
-            #         """
-            # else:
-            #     # Get closest datapoint at or before the requested timestamp
-            #     if is_wildcard:
-            #         query = """
-            #             SELECT timestamp, topic, payload
-            #             FROM kv_data
-            #             WHERE topic LIKE %s AND timestamp <= %s
-            #             ORDER BY timestamp DESC
-            #         """
-            #     else:
-            #         query = """
-            #             SELECT timestamp, topic, payload
-            #             FROM kv_data
-            #             WHERE topic = %s AND timestamp <= %s
-            #             ORDER BY timestamp DESC
-            #             LIMIT 1
-            #         """
-            
-            # Execute query
-            # if is_wildcard:
-            #     cursor.execute(query, (topic_pattern, target_time))
-            # else:
-            #     cursor.execute(query, (request.topic, target_time))
 
             query = f"""
                 SELECT timestamp, topic, payload
@@ -212,57 +195,52 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
             
             # For wildcard topics, verify exactly one topic matches
             if is_wildcard and len(rows) != 1:
-                # if len(rows) == 0:
-                #     context.set_code(grpc.StatusCode.NOT_FOUND)
-                #     context.set_details("No datapoint found")
-                # else:
-                #     context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                #     context.set_details(f"Topic pattern matches {len(rows)} topics, expected exactly 1")
-                # return service_pb2.GetDataPointResponse()
                 unique_topics = set(row[1] for row in rows)
                 if len(unique_topics) == 0:
+                    duration = time.perf_counter() - start_time
+                    grpc_request_duration.record(duration, {"method": "GetDataPoint"})
+                    grpc_requests_counter.add(1, {"method": "GetDataPoint", "status": "NOT_FOUND"})
+                    
                     context.set_code(grpc.StatusCode.NOT_FOUND)
                     context.set_details("No datapoint found")
                     return service_pb2.GetDataPointResponse()
                 elif len(unique_topics) > 1:
+                    duration = time.perf_counter() - start_time
+                    grpc_request_duration.record(duration, {"method": "GetDataPoint"})
+                    grpc_requests_counter.add(1, {"method": "GetDataPoint", "status": "INVALID_ARGUMENT"})
+                    
                     context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
                     context.set_details(f"Topic pattern matches {len(unique_topics)} distinct topics, expected exactly 1")
                     return service_pb2.GetDataPointResponse()
             
+            duration = time.perf_counter() - start_time  # <-- 4. Stop latency timer
+            
             if rows:
+                grpc_request_duration.record(duration, {"method": "GetDataPoint"})
+                grpc_requests_counter.add(1, {"method": "GetDataPoint", "status": "OK"})
+                returned_rows_histogram.record(1, {"method": "GetDataPoint"})
+                
                 datapoint = self._datapoint_to_proto(rows[0])
                 return service_pb2.GetDataPointResponse(datapoint=datapoint)
             else:
+                grpc_request_duration.record(duration, {"method": "GetDataPoint"})
+                grpc_requests_counter.add(1, {"method": "GetDataPoint", "status": "NOT_FOUND"})
+                
                 context.set_code(grpc.StatusCode.NOT_FOUND)
                 context.set_details("No datapoint found")
                 return service_pb2.GetDataPointResponse()
                 
         except psycopg2.Error as e:
+            duration = time.perf_counter() - start_time
+            grpc_request_duration.record(duration, {"method": "GetDataPoint"})
+            grpc_requests_counter.add(1, {"method": "GetDataPoint", "status": "ERROR"})
+            
             self.logger.error(f"Database error: {e}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(f"Database error: {str(e)}")
             return service_pb2.GetDataPointResponse()
         finally:
             conn.close()
-    
-    # def _topic_to_sql_pattern(self, topic: str) -> Tuple[str, bool]:
-    #     """Convert MQTT topic to SQL pattern for wildcard matching.
-        
-    #     Returns (pattern, is_wildcard) tuple.
-    #     Converts "mfi/test/#" to "mfi/test%" for LIKE matching.
-    #     """
-    #     is_wildcard = False
-    #     if topic.endswith('/#'):
-    #         # Convert MQTT wildcard to SQL LIKE pattern
-    #         pattern = topic[:-2] + '%'
-    #         is_wildcard = True
-    #     elif topic.endswith('#'):
-    #         # Handle case like "mfi/test/#" where # is at the end
-    #         pattern = topic[:-1] + '%'
-    #         is_wildcard = True
-    #     else:
-    #         pattern = topic
-    #     return pattern, is_wildcard
     
     def _topic_to_regex(self, topic_pattern: str) -> str:
         """Translate an MQTT topic filter into a full-match PostgreSQL regex.
@@ -271,7 +249,6 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
         '+' matches exactly one topic level and '#' matches zero or more levels.
         """
         regex_parts = []
-        # Escape characters that have special meanings in regex, excluding hyphen
         regex_meta = set('.^$*?{}[]\\|()')
         
         for ch in topic_pattern:
@@ -299,8 +276,14 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
 
     def GetDataRange(self, request, context):
         """Retrieve a list of datapoints between start_time and end_time."""
+        start_time_counter = time.perf_counter()  # <-- 5. Start latency timer
+        
         conn = self._get_connection()
         if not conn:
+            duration = time.perf_counter() - start_time_counter
+            grpc_request_duration.record(duration, {"method": "GetDataRange"})
+            grpc_requests_counter.add(1, {"method": "GetDataRange", "status": "ERROR"})
+            
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details("Failed to connect to database")
             return service_pb2.GetDataRangeResponse()
@@ -314,19 +297,20 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
             page_size = request.page_size if request.page_size > 0 else 1000
             page_token = request.page_token
             
-            # # Convert topic to SQL pattern for wildcard matching
-            # topic_pattern, is_wildcard = self._topic_to_sql_pattern(request.topic)
             # Generate the dynamic topic clause and parameter
             topic_clause, topic_param, _ = self._topic_clause(request.topic)
             
             # Build query with pagination
-            # The page_token is a Unix timestamp (string) to continue from
             if page_token:
                 try:
                     start_from = datetime.fromtimestamp(float(page_token), tz=timezone.utc)
                     time_filter = "timestamp > %s AND timestamp <= %s"
                     params = (start_from, end_time)
                 except (ValueError, OSError):
+                    duration = time.perf_counter() - start_time_counter
+                    grpc_request_duration.record(duration, {"method": "GetDataRange"})
+                    grpc_requests_counter.add(1, {"method": "GetDataRange", "status": "INVALID_ARGUMENT"})
+                    
                     context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
                     context.set_details("Invalid page token")
                     return service_pb2.GetDataRangeResponse()
@@ -334,34 +318,6 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
                 time_filter = "timestamp >= %s AND timestamp <= %s"
                 params = (start_time, end_time)
             
-            # # Get total count for this query to check if there are more pages
-            # if is_wildcard:
-            #     count_query = f"""
-            #         SELECT COUNT(*) FROM kv_data WHERE topic LIKE %s AND {time_filter}
-            #     """
-            # else:
-            #     count_query = f"""
-            #         SELECT COUNT(*) FROM kv_data WHERE topic = %s AND {time_filter}
-            #     """
-            
-            # if is_wildcard:
-            #     data_query = f"""
-            #         SELECT timestamp, topic, payload
-            #         FROM kv_data
-            #         WHERE topic LIKE %s AND {time_filter}
-            #         ORDER BY timestamp ASC
-            #         LIMIT %s
-            #     """
-            # else:
-            #     data_query = f"""
-            #         SELECT timestamp, topic, payload
-            #         FROM kv_data
-            #         WHERE topic = %s AND {time_filter}
-            #         ORDER BY timestamp ASC
-            #         LIMIT %s
-            #     """
-            
-            # Query structures built using the generated regex operator text
             count_query = f"""
                 SELECT COUNT(*) FROM kv_data WHERE {topic_clause} AND {time_filter}
             """
@@ -373,26 +329,12 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
                 ORDER BY timestamp ASC
                 LIMIT %s
             """
-
-            # Execute queries
-            # if is_wildcard:
-            #     cursor.execute(count_query, (topic_pattern, *params))
-            # else:
-            #     cursor.execute(count_query, (request.topic, *params))
-            # total_count = cursor.fetchone()[0]
-            
-            # if is_wildcard:
-            #     cursor.execute(data_query, (topic_pattern, *params, page_size))
-            # else:
-            #     cursor.execute(data_query, (request.topic, *params, page_size))
             
             cursor.execute(count_query, (topic_param, *params))
-            # total_count = cursor.fetchone()[0]
             count_result = cursor.fetchone()
             total_count = count_result[0] if count_result else 0
             
             cursor.execute(data_query, (topic_param, *params, page_size))
-
             rows = cursor.fetchall()
             
             # Convert to protobuf messages
@@ -401,9 +343,13 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
             # Generate next page token if there are more results
             next_page_token = ""
             if len(rows) == page_size and total_count > len(rows):
-                # Use the timestamp of the last result as the page token
                 last_timestamp = rows[-1][0]
                 next_page_token = str(last_timestamp.timestamp())
+            
+            duration = time.perf_counter() - start_time_counter  # <-- 6. Stop latency timer
+            grpc_request_duration.record(duration, {"method": "GetDataRange"})
+            grpc_requests_counter.add(1, {"method": "GetDataRange", "status": "OK"})
+            returned_rows_histogram.record(len(datapoints), {"method": "GetDataRange"})
             
             return service_pb2.GetDataRangeResponse(
                 datapoints=datapoints,
@@ -411,6 +357,10 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
             )
             
         except psycopg2.Error as e:
+            duration = time.perf_counter() - start_time_counter
+            grpc_request_duration.record(duration, {"method": "GetDataRange"})
+            grpc_requests_counter.add(1, {"method": "GetDataRange", "status": "ERROR"})
+            
             self.logger.error(f"Database error: {e}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(f"Database error: {str(e)}")
@@ -420,9 +370,9 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
     
     def StreamData(self, request, context):
         """Stream datapoints in real-time."""
-        """Supporting wildcard topic parsing using regex."""
         conn = self._get_connection()
         if not conn:
+            grpc_requests_counter.add(1, {"method": "StreamData", "status": "ERROR"})
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details("Failed to connect to database")
             return
@@ -438,28 +388,15 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
             # Get the current timestamp to start streaming from
             if start_from is None:
                 cursor.execute("SELECT NOW() AT TIME ZONE 'UTC'")
-                # start_from = cursor.fetchone()[0]
                 time_result = cursor.fetchone()
                 start_from = time_result[0] if time_result else datetime.now(timezone.utc)
             
-            # Start streaming new data
-            
-            # self.logger.info(f"Starting stream for topic: {request.topic} from {start_from}")
-
             topic_clause, topic_param, _ = self._topic_clause(request.topic)
             self.logger.info(f"Starting stream for topic filter: {request.topic} from {start_from}")
             
-            # while not context.is_active():
-            # client needs to be active while running the queries, otherwise loop evaluates to false and exists without streaming any data.
+            grpc_requests_counter.add(1, {"method": "StreamData", "status": "OK"})
+            
             while context.is_active():
-                # Query for new data
-                # query = """
-                #     SELECT timestamp, topic, payload
-                #     FROM kv_data
-                #     WHERE topic = %s AND timestamp > %s
-                #     ORDER BY timestamp ASC
-                #     LIMIT 100
-                # """
                 query = f"""
                     SELECT timestamp, topic, payload
                     FROM kv_data
@@ -468,24 +405,23 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
                     LIMIT 100
                 """
                 
-                # cursor.execute(query, (request.topic, start_from))
                 cursor.execute(query, (topic_param, start_from))
                 rows = cursor.fetchall()
                 
                 if not rows:
-                    time.sleep(0.1)  # Sleep briefly before checking for new data
+                    time.sleep(0.1)
                     continue
+
+                # Record the stream packet chunk sizes
+                returned_rows_histogram.record(len(rows), {"method": "StreamData"})
 
                 for row in rows:
                     datapoint = self._datapoint_to_proto(row)
                     yield service_pb2.StreamDataResponse(datapoint=datapoint)
-                    start_from = row[0]  # Update start_from to latest timestamp
-                
-                # if context.is_active():
-                #     # Sleep briefly before checking for new data
-                #     time.sleep(0.1)
+                    start_from = row[0]
                     
         except psycopg2.Error as e:
+            grpc_requests_counter.add(1, {"method": "StreamData", "status": "ERROR"})
             self.logger.error(f"Database error: {e}")
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(f"Database error: {str(e)}")
@@ -506,7 +442,7 @@ def serve(db_config: dict, port: int = 50051, debug: bool = False):
         
     try:
         while True:
-            time.sleep(86400)  # Sleep for a day
+            time.sleep(86400)
     except KeyboardInterrupt:
         server.stop(0)
         logging.info("DWS Server stopped")
@@ -530,7 +466,6 @@ def main():
     
     db_config = config.get('postgres', {})
     
-    # Get port from config or use default
     port = config.get('dws', {}).get('port', 50051)
     
     serve(db_config, port, debug=args.verbose)

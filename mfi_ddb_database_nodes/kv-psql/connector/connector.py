@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 from prometheus_client import start_http_server
 from opentelemetry.exporter.prometheus import PrometheusMetricReader
-from opentelemetry.metrics import set_meter_provider
+from opentelemetry.metrics import set_meter_provider, get_meter  # <-- 1. Added get_meter
 from opentelemetry.sdk.metrics import MeterProvider
 
 reader = PrometheusMetricReader()
@@ -34,6 +34,28 @@ provider = MeterProvider(metric_readers=[reader])
 set_meter_provider(provider)
 start_http_server(port=9464, addr="0.0.0.0")
 print("Prometheus metrics server listening on port 9464")
+
+
+# ==========================================
+# OPENTELEMETRY CUSTOM METRICS SETUP
+# ==========================================
+meter = get_meter("mfi.kv_psql.connector")
+
+mqtt_messages_received = meter.create_counter(
+    "mfi_kv_connector_mqtt_messages_received_total",
+    description="Total MQTT messages received by KV-PSQL connector"
+)
+
+db_writes = meter.create_counter(
+    "mfi_kv_connector_db_writes_total",
+    description="Total database insertions attempted by KV-PSQL connector"
+)
+
+db_write_duration = meter.create_histogram(
+    "mfi_kv_connector_db_write_duration_seconds",
+    description="Time taken to execute INSERT statements on PostgreSQL"
+)
+# ==========================================
 
 
 class MQTTConnector:
@@ -87,17 +109,6 @@ class MQTTConnector:
             self.db_conn.close()
             self.logger.info("Disconnected from PostgreSQL database")
     
-    # def create_table_if_not_exists(self):
-    #     """Create the kv_data table if it doesn't exist."""
-    #     with self.db_conn.cursor() as cursor:
-    #         cursor.execute("""
-    #             CREATE TABLE IF NOT EXISTS kv_data (
-    #                 timestamp TIMESTAMPTZ NOT NULL,
-    #                 topic TEXT NOT NULL,
-    #                 payload JSONB NOT NULL
-    #             )
-    #         """)
-    #         self.logger.info("Table 'kv_data' ready")
     def create_table_if_not_exists(self):
         """Create the kv_data table and indexes if they don't exist."""
         
@@ -132,8 +143,10 @@ class MQTTConnector:
         """Store a single data point in the database."""
         if not self.db_conn:
             self.logger.error("Database connection not established")
+            db_writes.add(1, {"status": "NO_CONNECTION"})  # <-- 2. Track missing connections
             return False
         
+        start_time = time.perf_counter()  # <-- 3. Start DB timer
         timestamp = datetime.now(timezone.utc)
         
         try:
@@ -145,10 +158,18 @@ class MQTTConnector:
                     """,
                     (timestamp, topic, Json(payload))
                 )
-            # self.logger.debug(f"Stored data point: topic={topic}")
+            
+            duration = time.perf_counter() - start_time  # <-- 4. Stop DB timer
+            db_write_duration.record(duration)
+            db_writes.add(1, {"status": "SUCCESS"})  # <-- 5. Track successful insert
+            
             self.logger.info(f"Stored data point: topic={topic}")
             return True
         except psycopg2.Error as e:
+            duration = time.perf_counter() - start_time  # <-- Stop DB timer on exception
+            db_write_duration.record(duration)
+            db_writes.add(1, {"status": "ERROR"})  # <-- 6. Track failed insert
+            
             self.logger.error(f"Failed to store data point: {e}")
             return False
     
@@ -164,6 +185,9 @@ class MQTTConnector:
     
     def on_message(self, client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         """Callback for when a message is received from the broker."""
+        # --- 7. Count incoming message from broker ---
+        mqtt_messages_received.add(1, {"topic": msg.topic})
+        
         try:
             # Try to parse payload as JSON
             try:

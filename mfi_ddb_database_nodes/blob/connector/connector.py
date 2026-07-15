@@ -1,7 +1,7 @@
 import json
 import os
 import uuid
-import time
+import time  # <-- 1. Ensure time is imported (already there)
 import argparse
 import logging
 
@@ -22,7 +22,7 @@ logger = logging.getLogger("CFSService")
 
 from prometheus_client import start_http_server
 from opentelemetry.exporter.prometheus import PrometheusMetricReader
-from opentelemetry.metrics import set_meter_provider
+from opentelemetry.metrics import set_meter_provider, get_meter # <-- 2. Added get_meter
 from opentelemetry.sdk.metrics import MeterProvider
 
 reader = PrometheusMetricReader()
@@ -30,6 +30,33 @@ provider = MeterProvider(metric_readers=[reader])
 set_meter_provider(provider)
 start_http_server(port=9464, addr="0.0.0.0")
 print("Prometheus metrics server listening on port 9464")
+
+
+# ==========================================
+# OPENTELEMETRY CUSTOM METRICS SETUP
+# ==========================================
+meter = get_meter("mfi.blob.connector")
+
+blob_messages_counter = meter.create_counter(
+    "mfi_blob_messages_processed_total",
+    description="Total blob messages processed by the connector"
+)
+
+blob_write_duration = meter.create_histogram(
+    "mfi_blob_write_duration_seconds",
+    description="Time taken to save blob and metadata to local disk"
+)
+
+blob_save_errors = meter.create_counter(
+    "mfi_blob_save_errors_total",
+    description="Total failures encountered while writing blobs to disk"
+)
+
+blob_size_histogram = meter.create_histogram(
+    "mfi_blob_size_bytes",
+    description="Size distribution of successfully saved files in bytes"
+)
+# ==========================================
 
 
 # ---------------- UTIL ----------------
@@ -49,6 +76,7 @@ class LocalFileStorage:
         logger.info(f"Storage initialized at: {self.save_dir}")
 
     def save_blob(self, topic, data):
+        start_time = time.perf_counter()  # <-- 3. Start I/O timer
         try:
             unique_id = generate_uid()
 
@@ -86,9 +114,20 @@ class LocalFileStorage:
             }
 
             self._append_to_index(index_record)
+
+            # --- RECORD METRICS ON SUCCESS ---
+            duration = time.perf_counter() - start_time
+            blob_write_duration.record(duration)
+            
+            # Record size from incoming metadata or the byte length
+            file_size = len(data.get("file", b""))
+            blob_size_histogram.record(file_size, {"file_type": file_ext})
+
             return unique_id
 
         except Exception as e:
+            # --- RECORD METRICS ON FAILURE ---
+            blob_save_errors.add(1)
             logger.exception(f"Failed to save blob: {e}")
             return None
 
@@ -174,6 +213,9 @@ class CFSSubscriberService:
             return
 
         try:
+            # --- COUNT INCOMING RAW MESSAGES ---
+            blob_messages_counter.add(1, {"type": data_type})
+            
             handler(topic, data)
         except Exception as e:
             logger.exception(f"Error handling {data_type} message: {e}")
@@ -216,15 +258,6 @@ class CFSSubscriberService:
 
 # ---------------- MAIN ----------------
 def main(mqtt_cfg_file, cfs_cfg_file):
-    # logger.info(f"Using MQTT config: {os.path.abspath(mqtt_cfg_file)}")
-    # logger.info(f"Using CFS config: {os.path.abspath(cfs_cfg_file)}")
-
-    # with open(mqtt_cfg_file) as f:
-    #     mqtt_config = yaml.safe_load(f)
-
-    # with open(cfs_cfg_file) as f:
-    #     cfs_config = yaml.safe_load(f)
-
     logger.info(f"Using unified config file: {os.path.abspath(mqtt_cfg_file)}")
 
     # Load the single file
@@ -254,8 +287,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Subscribe to MQTT topic and save blobs to local storage"
     )
-    # parser.add_argument("mqtt_config_path")
-    # parser.add_argument("cfs_config_path")
 
     parser.add_argument("config_path", help="Path to the unified config file for blob")
 

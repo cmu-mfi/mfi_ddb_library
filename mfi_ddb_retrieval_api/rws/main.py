@@ -2,93 +2,104 @@
 Retrieval API - Main Application Entry Point
 """
 
-# import os
+import sys
+import time
+import logging
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-# from fastapi.staticfiles import StaticFiles
-import logging
 
-# Import configuration router and application lifespan manager
-from app.api.v0.router import router
-from app.services.pg_mds import MdsReader
-
-logger = logging.getLogger(__name__)
-
-
+# ==============================================================================
+# 1. INITIALIZE TELEMETRY FIRST (Must run before loading database modules)
+# ==============================================================================
 from prometheus_client import start_http_server
 from opentelemetry.exporter.prometheus import PrometheusMetricReader
-from opentelemetry.metrics import set_meter_provider
+from opentelemetry.metrics import set_meter_provider, get_meter
 from opentelemetry.sdk.metrics import MeterProvider
 
+# Spin up Prometheus exporter on port 9464
 reader = PrometheusMetricReader()
 provider = MeterProvider(metric_readers=[reader])
 set_meter_provider(provider)
 start_http_server(port=9464, addr="0.0.0.0")
 print("Prometheus metrics server listening on port 9464")
 
+# Initialize global API meter
+meter = get_meter("mfi.rws.app")
+
+# Global HTTP metrics
+http_requests_counter = meter.create_counter(
+    "mfi_rws_http_requests_total",
+    description="Total HTTP requests processed by Retrieval API"
+)
+
+http_request_duration = meter.create_histogram(
+    "mfi_rws_http_request_duration_seconds",
+    description="Latency of HTTP requests in seconds"
+)
+# ==============================================================================
+
+# Now we can safely import our local modules that will use telemetry
+from app.api.v0.router import router
+from app.services.pg_mds import MdsReader
+
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: initialize metadata_reader
-    import sys
     config_file = 'pg_database.test.ini' if 'pytest' in sys.modules else 'pg_database.ini'
     app.state.metadata_reader = MdsReader(config_file=config_file)
     yield
-    # Shutdown: cleanup if needed
+    # Shutdown: cleanup
     if hasattr(app.state, 'metadata_reader'):
         del app.state.metadata_reader
         
-# FastAPI application instance with metadata and lifecycle management
 app = FastAPI(
     title="Retrieval API",
     version="0.1.0",
     description="Core API for data retrieval from MFI DDB Data store",
     lifespan=lifespan
-    # lifespan=lifespan  # Manages startup/shutdown tasks for adapters and connections
 )
 
-# Enables cross-origin requests from React development servers and production deployments
+# HTTP Request Telemetry Middleware
+@app.middleware("http")
+async def monitor_requests(request: Request, call_next):
+    start_time = time.perf_counter()
+    method = request.method
+    path = request.url.path
+    
+    try:
+        response = await call_next(request)
+        duration = time.perf_counter() - start_time
+        status_code = str(response.status_code)
+        
+        http_request_duration.record(duration, {"method": method, "path": path})
+        http_requests_counter.add(1, {"method": method, "path": path, "status": status_code})
+        return response
+    except Exception as e:
+        duration = time.perf_counter() - start_time
+        http_request_duration.record(duration, {"method": method, "path": path})
+        http_requests_counter.add(1, {"method": method, "path": path, "status": "500"})
+        raise e
+
+# CORS setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",   # React development server
-        "http://localhost:3001",   # Alternative React port
-        "http://127.0.0.1:3000",   # Localhost alternative
-        "*"                        # Allow all origins (development only)
-    ],
-    allow_credentials=True,        # Support authentication cookies/headers
-    allow_methods=["*"],           # Allow all HTTP methods
-    allow_headers=["*"],           # Allow all headers
+    allow_origins=["*"],  # Adjust for production security if needed
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# Register all configuration management routes under /connections prefix
 app.include_router(router, prefix="/mfi-ddb", tags=["MFI DDB"])
 
 @app.get("/")
 async def root():
-    """
-    Root endpoint providing basic API information.
-    
-    Returns:
-        Dictionary with service status and name for health monitoring
-    """
     return {"status": "healthy", "service": "MFI DDB: RETRIEVAL API"}
 
-# Static file serving for production UI deployment
-# Serves the built React application from the ui_interfaces build directory
-# build_dir = os.path.join(
-#     os.path.dirname(__file__),
-#     "..", "ui_interfaces", "data_adapters", "build"
-# )
-# if os.path.isdir(build_dir):
-#     # Mount static files with HTML fallback for client-side routing
-#     app.mount("/static", StaticFiles(directory=build_dir, html=True), name="ui")
-
-# Development server configuration
-# Only runs when script is executed directly (not when imported as module)
 if __name__ == "__main__":
-    # Start development server with auto-reload for code changes
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

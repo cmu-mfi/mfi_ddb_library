@@ -1,4 +1,7 @@
-"""TimeScaleDB connector: MQTT historian -> Sparkplug B decode -> DB insert."""
+#!/usr/bin/env python3
+"""
+TimeScaleDB connector: MQTT historian -> Sparkplug B decode -> DB insert.
+"""
 
 import json
 import time
@@ -17,7 +20,7 @@ from db import TimeScaleWriter
 
 from prometheus_client import start_http_server
 from opentelemetry.exporter.prometheus import PrometheusMetricReader
-from opentelemetry.metrics import set_meter_provider
+from opentelemetry.metrics import set_meter_provider, get_meter  # <-- 1. Added get_meter
 from opentelemetry.sdk.metrics import MeterProvider
 
 reader = PrometheusMetricReader()
@@ -25,6 +28,47 @@ provider = MeterProvider(metric_readers=[reader])
 set_meter_provider(provider)
 start_http_server(port=9464, addr="0.0.0.0")
 print("Prometheus metrics server listening on port 9464")
+
+
+# ==========================================
+# OPENTELEMETRY CUSTOM METRICS SETUP
+# ==========================================
+meter = get_meter("mfi.timescaledb.connector")
+
+mqtt_messages_counter = meter.create_counter(
+    "mfi_timescale_mqtt_messages_total",
+    description="Total MQTT payloads received by TimescaleDB connector"
+)
+
+decoded_points_counter = meter.create_counter(
+    "mfi_timescale_decoded_points_total",
+    description="Total raw metric points successfully decoded from Sparkplug B payloads"
+)
+
+queue_drops_counter = meter.create_counter(
+    "mfi_timescale_queue_drops_total",
+    description="Total decoded message chunks dropped due to queue backpressure"
+)
+
+batch_write_duration = meter.create_histogram(
+    "mfi_timescale_batch_write_duration_seconds",
+    description="Time taken to execute multi-row batch inserts on TimescaleDB"
+)
+
+# Limit the queue to 50,000 message chunks to prevent memory bloat if the DB drops
+data_queue: queue.Queue = queue.Queue(maxsize=50000)
+
+# Observable asynchronous gauge callback to track queue depth in real-time
+def get_queue_size(options) -> Iterable[Observation]:
+    yield Observation(data_queue.qsize())
+
+meter.create_observable_gauge(
+    "mfi_timescale_queue_size",
+    callbacks=[get_queue_size],
+    description="Current backlogged element chunks waiting inside data_queue"
+)
+# ==========================================
+
 
 # Configuration and initialization
 def load_config(path: Path):
@@ -39,10 +83,6 @@ cfg = load_config(CONFIG_PATH)
 # `writer` is created inside `main()` to avoid opening a DB socket at import time
 # which makes testing and other import-time operations brittle.
 writer = None
-
-# Thread safe queue to pass metrics from MQTT thread to DB worker thread
-# Limit the queue to 50,000 message chunks to prevent memory bloat if the DB drops
-data_queue: queue.Queue = queue.Queue(maxsize=50000)
 
 
 # parsing and classification logic
@@ -111,12 +151,10 @@ def on_connect(client, userdata, flags, rc, properties=None):
 
 def on_message(client, userdata, msg):
     """MQTT callback: decode payload and batch insert into TimeScaleDB."""
+    # --- 2. Increment MQTT message count ---
+    mqtt_messages_counter.add(1, {"topic": msg.topic})
+    
     try:
-        # initialize topic parser
-        # spb_topic = SpbTopic(msg.topic)
-        
-        # not using the sbptopic parser since it is harcoded to expect a namespace
-        # instead I can drop the namespace directly from the array
         topic_fields = msg.topic.split("/")
 
         if len(topic_fields) < 3:
@@ -127,18 +165,15 @@ def on_message(client, userdata, msg):
 
         # delete the message type from the array
         del topic_fields[2]
-
-        # assembling the topic path, leaving out message type folder
-        # clean_fields = [spb_topic.namespace, spb_topic.domain_name]
-
-        # if spb_topic.eon_name:
-        #     clean_fields.append(spb_topic.eon_name)
-        # if spb_topic.eon_device_name:
-        #     clean_fields.append(spb_topic.eon_device_name)
         
         clean_topic = "/".join(topic_fields)
         
         metrics = decode_sparkplug(msg.payload)
+        
+        # --- 3. Track number of decoded individual datapoints ---
+        if metrics:
+            decoded_points_counter.add(len(metrics))
+            
         rows = []
         for name, value, ts_ms in metrics:
             t = to_ts(ts_ms)
@@ -157,10 +192,11 @@ def on_message(client, userdata, msg):
                 (t, full_topic_path, cfg["component_id"], tracked_metric_name, value_num, value_text, value_json)
             )
         if rows:
-            # writer.insert_rows(rows) --> would overwhelm the DB if we do it directly in the MQTT thread; instead, push to the queue for the background worker to consume
             try:
-                data_queue.put(rows, block=False)  # Non-blocking put; raises queue.Full if the worker is too far behind
+                data_queue.put(rows, block=False)
             except queue.Full:
+                # --- 4. Queue backpressure telemetry ---
+                queue_drops_counter.add(1)
                 print(f"CRITICAL: Data queue is full! Dropping {len(rows)} metrics from topic {msg.topic}")
     except Exception as e:
         print(f"Error processing MQTT message incoming on topic {msg.topic}: {e}")
@@ -190,12 +226,10 @@ def db_batch_writer_worker(
 
             try:
                 # Wait for rows to arrive up to the remaining time boundary
-                # Each item from the queue is a list of rows from a single MQTT message
                 message_rows = q.get(timeout=max(remaining_time, 0.001))
                 batch.extend(message_rows)
                 q.task_done()
             except queue.Empty:
-                # Timeout hit with no new items; break out and flush current batch
                 break
 
         # Commit the accumulated micro-batch to the hypertable
@@ -203,16 +237,20 @@ def db_batch_writer_worker(
             # Loop until successful so we don't lose data during brief DB drops
             while True:
                 try:
-                    # If connection was previously broken, try to reset it
+                    # If connection was previously broken, try to reconnect
                     if db_writer.is_closed():
                         print("DB connection closed. Attempting reconnect...")
                         db_writer.reconnect()
 
+                    db_start = time.perf_counter()  # <-- 5. Measure write latency
                     db_writer.insert_rows(batch)
-                    break  # Success! Break the retry loop and move to next batch
+                    
+                    db_duration = time.perf_counter() - db_start  # <-- 6. Record metric
+                    batch_write_duration.record(db_duration)
+                    
+                    break  # Success! Break retry loop
                 except Exception as e:
                     print(f"Database insertion error (Size: {len(batch)}): {e}. Retrying in 5s...")
-                    # Force-close the socket so subsequent loop iterations notice the closed state
                     try:
                         conn = getattr(db_writer, "conn", None)
                         if conn is not None:
@@ -225,11 +263,6 @@ def db_batch_writer_worker(
 def main():
     """Start the background batch worker, connect to broker, and process events."""
     # 1. Create DB writer instance and spin up the background consumer thread
-    
-    # db_writer = TimeScaleWriter(cfg["timescaledb"])
-
-    # adding retries to ensure that the db is up and the schema is initialized before we start the MQTT client and worker thread
-    # max of a 45 second wait before application gives up and exits.
     db_writer = None
     retry_count = 0
     max_retries = 15
@@ -250,7 +283,7 @@ def main():
         target=db_batch_writer_worker,
         args=(data_queue, db_writer),
         kwargs={"max_batch_size": 1000, "flush_interval_sec": 0.1},
-        daemon=True,  # Allows clean application termination
+        daemon=True,
     )
     worker_thread.start()
 

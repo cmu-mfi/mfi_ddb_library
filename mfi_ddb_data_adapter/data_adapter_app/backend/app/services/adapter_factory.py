@@ -1,10 +1,30 @@
 import logging
 import threading
+import time  # <-- 1. Added time for execution latency tracking
 from typing import Any, Dict, Optional
 
 from pydantic import ValidationError
 
 import mfi_ddb
+
+# ==========================================
+# OPENTELEMETRY CUSTOM METRICS SETUP
+# ==========================================
+from opentelemetry.metrics import get_meter
+
+# Grabs the registered meter from main.py
+meter = get_meter("mfi.data_adapter.app")
+
+poll_duration_histogram = meter.create_histogram(
+    "mfi_adapter_poll_duration_seconds",
+    description="Time taken to pull and stream data in a single polling cycle"
+)
+
+poll_executions_counter = meter.create_counter(
+    "mfi_adapter_poll_executions_total",
+    description="Total database/adapter polling executions categorized by status"
+)
+# ==========================================
 
 
 class AdapterFactory:
@@ -105,7 +125,25 @@ class AdapterFactory:
         if self.is_polling:
             def polling_loop():
                 while self.poll_streaming.is_set():
-                    self.streamer.poll_and_stream_data(self.polling_rate_hz)
+                    start_time = time.perf_counter()
+                    try:
+                        # Perform polling operation
+                        self.streamer.poll_and_stream_data(self.polling_rate_hz)
+                        
+                        # Record metrics for success
+                        duration = time.perf_counter() - start_time
+                        poll_duration_histogram.record(duration, {"adapter_name": self.adp_name})
+                        poll_executions_counter.add(1, {"adapter_name": self.adp_name, "status": "SUCCESS"})
+                    except Exception as e:
+                        # Record metrics for failure
+                        duration = time.perf_counter() - start_time
+                        poll_duration_histogram.record(duration, {"adapter_name": self.adp_name})
+                        poll_executions_counter.add(1, {"adapter_name": self.adp_name, "status": "ERROR"})
+                        self.logger.error(f"Error in adapter polling thread: {e}")
+                        
+                        # Prevent high-frequency spinning if the error is persistent
+                        time.sleep(1.0 / self.polling_rate_hz)
+                        
             poll_thread = threading.Thread(target=polling_loop, daemon=True)
             poll_thread.start()
         

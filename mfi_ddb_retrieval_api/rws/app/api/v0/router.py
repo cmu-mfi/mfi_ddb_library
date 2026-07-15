@@ -1,11 +1,10 @@
 """
 Configuration Router for MFI DDB Retrieval API
-
-...
 """
 
 import datetime
 import logging
+import time  # <-- 1. Added time for measuring retrieval duration
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -15,6 +14,30 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from app.schema import schema
 from app.services.pg_mds import MdsReader
 from app.services.dws_agent import DwsAgent
+
+# ==========================================
+# OPENTELEMETRY CUSTOM METRICS SETUP
+# ==========================================
+from opentelemetry.metrics import get_meter
+
+# Grabs the registered meter from main.py of rws-app
+meter = get_meter("mfi.rws.app")
+
+dws_retrieval_duration = meter.create_histogram(
+    "mfi_rws_dws_retrieval_duration_seconds",
+    description="Duration of timeseries data retrieval operations from DWS Agent"
+)
+
+dws_retrieval_counter = meter.create_counter(
+    "mfi_rws_dws_retrievals_total",
+    description="Total requests handled by the DWS agent categorized by status"
+)
+
+trial_search_counter = meter.create_counter(
+    "mfi_rws_trial_searches_total",
+    description="Total metadata trial search operations executed"
+)
+# ==========================================
 
 logger = logging.getLogger(__name__)
 
@@ -71,18 +94,33 @@ def _build_trial_payload(trial_row: Dict[str, Any], request: schema.Type2Request
         "retrieved_at": datetime.datetime.now().isoformat() + "Z",
     }
     
-    # TODO: USE THE METADATA TO GET DATA USING DWS AGENT
     data_topics = trial_row.get("data_topics", [])
+    trial_name = trial_row.get("trial_name", "unknown")
+    
+    # Track DWS Agent read execution speed
+    start_retrieval = time.perf_counter()
     try:
         data = DwsAgent.get_data(data_topics, start_value, end_value)
+        duration = time.perf_counter() - start_retrieval
+        
+        # Record metrics on success
+        dws_retrieval_duration.record(duration, {"trial_name": trial_name, "status": "SUCCESS"})
+        dws_retrieval_counter.add(1, {"trial_name": trial_name, "status": "SUCCESS"})
+        
         logger.info(f"Retrieved data for trial {trial_row.get('uuid')}: {data}")    
     except Exception as e:
+        duration = time.perf_counter() - start_retrieval
+        
+        # Record metrics on failure
+        dws_retrieval_duration.record(duration, {"trial_name": trial_name, "status": "ERROR"})
+        dws_retrieval_counter.add(1, {"trial_name": trial_name, "status": "ERROR"})
+        
         logger.error(f"Error retrieving data for trial {trial_row.get('trial_name')}: {e}")
         data = {}
     
     return {
         "metadata": metadata,
-        "data": data,  # Actual data retrieved using DWS agent
+        "data": data,
     }
 
 
@@ -100,10 +138,7 @@ def _validate_time_range(start: Optional[datetime.datetime], end: Optional[datet
     response_model=schema.Type0Response,
 )
 async def list_endpoints():
-    """
-    List all available endpoints.
-    """
-
+    """List all available endpoints."""
     endpoints = [
         {
             "endpoint": "/type0",
@@ -141,29 +176,29 @@ async def list_endpoints():
     response_model=schema.Type1Response,
 )
 async def search_trials(request: schema.Type1Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
-    """
-    Search for trials based on provided criteria.
-
-    - **request**: A JSON object containing search criteria for trials.
-    """
-
+    """Search for trials based on provided criteria."""
     time_start = _parse_time_value(request.time_start, "time_start")
     time_end = _parse_time_value(request.time_end, "time_end")
     _validate_time_range(time_start, time_end)
 
-    trials = metadata_reader.find_trials(
-        enterprise_id=request.enterprise_id,
-        time_start=time_start,
-        time_end=time_end,
-        user_id=request.user_id,
-        user_domain=request.user_domain,
-        site=request.site,
-        device=request.device,
-        trial_id=request.trial_id,
-        project_id=request.project_id,
-        project_name=request.project_name,
-        search_terms=request.search_terms,
-    )
+    try:
+        trials = metadata_reader.find_trials(
+            enterprise_id=request.enterprise_id,
+            time_start=time_start,
+            time_end=time_end,
+            user_id=request.user_id,
+            user_domain=request.user_domain,
+            site=request.site,
+            device=request.device,
+            trial_id=request.trial_id,
+            project_id=request.project_id,
+            project_name=request.project_name,
+            search_terms=request.search_terms,
+        )
+        trial_search_counter.add(1, {"status": "SUCCESS"})
+    except Exception as e:
+        trial_search_counter.add(1, {"status": "ERROR"})
+        raise e
     
     for trial in trials:
         for key, value in trial.items():
@@ -184,12 +219,7 @@ async def search_trials(request: schema.Type1Request, metadata_reader: MdsReader
     response_model=schema.Type2Response,
 )
 async def get_trial_details(request: schema.Type2Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
-    """
-    Retrieve detailed data for a specific trial.
-
-    - **request**: A JSON object containing the trial UUID and other optional parameters for data retrieval.
-    """
-
+    """Retrieve detailed data for a specific trial."""
     trial = metadata_reader.get_trial_by_uuid(request.trial_uuid, request.user_id, request.user_domain)
     if not trial:
         raise HTTPException(status_code=404, detail="Trial not found")
@@ -209,29 +239,29 @@ async def get_trial_details(request: schema.Type2Request, metadata_reader: MdsRe
     response_model=schema.Type3Response,
 )
 async def search_trials_and_get_data(request: schema.Type3Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
-    """
-    Search for trials based on provided criteria and retrieve detailed data for matching trials.
-
-    - **request**: A JSON object containing search criteria for trials and parameters for data retrieval.
-    """
-
+    """Search for trials based on provided criteria and retrieve detailed data for matching trials."""
     time_start = _parse_time_value(request.time_start, "time_start")
     time_end = _parse_time_value(request.time_end, "time_end")
     _validate_time_range(time_start, time_end)
 
-    trials = metadata_reader.find_trials(
-        enterprise_id=request.enterprise_id,
-        time_start=time_start,
-        time_end=time_end,
-        user_id=request.user_id,
-        user_domain=request.user_domain,
-        site=request.site,
-        device=request.device,
-        trial_id=request.trial_id,
-        project_id=request.project_id,
-        project_name=request.project_name,
-        search_terms=request.search_terms,
-    )
+    try:
+        trials = metadata_reader.find_trials(
+            enterprise_id=request.enterprise_id,
+            time_start=time_start,
+            time_end=time_end,
+            user_id=request.user_id,
+            user_domain=request.user_domain,
+            site=request.site,
+            device=request.device,
+            trial_id=request.trial_id,
+            project_id=request.project_id,
+            project_name=request.project_name,
+            search_terms=request.search_terms,
+        )
+        trial_search_counter.add(1, {"status": "SUCCESS"})
+    except Exception as e:
+        trial_search_counter.add(1, {"status": "ERROR"})
+        raise e
 
     if len(trials) == 1:
         data = _build_trial_payload(trials[0], request) # type: ignore

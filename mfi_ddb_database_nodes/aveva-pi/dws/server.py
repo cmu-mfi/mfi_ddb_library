@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 from datetime import datetime, timezone
 import logging
 from concurrent import futures
@@ -18,7 +19,7 @@ pi_client = PIWebAPI(secrets)
 
 from prometheus_client import start_http_server
 from opentelemetry.exporter.prometheus import PrometheusMetricReader
-from opentelemetry.metrics import set_meter_provider
+from opentelemetry.metrics import set_meter_provider, get_meter
 from opentelemetry.sdk.metrics import MeterProvider
 
 reader = PrometheusMetricReader()
@@ -26,6 +27,20 @@ provider = MeterProvider(metric_readers=[reader])
 set_meter_provider(provider)
 start_http_server(port=9464, addr="0.0.0.0")
 print("Prometheus metrics server listening on port 9464")
+
+
+# Create meter and metrics
+meter = get_meter("mfi.aveva_pi.dws")
+
+grpc_requests_counter = meter.create_counter(
+    "mfi_grpc_requests_total",
+    description="Total number of gRPC requests handled by AVEVA PI DWS"
+)
+
+grpc_request_duration = meter.create_histogram(
+    "mfi_grpc_request_duration_seconds",
+    description="Time spent processing gRPC read requests in seconds"
+)
 
 
 class DataService(service_pb2_grpc.DataServiceServicer):
@@ -65,6 +80,7 @@ class DataService(service_pb2_grpc.DataServiceServicer):
             return models_pb2.Datapoint(topic=item["topic"], timestamp=ts, string_value=str(value))
         
     def GetDataPoint(self, request, context):
+        start_time = time.perf_counter()  # <-- 3. Start timer
         try:
             item = pi_client.get_data_point(
                 request.topic,
@@ -72,18 +88,32 @@ class DataService(service_pb2_grpc.DataServiceServicer):
                 request.do_closest_past
             )
         except Exception as e:
+            # Record failed request metrics
+            duration = time.perf_counter() - start_time
+            grpc_request_duration.record(duration, {"method": "GetDataPoint"})
+            grpc_requests_counter.add(1, {"method": "GetDataPoint", "status": "ERROR"})
+            
             self.__handle_exception(e, context)
             return service_pb2.GetDataPointResponse()
 
+        duration = time.perf_counter() - start_time  # <-- 4. Stop timer
+
         if item is None:
+            grpc_request_duration.record(duration, {"method": "GetDataPoint"})
+            grpc_requests_counter.add(1, {"method": "GetDataPoint", "status": "NOT_FOUND"})
             context.set_code(grpc.StatusCode.NOT_FOUND)
             context.set_details("No datapoint found")
             return service_pb2.GetDataPointResponse()
 
+        # Record successful request metrics
+        grpc_request_duration.record(duration, {"method": "GetDataPoint"})
+        grpc_requests_counter.add(1, {"method": "GetDataPoint", "status": "OK"})
+        
         context.set_code(grpc.StatusCode.OK)
         return service_pb2.GetDataPointResponse(datapoint=self._datapoint_to_proto(item))
 
     def GetDataRange(self, request, context):
+        start_time = time.perf_counter()  # <-- 5. Start timer
         try:
             values = pi_client.get_data_range(
                 request.topic,
@@ -93,8 +123,19 @@ class DataService(service_pb2_grpc.DataServiceServicer):
                 request.page_token,
             )
         except Exception as e:
+            # Record failed request metrics
+            duration = time.perf_counter() - start_time
+            grpc_request_duration.record(duration, {"method": "GetDataRange"})
+            grpc_requests_counter.add(1, {"method": "GetDataRange", "status": "ERROR"})
+            
             self.__handle_exception(e, context)
             return service_pb2.GetDataRangeResponse()
+
+        duration = time.perf_counter() - start_time  # <-- 6. Stop timer
+        
+        # Record successful request metrics
+        grpc_request_duration.record(duration, {"method": "GetDataRange"})
+        grpc_requests_counter.add(1, {"method": "GetDataRange", "status": "OK"})
 
         context.set_code(grpc.StatusCode.OK)
         return service_pb2.GetDataRangeResponse(
@@ -103,11 +144,11 @@ class DataService(service_pb2_grpc.DataServiceServicer):
         )
     
     def StreamData(self, request, context):
+        # Tracking unimplemented attempts
+        grpc_requests_counter.add(1, {"method": "StreamData", "status": "UNIMPLEMENTED"})
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Streaming is not implemented yet.")
         return service_pb2.StreamDataResponse()
-        # for value in pi_client.stream_data(request.topic, request.user_id, request.start_from):
-        #     yield service_pb2.StreamDataResponse(datapoint=value)
 
 
 def serve():
