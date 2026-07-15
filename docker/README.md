@@ -122,27 +122,27 @@ Each database node consists of three services: a database, a connector (MQTT-to-
 Start all services:
 ```bash
 cd docker
-docker compose up -d
+docker compose up --profile '*' -d
 ```
 
 Start a particular service. Can add multiple profile names of only one of them.
 ```bash
-docker compose up --profile <profile-name> <profile-name> -d
+docker compose --profile <profile-name> <profile-name> up -d
 ```
 
-View logs:
+View all logs (for specific, mention the profile you want to see the logs for, otherwise use `docker logs <container-name>`):
 ```bash
-docker compose logs -f
+docker compose --profile '*' logs -f
 ```
 
 Stop all services:
 ```bash
-docker compose down
+docker compose --profile '*' down
 ```
 
 Stop and remove volumes:
 ```bash
-docker compose down -v
+docker compose --profile '*' down -v
 ```
 
 ## Configuration Files

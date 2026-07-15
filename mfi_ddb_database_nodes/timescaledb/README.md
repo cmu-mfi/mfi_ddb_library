@@ -113,12 +113,12 @@ timescaledb/
 1. Configure your target database environment variables and broker targets inside `mfi_ddb_library/docker/timescale/connector-config.yaml`
 2. Run the following docker compose commands with profile tag:
 
-```
+```bash
 docker compose --profile ts up -d
 ```
 3. Check your docker processes either using ui or the following command:
 
-```
+```bash
 docker ps
 ```
 
