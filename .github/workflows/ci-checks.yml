@@ -74,4 +74,4 @@ jobs:
   # JOB 3: Run ROS2 tests
   ros2-check:
     needs: installation-check
-    uses: ./.github/workflows/data_adapters/ros2.yaml@main
+    uses: ./.github/workflows/data_adapters/ros2.yaml
