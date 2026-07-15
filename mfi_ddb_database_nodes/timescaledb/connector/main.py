@@ -10,7 +10,7 @@ import threading
 from pathlib import Path
 from unicodedata import name
 import yaml
-from typing import Any, List, Tuple, Optional
+from typing import Any, List, Tuple, Optional, Iterable
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
 from datetime import datetime, timezone
@@ -20,7 +20,7 @@ from db import TimeScaleWriter
 
 from prometheus_client import start_http_server
 from opentelemetry.exporter.prometheus import PrometheusMetricReader
-from opentelemetry.metrics import set_meter_provider, get_meter  # <-- 1. Added get_meter
+from opentelemetry.metrics import set_meter_provider, get_meter, Observation  # <-- 1. Added get_meter
 from opentelemetry.sdk.metrics import MeterProvider
 
 reader = PrometheusMetricReader()
