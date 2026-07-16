@@ -46,7 +46,7 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:10.4.1 # Clean, stable OSS build
+    image: grafana/grafana:11.6.16 # Clean, stable OSS build
     container_name: mfi-grafana
     profiles:
       - "monitoring"
