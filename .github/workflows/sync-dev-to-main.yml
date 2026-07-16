@@ -1,0 +1,36 @@
+name: Sync Dev to Main
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-dev-to-main:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.SHOBHITAGG_PAT }}
+          ref: main
+          fetch-depth: 0
+
+      - name: Configure Git user
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch all branches and tags
+        run: |
+          git fetch --all
+
+      - name: Sync dev to main
+        run: |
+          # Update main with dev branch changes
+          git merge origin/dev --no-edit
+          
+          # Push the updated main branch
+          git push origin main
