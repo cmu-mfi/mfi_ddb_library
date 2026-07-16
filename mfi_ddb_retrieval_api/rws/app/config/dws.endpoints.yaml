@@ -1,22 +1,22 @@
 services:
   metadata_service:                     # service name is arbitrary, but should be unique across services
-    url: "http://mfi-metadata-store-db:5432"        # (required) DWS server URL (protocol, host, port)
+    url: "mfi-metadata-store-db:5432"        # (required) DWS server URL (protocol, host, port)
     topic_families:                     # (required) list of topic families that this service can handle; used for routing requests
     - mfi-v1.0-kv
     # topics:                                             # (optional) list of topics (wildcards allowed) 
     # - 'mfi-v1.0-kv/CMU/some/path/to/specific/topic/#'   # if 'topics' key is used, make sure to include all topics
 
   kv_service:
-    url: "http://mfi-kv-psql-dws:50051"  
+    url: "mfi-kv-psql-dws:50051"  
     topic_families: 
     - mfi-v1.0-kv
 
   historian_service:
-    url: "http://mfi-timescaledb-dws:50051"  
+    url: "mfi-timescaledb-dws:50051"  
     topic_families: 
     - mfi-v1.0-historian
 
   cfs_service:
-    url: "http://blob-dws:50053"  
+    url: "mfi-blob-dws:50053"  
     topic_families: 
     - mfi-v1.0-blob
