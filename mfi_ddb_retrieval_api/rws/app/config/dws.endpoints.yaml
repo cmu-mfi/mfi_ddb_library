@@ -12,7 +12,7 @@ services:
     - mfi-v1.0-kv
 
   historian_service:
-    url: "http://mfi-timescaledb-dws:50052"  
+    url: "http://mfi-timescaledb-dws:50051"  
     topic_families: 
     - mfi-v1.0-historian
 
