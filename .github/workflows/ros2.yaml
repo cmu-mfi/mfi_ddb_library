@@ -23,6 +23,9 @@ jobs:
     services:
       emqx:
         image: emqx/emqx:5.10.2
+        ports:
+          - 1883:1883
+          - 18083:18083
 
     steps:
       - uses: actions/checkout@v5
