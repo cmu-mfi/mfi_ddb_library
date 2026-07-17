@@ -37,6 +37,7 @@ jobs:
           apt-get install -y \
             curl \
             python3-pip \
+            python3-lark \
             ros-jazzy-demo-nodes-cpp \
             ros-jazzy-launch-testing
 
