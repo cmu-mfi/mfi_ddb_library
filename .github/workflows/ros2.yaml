@@ -41,6 +41,11 @@ jobs:
             ros-jazzy-demo-nodes-cpp \
             ros-jazzy-launch-testing
 
+      - name: Uninstall unnecessary ROS pytest plugins
+        shell: bash
+        run: |
+          pip uninstall -y launch-testing launch-ros ament-flake8 ament-xmllint ament-lint ament-pep257 ament-copyright colcon-core-warnings-stderr 2>/dev/null || true
+
       - name: Install uv
         shell: bash
         run: |
