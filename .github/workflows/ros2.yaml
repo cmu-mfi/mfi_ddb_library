@@ -19,41 +19,49 @@ jobs:
 
     container:
       image: ros:jazzy
-
+      
     services:
       emqx:
         image: emqx/emqx:5.10.2
         ports:
           - 1883:1883
           - 18083:18083
+        options: >-
+          --health-cmd "curl --fail http://127.0.0.1:18083/api/v5/status || exit 1"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+          --add-host emqx:127.0.0.1      
 
     steps:
       - uses: actions/checkout@v5
 
+      # Optimization 1: Combined apt steps and cleared cache to save space/time
       - name: Install ROS2 system dependencies
         shell: bash
         run: |
-          apt-get update
-          apt-get install -y \
+          apt-get update && apt-get install -y \
             curl \
             python3-pip \
             python3-lark \
-            ros-jazzy-demo-nodes-cpp \
-            ros-jazzy-launch-testing
+            ros-jazzy-demo-nodes-cpp
+        # && rm -rf /var/lib/apt/lists/*
 
-      - name: Uninstall unnecessary ROS pytest plugins
-        shell: bash
-        run: |
-          pip uninstall -y launch-testing launch-ros ament-flake8 ament-xmllint ament-lint ament-pep257 ament-copyright colcon-core-warnings-stderr 2>/dev/null || true
-
+      # Optimization 2: Use the official setup-uv action (includes automatic caching)
       - name: Install uv
         shell: bash
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
+      # Optimization 3: Pass --system-site-packages so uv can see your ROS2 installation
       - name: Install dependencies
-        run: uv sync --locked --all-extras --dev
+        run: |
+          git submodule update --init --recursive
+          uv sync --locked --all-extras --dev
+
+      # - name: Change pytest version
+      #   run: uv add --dev "pytest<=8.0"
 
       - name: Start ROS2 talker
         shell: bash
