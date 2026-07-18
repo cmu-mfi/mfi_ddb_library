@@ -35,8 +35,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          submodules: 'recursive'
 
-      # Optimization 1: Combined apt steps and cleared cache to save space/time
       - name: Install ROS2 system dependencies
         shell: bash
         run: |
@@ -45,23 +46,15 @@ jobs:
             python3-pip \
             python3-lark \
             ros-jazzy-demo-nodes-cpp
-        # && rm -rf /var/lib/apt/lists/*
 
-      # Optimization 2: Use the official setup-uv action (includes automatic caching)
       - name: Install uv
         shell: bash
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      # Optimization 3: Pass --system-site-packages so uv can see your ROS2 installation
       - name: Install dependencies
-        run: |
-          git submodule update --init --recursive
-          uv sync --locked --all-extras --dev
-
-      # - name: Change pytest version
-      #   run: uv add --dev "pytest<=8.0"
+        run: uv sync --locked --all-extras --dev
 
       - name: Start ROS2 talker
         shell: bash
