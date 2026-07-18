@@ -25,14 +25,19 @@ def test_system_polling():
     }
     
     streamer_config = {
-        "topic_family": "historian",
+        "user": {
+            "user_id": "user123",
+            "domain": "ANDREW",
+            "email": "user123@example.com",
+            "name": "User 123"
+        },        
         "mqtt": {
             "broker_address": "emqx",
             "broker_port": 1883,
             "enterprise": "TEST_ORG",
             "site": "TEST_SITE"
         }
-    }
+    }    
     
     # Start the ROS2 adapter and streamer
     adapter = mfi_ddb.data_adapters.Ros2DataAdapter(adapter_config)
@@ -74,14 +79,19 @@ def test_system_callback():
     }
     
     streamer_config = {
-        "topic_family": "historian",
+        "user": {
+            "user_id": "user123",
+            "domain": "ANDREW",
+            "email": "user123@example.com",
+            "name": "User 123"
+        },        
         "mqtt": {
             "broker_address": "emqx",
             "broker_port": 1883,
             "enterprise": "TEST_ORG",
             "site": "TEST_SITE"
         }
-    }
+    }    
 
     adapter = mfi_ddb.data_adapters.Ros2DataAdapter(adapter_config)
     exec_queue = queue.Queue()
