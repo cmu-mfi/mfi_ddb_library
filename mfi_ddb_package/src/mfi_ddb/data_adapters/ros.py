@@ -26,6 +26,7 @@ class RosDataAdapter(BaseDataAdapter):
         "devices": "List of devices to subscribe to. Each device should have a 'namespace' and a list of 'rostopics' to subscribe to. 'attributes' are optional and can be used to set the attributes of the device.",   
     }
     CONFIG_EXAMPLE = {
+        "adapter_name": "my_ros_adapter",
         "trial_id": "trial_001",
         "devices": {
             "device1": {

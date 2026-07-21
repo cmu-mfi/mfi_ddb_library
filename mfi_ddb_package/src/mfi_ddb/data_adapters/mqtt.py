@@ -126,6 +126,7 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
     }
     
     CONFIG_EXAMPLE = {
+        "adapter_name": "my_mqtt_adapter",
         "mqtt": {
             "broker_address": "mqtt.example.com",
             "broker_port": 1883,

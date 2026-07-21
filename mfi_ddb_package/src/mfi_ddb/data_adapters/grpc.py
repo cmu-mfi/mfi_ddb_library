@@ -23,7 +23,7 @@ class _SCHEMA(BaseModel):
         stub_class: str = Field(..., description="Name of the gRPC stub class to use for communication")
         request_class: str = Field(..., description="Name of the request class to use for the gRPC service call.")
         request: dict = Field(..., description="Request parameters for the gRPC service call")
-        
+
     class SCHEMA(BaseModel):
         server_address: str = Field(..., description="Network Address of the gRPC server")
         server_port: int = Field(..., description="Port of the gRPC server")
@@ -32,11 +32,11 @@ class _SCHEMA(BaseModel):
         compiled_protos_dir: str = Field("./compiled_protos", description="Full path to the compiled protobuf stubs (optional)")
         trial_id: str = Field(..., description="Trial ID for the gRPC device. No spaces or special characters allowed.")
         components: List['_GRPCComponent'] = Field(..., description="List of gRPC components to monitor")
-        
+
 class GrpcDataAdapter(BaseDataAdapter):
-    
+
     NAME = "gRPC"
-    
+
     CONFIG_HELP = {
         "server_address": "Network Address of the gRPC server (string)",
         "server_port": "Port of the gRPC server (int)",
@@ -46,8 +46,9 @@ class GrpcDataAdapter(BaseDataAdapter):
         "trial_id": "Trial ID for the gRPC device. No spaces or special characters allowed. (string)",
         "components": "List of gRPC components to monitor (list of dicts with keys: component_id, attributes (optional), proto_path, stub_class, request_class, request)"
     }
-    
+
     CONFIG_EXAMPLE = {
+        "adapter_name": "my_grpc_adapter",
         "server_address": "localhost",
         "server_port": 50051,
         "certificate_path": "/full/path/to/cert.pem",
@@ -85,11 +86,11 @@ class GrpcDataAdapter(BaseDataAdapter):
             }
         ]
     }
-    
+
     RECOMMENDED_TOPIC_FAMILY = "historian"
-    
+
     SELF_UPDATE = False
-    
+
     class SCHEMA(BaseDataAdapter.SCHEMA, _SCHEMA.SCHEMA):
         """
         Schema for the MTConnect data adapter configuration.
@@ -97,10 +98,8 @@ class GrpcDataAdapter(BaseDataAdapter):
         pass
 
     def __init__(self, config: dict):
-        super().__init__()
-        
-        self.cfg = config
-        
+        super().__init__(config)
+
         # 1. OPEN GRPC CHANNEL
         addr = f"{self.cfg['server_address']}:{self.cfg['server_port']}"
         if 'certificate_path' in self.cfg:
@@ -115,7 +114,7 @@ class GrpcDataAdapter(BaseDataAdapter):
         except grpc.FutureTimeoutError:
             raise ConnectionError('Error connecting to gRPC server')
         print(f"Connected to gRPC server at {addr}")
-        
+
         # 2. PREPARE COMPILED PROTOBUFS
         if not os.path.exists(self.cfg['compiled_protos_dir']):
             os.makedirs(self.cfg['compiled_protos_dir'])
@@ -135,7 +134,7 @@ class GrpcDataAdapter(BaseDataAdapter):
             sys.path.append(str(proto_full_path.parent.resolve()))
             # Import compiled protobuf stubs dynamically
             # ``````````````````````````````````````````
-            
+
             stub_module = importlib.import_module(f"{proto_name}_pb2_grpc")
             if not stub_module:
                 if not self.did_i_compile_once:
@@ -145,10 +144,10 @@ class GrpcDataAdapter(BaseDataAdapter):
                 raise ImportError(f"Could not import compiled protobuf module for {proto_name}")
 
             stub_class = getattr(stub_module, component['stub_class'])
-            
+
             # Import compiled protobuf request dynamically
-            # ``````````````````````````````````````````            
-            
+            # ``````````````````````````````````````````
+
             request_module = importlib.import_module(f"{proto_name}_pb2")
             if not request_module:
                 if not self.did_i_compile_once:
@@ -159,9 +158,9 @@ class GrpcDataAdapter(BaseDataAdapter):
 
             request_class = getattr(request_module, component['request_class'])
             request_dict = component['request']
-            
+
             # Instantiate stub and request
-            # ````````````````````````````            
+            # ````````````````````````````
             stub = stub_class(self.channel)
             request_instance = request_class(**request_dict)
 
@@ -173,7 +172,7 @@ class GrpcDataAdapter(BaseDataAdapter):
             self.component_ids.append(component['component_id'])
             self.attributes[component['component_id']] = component
             self._data[component['component_id']] = {}
-            
+
 
             self.components.append({
                 'component_id': component['component_id'],
@@ -189,7 +188,7 @@ class GrpcDataAdapter(BaseDataAdapter):
             # Assuming response has a 'data' attribute; adjust as needed
             self._data[comp['component_id']] = self.__process_data(raw_response)
             self.last_updated[comp['component_id']] = time.time()
-        
+
     def __generate_compiled_protos(self):
         '''
         #!/bin/bash
@@ -233,7 +232,7 @@ class GrpcDataAdapter(BaseDataAdapter):
             subprocess.run(cmd, check=True)
 
         print("Compiled protobufs successfully.")
-            
+
     def __process_data(self, raw_response):
         '''
         Convert to strict keyed dict
@@ -244,7 +243,7 @@ class GrpcDataAdapter(BaseDataAdapter):
              processed_data.update(self.__extract_key_value(raw_data[key], key))
 
         return processed_data
-    
+
     def __extract_key_value(self, data_item, data_item_key):
         if len(data_item_key) > 0 and data_item_key[0] == '/':
             data_item_key = data_item_key[1:]
@@ -261,7 +260,7 @@ class GrpcDataAdapter(BaseDataAdapter):
             return extracted_data
         else:
             return {data_item_key: self.__autotype(data_item)}
-    
+
     def __autotype(self, value):
         for cast in (int, float, eval):
             try:
@@ -274,4 +273,4 @@ class GrpcDataAdapter(BaseDataAdapter):
             except:
                 continue
 
-        return value        
+        return value
