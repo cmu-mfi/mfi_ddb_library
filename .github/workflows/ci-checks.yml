@@ -18,7 +18,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     defaults:
       run:
-        working-directory: mfi_ddb_package
+        working-directory: mfi_ddb_package    
 
     steps:
       - uses: actions/checkout@v5
@@ -35,14 +35,14 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: mfi_ddb_package
+        working-directory: mfi_ddb_package    
 
     services:
       emqx:
         image: emqx/emqx:5.10.2
         ports:
           - 1883:1883
-          - 18083:18083
+          - 18083:18083        
         options: >-
           --health-cmd "curl --fail http://127.0.0.1:18083/api/v5/status || exit 1"
           --health-interval 5s
