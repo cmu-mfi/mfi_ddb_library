@@ -34,10 +34,10 @@ class _SCHEMA:
         password: str = Field("", description="Password for MQTT broker authentication")
         tls_enabled: bool = Field(False, description="Enable TLS for MQTT connection (default: False)")
         debug: bool = Field(False, description="Enable debug mode for MQTT client (default: False)")
-        timeout: int = Field(5, description="Timeout in seconds for connecting to the MQTT broker (default: 5)")    
+        timeout: int = Field(5, description="Timeout in seconds for connecting to the MQTT broker (default: 5)")
         enterprise: str = Field(..., description="Enterprise name for MQTT connection")
         site: str = Field("", description="Site name for MQTT connection")
-    
+
     class _USER(BaseModel):
         user_id: str = Field(..., description="User ID associated with the data")
         domain: str = Field(..., description="Domain of the user")
@@ -93,16 +93,16 @@ class Streamer(Observer):
             "tls_enabled": "Enable TLS for MQTT connection (default: False)",
             "debug": "Enable debug mode for MQTT client (default: False)",
             "timeout": "Timeout in seconds for connecting to the MQTT broker (default: 5)"
-        },        
+        },
     }
-    
+
     class SCHEMA(_SCHEMA.SCHEMA):
         pass
-        
+
     def __init__(self, config: dict, data_adp: BaseDataAdapter, stream_on_update:bool = False) -> None:
         super().__init__()
-        
-        
+
+
         # 1. initialize the data adapter and respective topic family client
         # `````````````````````````````````````````````````````````````````````````
         self.cfg = copy.deepcopy(config)
@@ -120,21 +120,21 @@ class Streamer(Observer):
             topic_family_name = data_adp.RECOMMENDED_TOPIC_FAMILY
         else:
             topic_family_name = config['topic_family']
-            
+
         topic_family = globals()[TOPIC_CLIENTS[topic_family_name][1]]()
         self.__client = globals()[TOPIC_CLIENTS[topic_family_name][0]](self.cfg, topic_family)
-        self.__data_adp = data_adp        
+        self.__data_adp = data_adp
 
         self.__data_adp.get_data()
         print("WARNING: Waiting for birth data to be populated in the data adapter for all components...")
         while any(not bool(value) for value in self.__data_adp.data.values()):
             time.sleep(0.1)
             self.__data_adp.get_data()
-        
+
         self.__birth_data = copy.deepcopy(self.__data_adp.data)
-        
+
         print("Birth data populated in the data adapter for all components.")
-        
+
         # 2. initialize the key-value metadata and respective topic family client
         # `````````````````````````````````````````````````````````````````````````
         kv_topic_family = globals()[TOPIC_CLIENTS['kv'][1]]()
@@ -143,9 +143,9 @@ class Streamer(Observer):
         self.__blob_client = globals()[TOPIC_CLIENTS['blob'][0]](copy.deepcopy(config), blob_topic_family)
         self.__kv_birth_payload = {}
         self.__reset_stream()
-        
+
         self.__last_poll_update = 0
-        
+
         if stream_on_update:
             if(self.__data_adp.SELF_UPDATE):
                 self.__data_adp.add_observer(self)
@@ -160,11 +160,11 @@ class Streamer(Observer):
             blob_death_payload = get_blob_json_payload_from_dict(
                 data = kv_death_payload,
                 file_name = f'{trial_id}_metadata_death.json',
-                trial_id = trial_id)        
+                trial_id = trial_id)
 
             self.__kv_client.set_death_payload("metadata", kv_death_payload)
-            self.__blob_client.set_death_payload("metadata", blob_death_payload)            
-            
+            self.__blob_client.set_death_payload("metadata", blob_death_payload)
+
             self.__client.disconnect()
             self.__kv_client.disconnect()
             self.__blob_client.disconnect()
@@ -173,42 +173,42 @@ class Streamer(Observer):
             print("Streamer instance deleted. Bye! \u2764\uFE0F  MFI")
         except Exception as e:
             print(f"Error while disconnecting: {e}")
-        
+
     def reconnect(self, config=None):
         config = self.cfg if config==None else config
         self.__client.disconnect()
-        
+
         wait_time = 1
         print(f"Trying to reinitialize Data Adapter and connect in {wait_time} second...")
         time.sleep(wait_time)
-        
+
         data_adp = self.__data_adp.__class__(self.__data_adp.cfg)
         self.__init__(config, data_adp)
-    
+
     def poll_and_stream_data(self, polling_rate_hz: int = 1):
-        
+
         try:
             polling_rate_hz = int(polling_rate_hz)
         except Exception:
             print(f"WARNING: Invalid polling rate = {polling_rate_hz}. Using 1Hz.")
             polling_rate_hz = 1
-        
+
         if polling_rate_hz <= 0:
             print(f"WARNING: Invalid polling rate = {polling_rate_hz}. Using 1Hz.")
             polling_rate_hz = 1
-        
+
         while (time.time() - self.__last_poll_update) < 1/polling_rate_hz:
-            time.sleep(0.1)            
-        
+            time.sleep(0.1)
+
         self.__data_adp.get_data()
         self.__client.stream_data(self.__data_adp.data)
         self.__data_adp.clear_data_buffer()
-                
+
         self.__last_poll_update = time.time()
-        
+
     def on_data_update(self, data: dict):
         if self.__refresh_birth_data_with_new_keys(data):
-            self.__reset_stream()        
+            self.__reset_stream()
         self.__client.stream_data(data)
         self.__data_adp.clear_data_buffer(list(data.keys()))
 
@@ -228,17 +228,17 @@ class Streamer(Observer):
 
         Side effects:
             Updates the object's stored birth data in-place to include newly discovered keys.
-            
+
         """
         if not data:
             data = self.__data_adp.data
-        
+
         new_key_detected = False
         for key in data.keys():
             if key not in self.__birth_data:
                 print(f"WARNING: New component_id detected in data adapter: {key}.")
                 '''
-                Not updating the birth data structure here as it requires 
+                Not updating the birth data structure here as it requires
                 updating the data adapter attributes as well.
                 If this warning is seen, one of two scenarios is possible:
                 * the data adapter is populating data for an unknown component(s).
@@ -253,9 +253,9 @@ class Streamer(Observer):
                     new_key_detected = True
                 else:
                     self.__birth_data[key][sub_key] = copy.deepcopy(data[key][sub_key])
- 
+
         return new_key_detected
-    
+
     def __reset_stream(self):
         print("Resetting the stream with updated birth data...")
         # 1. reconnect existing clients
@@ -279,29 +279,29 @@ class Streamer(Observer):
                                                              trial_id = trial_id)
         blob_death_payload = get_blob_json_payload_from_dict(data = kv_death_payload,
                                                              file_name = f'{trial_id}_metadata_death.json',
-                                                             trial_id = trial_id)        
+                                                             trial_id = trial_id)
 
         # 3. publish the key-value metadata birth message with initial data
         # ```````````````````````````````````````````````````````````````````````
         self.__kv_client.set_death_payload("metadata", kv_death_payload)
         self.__kv_client.connect(['metadata'])
-        
+
         self.__blob_client.set_death_payload("metadata", blob_death_payload)
         self.__blob_client.connect(['metadata'])
-        
+
         self.__kv_client.stream_data({"metadata": kv_birth_payload})
         self.__blob_client.stream_data({"metadata": blob_birth_payload})
-        
-        # 4. publish the birth message of the data adapter        
+
+        # 4. publish the birth message of the data adapter
         # `````````````````````````````````````````````````````````````````````````
         self.__client.publish_birth(self.__data_adp.attributes, self.__data_adp.data)
-        self.__data_adp.clear_data_buffer()   
-             
+        self.__data_adp.clear_data_buffer()
+
     def __generate_birth_kv_payload(self) -> dict:
-        
+
         sample_data = copy.deepcopy(self.__birth_data)
         sample_data_size = sys.getsizeof(str(sample_data))
-        
+
         # drop keys until the size is less than 32768 bytes
         # since total size of payload <= 65536 bytes
         # ref: error with paho-mqtt: "struct.error: 'H' format requires 0 <= number <= 65535"
@@ -309,7 +309,7 @@ class Streamer(Observer):
             # remove the last key
             sample_data.popitem()
             sample_data_size = sys.getsizeof(str(sample_data))
-        
+
         payload = {
             "schema_version": "mfi-v1.0",
             "msg_type": "birth",
@@ -338,18 +338,18 @@ class Streamer(Observer):
             },
             "broker": {k: v for k, v in self.cfg["mqtt"].items() if k != "password"},
             "data_topics": list(self.__client.get_data_topics())
-        }         
-        
+        }
+
         return payload
-    
+
     def __generate_death_kv_payload(self, birth_payload: dict) -> dict:
         death_payload = copy.deepcopy(birth_payload)
         death_payload["msg_type"] = "death"
-        
-        # Update death time to now if birth time is more than 5 seconds ago, 
-        # otherwise don't update the time to ensure death time is after birth time. 
+
+        # Update death time to now if birth time is more than 5 seconds ago,
+        # otherwise don't update the time to ensure death time is after birth time.
         # This is to handle the case when streaming is not ended cleanly.
         if (datetime.now() - datetime.fromisoformat(birth_payload["time"]["birth"])) > timedelta(seconds=1.0):
             death_payload["time"]["death"] = datetime.now().isoformat()
-    
+
         return death_payload
