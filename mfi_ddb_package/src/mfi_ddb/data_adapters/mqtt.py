@@ -57,7 +57,7 @@ class _Mqtt:
         
         start_time = time.time()
         time_elapsed = 0
-        while not self.client.is_connected() or time_elapsed < timeout:
+        while not self.client.is_connected() and time_elapsed < timeout:
             print(f"Connecting to MQTT broker...{int(time_elapsed)}s")
             time.sleep(1)
             self.client.loop()

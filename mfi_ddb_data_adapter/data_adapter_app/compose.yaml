@@ -15,4 +15,9 @@ services:
       context: ./backend
     ports:
       - "8000:8000"
+    volumes:
+      - backend_data:/app/data
     restart: always
+
+volumes:
+  backend_data:
