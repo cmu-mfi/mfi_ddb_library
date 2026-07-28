@@ -7,16 +7,16 @@ services:
     # - 'mfi-v1.0-kv/CMU/some/path/to/specific/topic/#'   # if 'topics' key is used, make sure to include all topics
 
   kv_service:
-    url: "mfi-kv-psql-dws:50051"  
-    topic_families: 
+    url: "mfi-kv-psql-dws:50051"
+    topic_families:
     - mfi-v1.0-kv
 
   historian_service:
-    url: "mfi-timescaledb-dws:50051"  
-    topic_families: 
+    url: "mfi-timescaledb-dws:50051"
+    topic_families:
     - mfi-v1.0-historian
 
   cfs_service:
-    url: "mfi-blob-dws:50053"  
-    topic_families: 
+    url: "blob-dws:50053"
+    topic_families:
     - mfi-v1.0-blob

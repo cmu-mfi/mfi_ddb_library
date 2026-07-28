@@ -7,11 +7,11 @@ mqtt:
   debug: false
 
 config:
-  save_directory: "/data/blob_storage"
+  save_directory: "/.data/blob_storage"
   topic:
     version: "1.0"
     topic_family: "blob"
-    enterprise: "mfi"
+    enterprise: "CMU"
     site: null
     area: null
     device: null
