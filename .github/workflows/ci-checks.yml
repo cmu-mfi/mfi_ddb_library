@@ -74,4 +74,4 @@ jobs:
   # JOB 3: Run ROS2 tests
   ros2-check:
     needs: installation-check
-    uses: ./mfi_ddb_package/tests/workflows/data_adapters/ros2.yaml
+    uses: ./.github/workflows/ros2.yaml
