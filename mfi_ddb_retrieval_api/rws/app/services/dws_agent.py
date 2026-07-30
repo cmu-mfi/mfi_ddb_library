@@ -1,7 +1,9 @@
 import logging
 import time
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from pathlib import Path
 from typing import List, Optional, Union, Dict
 
@@ -57,9 +59,14 @@ def parse_datetime(ts_str: str) -> datetime:
     """Safely convert ISO string to timezone-naive UTC datetime for arithmetic."""
     dt = datetime.fromisoformat(ts_str)
     if dt.tzinfo is not None:
-        # Normalize timezone to UTC then drop tzinfo for clean timedelta math
         dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
     return dt
+
+
+@lru_cache(maxsize=10000)
+def cached_iso_format(ts_seconds: int) -> str:
+    """Cache timestamp conversion to avoid repetitive datetime construction."""
+    return datetime.fromtimestamp(ts_seconds, tz=timezone.utc).isoformat()
 
 
 class __DwsAgent:
@@ -68,6 +75,9 @@ class __DwsAgent:
         dws_config_path = Path(current_dir, "../config", cfg_file)
         
         self.config = self._load_config(dws_config_path)
+        # Persistent channel & stub storage for connection reuse
+        self._channels: Dict[str, grpc.Channel] = {}
+        self._stubs: Dict[str, DataServiceStub] = {}
         
     def _load_config(self, config_file):
         with open(config_file, 'r') as f:
@@ -86,27 +96,42 @@ class __DwsAgent:
                 config[topic_family].append(service_cfg)
         return config   
 
-    def _fetch_time_chunk(self, server_url: str, topics_str: str, start_dt: datetime, end_dt: datetime) -> List[Datapoint]:
-        """Worker thread function to fetch a single time range chunk sequentially."""
+    def _get_stub(self, server_url: str) -> DataServiceStub:
+        """Reuse gRPC channels and stubs across worker threads."""
+        if server_url not in self._stubs:
+            # Configure gRPC channel with keepalive options to maintain persistent connection
+            options = [
+                ('grpc.keepalive_time_ms', 30000),
+                ('grpc.keepalive_timeout_ms', 10000),
+                ('grpc.keepalive_permit_without_calls', 1),
+                ('grpc.http2.max_pings_without_data', 0),
+            ]
+            channel = grpc.insecure_channel(server_url, options=options)
+            self._channels[server_url] = channel
+            self._stubs[server_url] = DataServiceStub(channel)
+        return self._stubs[server_url]
+
+    def _fetch_time_chunk(self, stub: DataServiceStub, topics_str: str, start_dt: datetime, end_dt: datetime) -> List[Datapoint]:
+        """Worker thread function using a SHARED gRPC stub."""
         request = GetDataRangeRequest(
             topic=topics_str,
             start_time=Timestamp(seconds=int(start_dt.timestamp())),
             end_time=Timestamp(seconds=int(end_dt.timestamp())),
-            page_size=1000,
+            page_size=2500,
             page_token=""
         )
         
         datapoints = []
-        with grpc.insecure_channel(server_url) as channel:
-            stub = DataServiceStub(channel)
-            response: GetDataRangeResponse = stub.GetDataRange(request)
+        response: GetDataRangeResponse = stub.GetDataRange(request)
+        datapoints.extend(response.datapoints)
+        
+        page_count = 1
+        while response.next_page_token != "":
+            request.page_token = response.next_page_token
+            response = stub.GetDataRange(request)
             datapoints.extend(response.datapoints)
+            page_count += 1
             
-            while response.next_page_token != "":
-                request.page_token = response.next_page_token
-                response = stub.GetDataRange(request)
-                datapoints.extend(response.datapoints)
-                
         return datapoints
 
     def get_data(self, topics: Union[str, List[str]], time_start: str, time_end: str, max_workers: int = 10) -> Dict:
@@ -117,27 +142,26 @@ class __DwsAgent:
             topics = [topics]
             
         try:
-            topic_family_map = {}
+            topic_family_map = defaultdict(list)
             for topic in topics:
                 topic_family = topic.split("/")[0]
-                topic_family_map[topic_family] = topic_family_map.get(topic_family, []) + [topic]
+                topic_family_map[topic_family].append(topic)
             
-            result = {}
-            # FIX: Safely parse datetimes to handle aware vs naive mixed strings
+            result = defaultdict(list)
             dt_start = parse_datetime(time_start)
             dt_end = parse_datetime(time_end)
 
-            for topic_family in list(topic_family_map.keys()):
+            for topic_family, family_topics in topic_family_map.items():
                 if topic_family not in self.config:
                     logger.error(f"Topic family '{topic_family}' not found in DWS configuration.")
                     continue
                 
-                topics_str = ",".join(topic_family_map[topic_family])
+                topics_str = ",".join(family_topics)
                 servers = self.config[topic_family]
                 data_points: List[Datapoint] = []
                 
                 # ------------------------------------------------------------------
-                # 1. PARALLEL CHUNKED gRPC FETCH
+                # 1. PARALLEL CHUNKED gRPC FETCH (REUSING CHANNELS)
                 # ------------------------------------------------------------------
                 grpc_start = time.perf_counter()
                 
@@ -153,11 +177,14 @@ class __DwsAgent:
                 for server in servers:
                     logger.info(f"Retrieving data in parallel across {max_workers} threads from server: {server['name']}")
                     
+                    # Get persistent stub for this server
+                    stub = self._get_stub(server['url'])
+                    
                     with ThreadPoolExecutor(max_workers=max_workers) as executor:
                         futures = [
                             executor.submit(
                                 self._fetch_time_chunk, 
-                                server['url'], 
+                                stub, 
                                 topics_str, 
                                 c_start, 
                                 c_end
@@ -173,7 +200,6 @@ class __DwsAgent:
                         grpc_duration, 
                         {"server": server['name'], "topic_family": topic_family}
                     )
-                    logger.info(f"Parallel gRPC fetch finished in {grpc_duration:.3f}s across {max_workers} threads.")
 
                 # ------------------------------------------------------------------
                 # 2. DEDUPLICATION
@@ -189,14 +215,12 @@ class __DwsAgent:
                 
                 dedup_duration = time.perf_counter() - dedup_start
                 dws_dedup_duration.record(dedup_duration, {"topic_family": topic_family})
-                logger.info(f"Deduplication took {dedup_duration:.3f}s")
 
                 # ------------------------------------------------------------------
                 # 3. SERIALIZATION
                 # ------------------------------------------------------------------
                 serial_start = time.perf_counter()
                 for dp in unique_data_points:
-                    value = None
                     value_field = dp.WhichOneof("value")
                     if value_field == "int_value":
                         value = dp.int_value
@@ -208,28 +232,34 @@ class __DwsAgent:
                         value = MessageToDict(dp.json_value)
                     elif value_field == "file_value":
                         value = dp.file_value.filename
-                        logger.warning(f"File value found for topic {dp.topic} at timestamp {dp.timestamp.seconds}.")
-                    
-                    if dp.topic in result:
-                        result[dp.topic].append({
-                            "timestamp": datetime.fromtimestamp(dp.timestamp.seconds).isoformat(),
-                            "value": value
-                        })
                     else:
-                        result[dp.topic] = [{
-                            "timestamp": datetime.fromtimestamp(dp.timestamp.seconds).isoformat(),
-                            "value": value
-                        }]
+                        value = None
+
+                    result[dp.topic].append({
+                        "timestamp": cached_iso_format(dp.timestamp.seconds),
+                        "value": value
+                    })
 
                 serial_duration = time.perf_counter() - serial_start
                 dws_serialization_duration.record(serial_duration, {"topic_family": topic_family})
-                logger.info(f"Serialization took {serial_duration:.3f}s")
+
+                # Detailed breakdown logging as suggested by ChatGPT
+                logger.info(
+                    f"\n--- PERFORMANCE BREAKDOWN ---\n"
+                    f"Points Returned : {len(unique_data_points)}\n"
+                    f"gRPC Fetch      : {grpc_duration:.3f}s\n"
+                    f"Deduplication   : {dedup_duration:.3f}s\n"
+                    f"Serialization   : {serial_duration:.3f}s\n"
+                    f"Total Run       : {time.perf_counter() - start_time:.3f}s\n"
+                    f"-----------------------------"
+                )
 
             duration = time.perf_counter() - start_time
             dws_retrieval_duration.record(duration, {"trial_name": primary_topic, "status": "SUCCESS"})
             dws_retrieval_counter.add(1, {"trial_name": primary_topic, "status": "SUCCESS"})
 
-            return result
+            # Convert defaultdict back to standard dict
+            return dict(result)
 
         except Exception as e:
             logger.exception("Error executing get_data in DwsAgent")
@@ -237,6 +267,11 @@ class __DwsAgent:
             dws_retrieval_duration.record(duration, {"trial_name": primary_topic, "status": "ERROR"})
             dws_retrieval_counter.add(1, {"trial_name": primary_topic, "status": "ERROR"})
             raise e
+
+    def __del__(self):
+        """Cleanup gRPC channels when the agent instance is destroyed."""
+        for channel in getattr(self, '_channels', {}).values():
+            channel.close()
 
 
 DwsAgent = __DwsAgent()
