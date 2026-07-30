@@ -12,11 +12,16 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 from app.utils.dws.gen.models_pb2 import Datapoint
 from app.utils.dws.gen.service_pb2 import (
+    GetDataPointRequest,
+    GetDataPointResponse,
     GetDataRangeRequest,
     GetDataRangeResponse,
 )
 from app.utils.dws.gen.service_pb2_grpc import DataServiceStub
 
+# ==============================================================================
+# OPENTELEMETRY CUSTOM METRICS SETUP
+# ==============================================================================
 from opentelemetry.metrics import get_meter
 
 meter = get_meter("mfi.rws.app")
@@ -46,6 +51,7 @@ dws_serialization_duration = meter.create_histogram(
     "mfi_rws_dws_serialization_duration_seconds",
     description="Duration of Protobuf to Python Dict conversion"
 )
+# ==============================================================================
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +60,7 @@ class __DwsAgent:
     def __init__(self, cfg_file: str = "dws.endpoints.yaml"):
         current_dir = Path(__file__).parent
         dws_config_path = Path(current_dir, "../config", cfg_file)
+        
         self.config = self._load_config(dws_config_path)
         
     def _load_config(self, config_file):
@@ -89,7 +96,7 @@ class __DwsAgent:
             result = {}
             for topic_family in list(topic_family_map.keys()):
                 if topic_family not in self.config:
-                    logger.error(f"Topic family '{topic_family}' not found in DWS configuration. Skipping: {topic_family_map[topic_family]}")
+                    logger.error(f"Topic family '{topic_family}' not found in DWS configuration. Skipping data retrieval for topics: {topic_family_map[topic_family]}")
                     continue
                             
                 request = GetDataRangeRequest(
@@ -108,32 +115,28 @@ class __DwsAgent:
                 # ------------------------------------------------------------------
                 for server in servers:
                     grpc_start = time.perf_counter()
-                    logger.info(f"Retrieving data from server {server['name']} ({server['url']})")
+                    logger.info(f"Retrieving data for topics: {topic_family_map[topic_family]} from server: {server['name']} at {server['url']}")
                     
                     page_count = 0
-                    # Open a single persistent channel per server instead of recreating per request
-                    with grpc.insecure_channel(server['url']) as channel:
-                        stub = DataServiceStub(channel)
-                        
-                        response: GetDataRangeResponse = stub.GetDataRange(request)
-                        raw_data = response.datapoints
-                        page_count += 1
+                    response: GetDataRangeResponse = self._call_dws_server(server['url'], request)
+                    raw_data = response.datapoints
+                    page_count += 1
 
-                        while response.next_page_token != "":
-                            request = copy.deepcopy(request)
-                            request.page_token = response.next_page_token
-                            response = stub.GetDataRange(request)
-                            raw_data.extend(response.datapoints)
-                            page_count += 1
+                    while response.next_page_token != "":
+                        request = copy.deepcopy(request)
+                        request.page_token = response.next_page_token
+                        response: GetDataRangeResponse = self._call_dws_server(server['url'], request)
+                        raw_data.extend(response.datapoints)
+                        page_count += 1
                         
                     data_points.extend(raw_data)
                     
                     grpc_duration = time.perf_counter() - grpc_start
                     dws_grpc_call_duration.record(
                         grpc_duration, 
-                        {"server": server['name'], "pages": str(page_count)}
+                        {"server": server['name'], "pages": str(page_count), "topic_family": topic_family}
                     )
-                    logger.info(f"gRPC fetch from {server['name']} took {grpc_duration:.3f}s across {page_count} page(s) ({len(raw_data)} datapoints)")
+                    logger.info(f"gRPC fetch from {server['name']} took {grpc_duration:.3f}s across {page_count} page(s)")
 
                 # ------------------------------------------------------------------
                 # 2. MEASURE DEDUPLICATION TIME
@@ -149,7 +152,7 @@ class __DwsAgent:
                 
                 dedup_duration = time.perf_counter() - dedup_start
                 dws_dedup_duration.record(dedup_duration, {"topic_family": topic_family})
-                logger.info(f"Deduplication took {dedup_duration:.3f}s for {len(data_points)} total -> {len(unique_data_points)} unique points")
+                logger.info(f"Deduplication took {dedup_duration:.3f}s")
 
                 # ------------------------------------------------------------------
                 # 3. MEASURE PROTOBUF TO DICT SERIALIZATION TIME
@@ -168,7 +171,7 @@ class __DwsAgent:
                         value = MessageToDict(dp.json_value)
                     elif value_field == "file_value":
                         value = dp.file_value.filename
-                        logger.warning(f"File value found for topic {dp.topic}. Returning filename '{value}'")
+                        logger.warning(f"File value found for topic {dp.topic} at timestamp {dp.timestamp.seconds}. Returning filename '{value}' instead of file content.")
                     
                     if dp.topic in result:
                         result[dp.topic].append({
@@ -180,12 +183,12 @@ class __DwsAgent:
                             "timestamp": datetime.fromtimestamp(dp.timestamp.seconds).isoformat(),
                             "value": value
                         }]
-                
+
                 serial_duration = time.perf_counter() - serial_start
                 dws_serialization_duration.record(serial_duration, {"topic_family": topic_family})
-                logger.info(f"Serialization took {serial_duration:.3f}s for {len(unique_data_points)} points")
+                logger.info(f"Serialization took {serial_duration:.3f}s")
 
-            # Overall Metric Recording
+            # Telemetry: Record successful extraction metrics
             duration = time.perf_counter() - start_time
             dws_retrieval_duration.record(duration, {"trial_name": primary_topic, "status": "SUCCESS"})
             dws_retrieval_counter.add(1, {"trial_name": primary_topic, "status": "SUCCESS"})
@@ -193,10 +196,17 @@ class __DwsAgent:
             return result
 
         except Exception as e:
+            # Telemetry: Record failure execution metrics
             duration = time.perf_counter() - start_time
             dws_retrieval_duration.record(duration, {"trial_name": primary_topic, "status": "ERROR"})
             dws_retrieval_counter.add(1, {"trial_name": primary_topic, "status": "ERROR"})
             raise e
+        
+    def _call_dws_server(self, endpoint: str, request: GetDataRangeRequest) -> GetDataRangeResponse:
+        with grpc.insecure_channel(endpoint) as channel:
+            stub = DataServiceStub(channel)
+            response = stub.GetDataRange(request)
+            return response
 
 
 DwsAgent = __DwsAgent()
