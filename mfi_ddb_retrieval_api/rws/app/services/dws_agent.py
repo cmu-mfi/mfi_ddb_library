@@ -42,6 +42,22 @@ dws_grpc_call_duration = meter.create_histogram(
     description="Duration of raw gRPC network calls including pagination"
 )
 
+# NEW FINE-GRAINED METRICS
+dws_single_page_network_duration = meter.create_histogram(
+    "mfi_rws_dws_single_page_network_duration_seconds",
+    description="Duration of individual gRPC page fetch network calls"
+)
+
+dws_first_page_duration = meter.create_histogram(
+    "mfi_rws_dws_first_page_duration_seconds",
+    description="Time taken to return the very first page (upstream DB latency)"
+)
+
+dws_request_copy_duration = meter.create_histogram(
+    "mfi_rws_dws_request_copy_duration_seconds",
+    description="Time spent doing deepcopy on request objects"
+)
+
 dws_dedup_duration = meter.create_histogram(
     "mfi_rws_dws_dedup_duration_seconds",
     description="Duration of in-memory deduplication"
@@ -118,14 +134,33 @@ class __DwsAgent:
                     logger.info(f"Retrieving data for topics: {topic_family_map[topic_family]} from server: {server['name']} at {server['url']}")
                     
                     page_count = 0
+                    
+                    # --- TIMER: First Page Fetch (Upstream Query Execution Time) ---
+                    first_page_start = time.perf_counter()
                     response: GetDataRangeResponse = self._call_dws_server(server['url'], request)
+                    first_page_time = time.perf_counter() - first_page_start
+                    
+                    dws_first_page_duration.record(first_page_time, {"server": server['name'], "topic_family": topic_family})
+                    dws_single_page_network_duration.record(first_page_time, {"server": server['name'], "page": "1"})
+                    
                     raw_data = response.datapoints
                     page_count += 1
 
                     while response.next_page_token != "":
+                        # --- TIMER: Deepcopy Request Overhead ---
+                        copy_start = time.perf_counter()
                         request = copy.deepcopy(request)
                         request.page_token = response.next_page_token
+                        copy_duration = time.perf_counter() - copy_start
+                        dws_request_copy_duration.record(copy_duration, {"server": server['name']})
+
+                        # --- TIMER: Subsequent Page Network Latency ---
+                        page_start = time.perf_counter()
                         response: GetDataRangeResponse = self._call_dws_server(server['url'], request)
+                        page_duration = time.perf_counter() - page_start
+                        
+                        dws_single_page_network_duration.record(page_duration, {"server": server['name'], "page": str(page_count + 1)})
+
                         raw_data.extend(response.datapoints)
                         page_count += 1
                         
@@ -136,7 +171,7 @@ class __DwsAgent:
                         grpc_duration, 
                         {"server": server['name'], "pages": str(page_count), "topic_family": topic_family}
                     )
-                    logger.info(f"gRPC fetch from {server['name']} took {grpc_duration:.3f}s across {page_count} page(s)")
+                    logger.info(f"gRPC fetch from {server['name']} took {grpc_duration:.3f}s across {page_count} page(s) (First page: {first_page_time:.3f}s)")
 
                 # ------------------------------------------------------------------
                 # 2. MEASURE DEDUPLICATION TIME
