@@ -1,4 +1,3 @@
-import copy
 import logging
 import time
 from datetime import datetime
@@ -42,7 +41,6 @@ dws_grpc_call_duration = meter.create_histogram(
     description="Duration of raw gRPC network calls including pagination"
 )
 
-# NEW FINE-GRAINED METRICS
 dws_single_page_network_duration = meter.create_histogram(
     "mfi_rws_dws_single_page_network_duration_seconds",
     description="Duration of individual gRPC page fetch network calls"
@@ -51,11 +49,6 @@ dws_single_page_network_duration = meter.create_histogram(
 dws_first_page_duration = meter.create_histogram(
     "mfi_rws_dws_first_page_duration_seconds",
     description="Time taken to return the very first page (upstream DB latency)"
-)
-
-dws_request_copy_duration = meter.create_histogram(
-    "mfi_rws_dws_request_copy_duration_seconds",
-    description="Time spent doing deepcopy on request objects"
 )
 
 dws_dedup_duration = meter.create_histogram(
@@ -115,11 +108,12 @@ class __DwsAgent:
                     logger.error(f"Topic family '{topic_family}' not found in DWS configuration. Skipping data retrieval for topics: {topic_family_map[topic_family]}")
                     continue
                             
+                # OPTIMIZATION: Increased page_size from 1,000 to 10,000 to cut network RTTs by 90%
                 request = GetDataRangeRequest(
                     topic=",".join(topic_family_map[topic_family]),
                     start_time=Timestamp(seconds=int(datetime.fromisoformat(time_start).timestamp())),
                     end_time=Timestamp(seconds=int(datetime.fromisoformat(time_end).timestamp())),
-                    page_size=1000,
+                    page_size=10000,
                     page_token=""
                 )
                 
@@ -135,41 +129,41 @@ class __DwsAgent:
                     
                     page_count = 0
                     
-                    # --- TIMER: First Page Fetch (Upstream Query Execution Time) ---
-                    first_page_start = time.perf_counter()
-                    response: GetDataRangeResponse = self._call_dws_server(server['url'], request)
-                    first_page_time = time.perf_counter() - first_page_start
-                    
-                    dws_first_page_duration.record(first_page_time, {"server": server['name'], "topic_family": topic_family})
-                    dws_single_page_network_duration.record(first_page_time, {"server": server['name'], "page": "1"})
-                    
-                    raw_data = response.datapoints
-                    page_count += 1
-
-                    while response.next_page_token != "":
-                        # --- TIMER: Deepcopy Request Overhead ---
-                        copy_start = time.perf_counter()
-                        request = copy.deepcopy(request)
-                        request.page_token = response.next_page_token
-                        copy_duration = time.perf_counter() - copy_start
-                        dws_request_copy_duration.record(copy_duration, {"server": server['name']})
-
-                        # --- TIMER: Subsequent Page Network Latency ---
-                        page_start = time.perf_counter()
-                        response: GetDataRangeResponse = self._call_dws_server(server['url'], request)
-                        page_duration = time.perf_counter() - page_start
+                    # OPTIMIZATION: Reuse a single gRPC channel across all pages for this server
+                    with grpc.insecure_channel(server['url']) as channel:
+                        stub = DataServiceStub(channel)
                         
-                        dws_single_page_network_duration.record(page_duration, {"server": server['name'], "page": str(page_count + 1)})
-
-                        raw_data.extend(response.datapoints)
+                        # --- TIMER: First Page Fetch ---
+                        first_page_start = time.perf_counter()
+                        response: GetDataRangeResponse = stub.GetDataRange(request)
+                        first_page_time = time.perf_counter() - first_page_start
+                        
+                        dws_first_page_duration.record(first_page_time, {"server": server['name'], "topic_family": topic_family})
+                        dws_single_page_network_duration.record(first_page_time, {"server": server['name']})
+                        
+                        raw_data = response.datapoints
                         page_count += 1
+
+                        while response.next_page_token != "":
+                            # OPTIMIZATION: Direct mutation removes deepcopy overhead
+                            request.page_token = response.next_page_token
+
+                            # --- TIMER: Subsequent Page Network Latency ---
+                            page_start = time.perf_counter()
+                            response = stub.GetDataRange(request)
+                            page_duration = time.perf_counter() - page_start
+                            
+                            dws_single_page_network_duration.record(page_duration, {"server": server['name']})
+
+                            raw_data.extend(response.datapoints)
+                            page_count += 1
                         
                     data_points.extend(raw_data)
                     
                     grpc_duration = time.perf_counter() - grpc_start
                     dws_grpc_call_duration.record(
                         grpc_duration, 
-                        {"server": server['name'], "pages": str(page_count), "topic_family": topic_family}
+                        {"server": server['name'], "topic_family": topic_family}
                     )
                     logger.info(f"gRPC fetch from {server['name']} took {grpc_duration:.3f}s across {page_count} page(s) (First page: {first_page_time:.3f}s)")
 
@@ -236,12 +230,6 @@ class __DwsAgent:
             dws_retrieval_duration.record(duration, {"trial_name": primary_topic, "status": "ERROR"})
             dws_retrieval_counter.add(1, {"trial_name": primary_topic, "status": "ERROR"})
             raise e
-        
-    def _call_dws_server(self, endpoint: str, request: GetDataRangeRequest) -> GetDataRangeResponse:
-        with grpc.insecure_channel(endpoint) as channel:
-            stub = DataServiceStub(channel)
-            response = stub.GetDataRange(request)
-            return response
 
 
 DwsAgent = __DwsAgent()
