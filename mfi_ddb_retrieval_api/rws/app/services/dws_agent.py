@@ -1,7 +1,7 @@
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Optional, Union, Dict
 
@@ -51,6 +51,15 @@ dws_serialization_duration = meter.create_histogram(
 # ==============================================================================
 
 logger = logging.getLogger(__name__)
+
+
+def parse_datetime(ts_str: str) -> datetime:
+    """Safely convert ISO string to timezone-naive UTC datetime for arithmetic."""
+    dt = datetime.fromisoformat(ts_str)
+    if dt.tzinfo is not None:
+        # Normalize timezone to UTC then drop tzinfo for clean timedelta math
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
 
 
 class __DwsAgent:
@@ -114,8 +123,9 @@ class __DwsAgent:
                 topic_family_map[topic_family] = topic_family_map.get(topic_family, []) + [topic]
             
             result = {}
-            dt_start = datetime.fromisoformat(time_start)
-            dt_end = datetime.fromisoformat(time_end)
+            # FIX: Safely parse datetimes to handle aware vs naive mixed strings
+            dt_start = parse_datetime(time_start)
+            dt_end = parse_datetime(time_end)
 
             for topic_family in list(topic_family_map.keys()):
                 if topic_family not in self.config:
@@ -131,7 +141,6 @@ class __DwsAgent:
                 # ------------------------------------------------------------------
                 grpc_start = time.perf_counter()
                 
-                # Divide overall time range into `max_workers` chunks
                 total_duration_sec = (dt_end - dt_start).total_seconds()
                 chunk_duration_sec = total_duration_sec / max_workers
                 
@@ -223,6 +232,7 @@ class __DwsAgent:
             return result
 
         except Exception as e:
+            logger.exception("Error executing get_data in DwsAgent")
             duration = time.perf_counter() - start_time
             dws_retrieval_duration.record(duration, {"trial_name": primary_topic, "status": "ERROR"})
             dws_retrieval_counter.add(1, {"trial_name": primary_topic, "status": "ERROR"})
