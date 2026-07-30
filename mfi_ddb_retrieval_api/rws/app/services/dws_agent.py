@@ -1,6 +1,7 @@
 import logging
 import time
-from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional, Union, Dict
 
@@ -11,8 +12,6 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 from app.utils.dws.gen.models_pb2 import Datapoint
 from app.utils.dws.gen.service_pb2 import (
-    GetDataPointRequest,
-    GetDataPointResponse,
     GetDataRangeRequest,
     GetDataRangeResponse,
 )
@@ -35,20 +34,9 @@ dws_retrieval_counter = meter.create_counter(
     description="Total raw data extraction runs requested by users"
 )
 
-# --- Sub-operation Timers ---
 dws_grpc_call_duration = meter.create_histogram(
     "mfi_rws_dws_grpc_call_duration_seconds",
     description="Duration of raw gRPC network calls including pagination"
-)
-
-dws_single_page_network_duration = meter.create_histogram(
-    "mfi_rws_dws_single_page_network_duration_seconds",
-    description="Duration of individual gRPC page fetch network calls"
-)
-
-dws_first_page_duration = meter.create_histogram(
-    "mfi_rws_dws_first_page_duration_seconds",
-    description="Time taken to return the very first page (upstream DB latency)"
 )
 
 dws_dedup_duration = meter.create_histogram(
@@ -89,7 +77,30 @@ class __DwsAgent:
                 config[topic_family].append(service_cfg)
         return config   
 
-    def get_data(self, topics: Union[str, List[str]], time_start: str, time_end: str) -> Dict:
+    def _fetch_time_chunk(self, server_url: str, topics_str: str, start_dt: datetime, end_dt: datetime) -> List[Datapoint]:
+        """Worker thread function to fetch a single time range chunk sequentially."""
+        request = GetDataRangeRequest(
+            topic=topics_str,
+            start_time=Timestamp(seconds=int(start_dt.timestamp())),
+            end_time=Timestamp(seconds=int(end_dt.timestamp())),
+            page_size=1000,
+            page_token=""
+        )
+        
+        datapoints = []
+        with grpc.insecure_channel(server_url) as channel:
+            stub = DataServiceStub(channel)
+            response: GetDataRangeResponse = stub.GetDataRange(request)
+            datapoints.extend(response.datapoints)
+            
+            while response.next_page_token != "":
+                request.page_token = response.next_page_token
+                response = stub.GetDataRange(request)
+                datapoints.extend(response.datapoints)
+                
+        return datapoints
+
+    def get_data(self, topics: Union[str, List[str]], time_start: str, time_end: str, max_workers: int = 10) -> Dict:
         start_time = time.perf_counter()
         primary_topic = topics[0] if isinstance(topics, list) and len(topics) > 0 else (topics or "unknown")
 
@@ -103,72 +114,60 @@ class __DwsAgent:
                 topic_family_map[topic_family] = topic_family_map.get(topic_family, []) + [topic]
             
             result = {}
+            dt_start = datetime.fromisoformat(time_start)
+            dt_end = datetime.fromisoformat(time_end)
+
             for topic_family in list(topic_family_map.keys()):
                 if topic_family not in self.config:
-                    logger.error(f"Topic family '{topic_family}' not found in DWS configuration. Skipping data retrieval for topics: {topic_family_map[topic_family]}")
+                    logger.error(f"Topic family '{topic_family}' not found in DWS configuration.")
                     continue
-                            
-                # OPTIMIZATION: Increased page_size from 1,000 to 10,000 to cut network RTTs by 90%
-                request = GetDataRangeRequest(
-                    topic=",".join(topic_family_map[topic_family]),
-                    start_time=Timestamp(seconds=int(datetime.fromisoformat(time_start).timestamp())),
-                    end_time=Timestamp(seconds=int(datetime.fromisoformat(time_end).timestamp())),
-                    page_size=10000,
-                    page_token=""
-                )
                 
+                topics_str = ",".join(topic_family_map[topic_family])
                 servers = self.config[topic_family]
                 data_points: List[Datapoint] = []
                 
                 # ------------------------------------------------------------------
-                # 1. MEASURE gRPC FETCH & PAGINATION TIME
+                # 1. PARALLEL CHUNKED gRPC FETCH
                 # ------------------------------------------------------------------
+                grpc_start = time.perf_counter()
+                
+                # Divide overall time range into `max_workers` chunks
+                total_duration_sec = (dt_end - dt_start).total_seconds()
+                chunk_duration_sec = total_duration_sec / max_workers
+                
+                time_chunks = []
+                for i in range(max_workers):
+                    chunk_start = dt_start + timedelta(seconds=i * chunk_duration_sec)
+                    chunk_end = dt_start + timedelta(seconds=(i + 1) * chunk_duration_sec) if i < max_workers - 1 else dt_end
+                    time_chunks.append((chunk_start, chunk_end))
+
                 for server in servers:
-                    grpc_start = time.perf_counter()
-                    logger.info(f"Retrieving data for topics: {topic_family_map[topic_family]} from server: {server['name']} at {server['url']}")
+                    logger.info(f"Retrieving data in parallel across {max_workers} threads from server: {server['name']}")
                     
-                    page_count = 0
-                    
-                    # OPTIMIZATION: Reuse a single gRPC channel across all pages for this server
-                    with grpc.insecure_channel(server['url']) as channel:
-                        stub = DataServiceStub(channel)
+                    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                        futures = [
+                            executor.submit(
+                                self._fetch_time_chunk, 
+                                server['url'], 
+                                topics_str, 
+                                c_start, 
+                                c_end
+                            )
+                            for c_start, c_end in time_chunks
+                        ]
                         
-                        # --- TIMER: First Page Fetch ---
-                        first_page_start = time.perf_counter()
-                        response: GetDataRangeResponse = stub.GetDataRange(request)
-                        first_page_time = time.perf_counter() - first_page_start
-                        
-                        dws_first_page_duration.record(first_page_time, {"server": server['name'], "topic_family": topic_family})
-                        dws_single_page_network_duration.record(first_page_time, {"server": server['name']})
-                        
-                        raw_data = response.datapoints
-                        page_count += 1
+                        for future in as_completed(futures):
+                            data_points.extend(future.result())
 
-                        while response.next_page_token != "":
-                            # OPTIMIZATION: Direct mutation removes deepcopy overhead
-                            request.page_token = response.next_page_token
-
-                            # --- TIMER: Subsequent Page Network Latency ---
-                            page_start = time.perf_counter()
-                            response = stub.GetDataRange(request)
-                            page_duration = time.perf_counter() - page_start
-                            
-                            dws_single_page_network_duration.record(page_duration, {"server": server['name']})
-
-                            raw_data.extend(response.datapoints)
-                            page_count += 1
-                        
-                    data_points.extend(raw_data)
-                    
                     grpc_duration = time.perf_counter() - grpc_start
                     dws_grpc_call_duration.record(
                         grpc_duration, 
                         {"server": server['name'], "topic_family": topic_family}
                     )
-                    logger.info(f"gRPC fetch from {server['name']} took {grpc_duration:.3f}s across {page_count} page(s) (First page: {first_page_time:.3f}s)")
+                    logger.info(f"Parallel gRPC fetch finished in {grpc_duration:.3f}s across {max_workers} threads.")
 
                 # ------------------------------------------------------------------
-                # 2. MEASURE DEDUPLICATION TIME
+                # 2. DEDUPLICATION
                 # ------------------------------------------------------------------
                 dedup_start = time.perf_counter()
                 seen = set()
@@ -184,7 +183,7 @@ class __DwsAgent:
                 logger.info(f"Deduplication took {dedup_duration:.3f}s")
 
                 # ------------------------------------------------------------------
-                # 3. MEASURE PROTOBUF TO DICT SERIALIZATION TIME
+                # 3. SERIALIZATION
                 # ------------------------------------------------------------------
                 serial_start = time.perf_counter()
                 for dp in unique_data_points:
@@ -200,7 +199,7 @@ class __DwsAgent:
                         value = MessageToDict(dp.json_value)
                     elif value_field == "file_value":
                         value = dp.file_value.filename
-                        logger.warning(f"File value found for topic {dp.topic} at timestamp {dp.timestamp.seconds}. Returning filename '{value}' instead of file content.")
+                        logger.warning(f"File value found for topic {dp.topic} at timestamp {dp.timestamp.seconds}.")
                     
                     if dp.topic in result:
                         result[dp.topic].append({
@@ -217,7 +216,6 @@ class __DwsAgent:
                 dws_serialization_duration.record(serial_duration, {"topic_family": topic_family})
                 logger.info(f"Serialization took {serial_duration:.3f}s")
 
-            # Telemetry: Record successful extraction metrics
             duration = time.perf_counter() - start_time
             dws_retrieval_duration.record(duration, {"trial_name": primary_topic, "status": "SUCCESS"})
             dws_retrieval_counter.add(1, {"trial_name": primary_topic, "status": "SUCCESS"})
@@ -225,7 +223,6 @@ class __DwsAgent:
             return result
 
         except Exception as e:
-            # Telemetry: Record failure execution metrics
             duration = time.perf_counter() - start_time
             dws_retrieval_duration.record(duration, {"trial_name": primary_topic, "status": "ERROR"})
             dws_retrieval_counter.add(1, {"trial_name": primary_topic, "status": "ERROR"})
