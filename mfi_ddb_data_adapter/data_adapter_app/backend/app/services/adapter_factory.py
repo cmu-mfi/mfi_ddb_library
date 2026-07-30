@@ -24,6 +24,22 @@ poll_executions_counter = meter.create_counter(
     "mfi_adapter_poll_executions_total",
     description="Total database/adapter polling executions categorized by status"
 )
+
+
+# 1. Gauge for when hardware fetch starts
+poll_fetch_start_gauge = meter.create_gauge(
+    "mfi_adapter_poll_fetch_start_timestamp_seconds",
+    description="Unix timestamp in seconds when the hardware fetch started",
+    unit="s"
+)
+
+# 2. Gauge for when hardware fetch finishes (internal pipeline start)
+poll_fetch_finish_gauge = meter.create_gauge(
+    "mfi_adapter_poll_fetch_finish_timestamp_seconds",
+    description="Unix timestamp in seconds when the hardware fetch completed",
+    unit="s"
+)
+
 # ==========================================
 
 
@@ -126,9 +142,22 @@ class AdapterFactory:
             def polling_loop():
                 while self.poll_streaming.is_set():
                     start_time = time.perf_counter()
+
+                    fetch_start_timestamp = time.time()
+                    poll_fetch_start_gauge.set(
+                        fetch_start_timestamp,
+                        {"adapter_name": self.adp_name}
+                    )
+
                     try:
                         # Perform polling operation
                         self.streamer.poll_and_stream_data(self.polling_rate_hz)
+
+                        fetch_finish_timestamp = time.time()
+                        poll_fetch_finish_gauge.set(
+                            fetch_finish_timestamp,
+                            {"adapter_name": self.adp_name}
+                        )
                         
                         # Record metrics for success
                         duration = time.perf_counter() - start_time

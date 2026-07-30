@@ -30,6 +30,17 @@ BEGIN
 END $$;
 """
 
+import time
+from opentelemetry.metrics import get_meter
+
+meter = get_meter("mfi.data_adapter.app")
+
+tsdb_insert_executed_at = meter.create_gauge(
+    "mfi_timescale_last_insert_executed_at_seconds",
+    description="Unix timestamp in seconds when the batch insertion was executed",
+    unit="s"
+)
+
 
 class TimeScaleWriter:
     def __init__(self, db_config: dict):
@@ -100,3 +111,9 @@ class TimeScaleWriter:
 
         with conn.cursor() as cur:
             execute_batch(cur, sql, rows, page_size=500)
+
+        # Record exact completion time (float with microsecond/millisecond precision)
+        tsdb_insert_executed_at.set(
+            time.time(),
+            {"status": "SUCCESS"}
+        )
