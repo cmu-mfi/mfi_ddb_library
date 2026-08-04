@@ -1,3 +1,4 @@
+adapter_name: my_kv_adapter
 trial_id: booster-a1
 payloads:
 - schema_version: mfi-v1.0
