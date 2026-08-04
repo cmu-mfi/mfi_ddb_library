@@ -1,7 +1,7 @@
-import threading
 import logging
+import threading
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class BaseDataAdapter:
