@@ -31,6 +31,7 @@ services:
       - ./.data/emqx/log:/opt/emqx/log
     environment:
       - EMQX_NAME=mfi_broker
+      - EMQX_SYSMON__EVENTS__CLIENT_DELIVERED=on
     networks:
       - mfi_network
     restart: always
