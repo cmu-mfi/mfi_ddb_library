@@ -122,7 +122,7 @@ Each database node consists of three services: a database, a connector (MQTT-to-
 Start all services:
 ```bash
 cd docker
-docker compose up --profile '*' -d
+docker compose --profile '*' up -d
 ```
 
 Start a particular service. Can add multiple profile names of only one of them.
