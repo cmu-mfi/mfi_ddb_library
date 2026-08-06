@@ -1,4 +1,4 @@
-name: Sync Main into Feature Performance-Testing
+name: Sync feature/performance-testing with Main
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  sync-branch:
+  sync-main-to-pt:
     runs-on: ubuntu-latest
     permissions:
       contents: write
