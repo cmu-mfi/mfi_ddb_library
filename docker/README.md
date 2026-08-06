@@ -122,7 +122,7 @@ Each database node consists of three services: a database, a connector (MQTT-to-
 Start all services:
 ```bash
 cd docker
-docker compose up --profile '*' -d
+docker compose --profile '*' up -d
 ```
 
 Start a particular service. Can add multiple profile names of only one of them.
@@ -190,3 +190,7 @@ Data is persisted in `.data/` directory:
 ## Network
 
 All services communicate on the `mfi_network` bridge network.
+
+## Updating Docker Hub
+
+A GitHub Workflow has been created to update the images on Docker Hub. On push to the `main` branch, the new images will be built and pushed to Docker Hub to keep all the images to the latest version.

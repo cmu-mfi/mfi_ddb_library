@@ -1,0 +1,56 @@
+name: Sync feature/performance-testing with Main
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  sync-main-to-pt:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git Credentials
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Attempt Automatic Merge
+        id: merge
+        run: |
+          git fetch origin
+          git checkout feature/performance-testing
+          
+          if git merge origin/main --no-ff -m "chore: auto-sync main into feature/performance-testing"; then
+            echo "merged=true" >> $GITHUB_OUTPUT
+            git push origin feature/performance-testing
+          else
+            echo "merged=false" >> $GITHUB_OUTPUT
+            git merge --abort
+          fi
+
+      - name: Create Pull Request if Conflicts Exist
+        if: steps.merge.outputs.merged == 'false'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: sync/main-to-performance-testing #action copies code from main to this branch temporarily to create a PR
+          base: feature/performance-testing
+          delete-branch: true
+          title: "chore: resolve merge conflict in performance-testing from main"
+          body: |
+            ## Automated Sync Alert
+            A push to `main` could not be automatically merged into `feature/performance-testing` due to merge conflicts.
+            
+            You can resolve the conflicts directly in this pull request or by merging `main` into your branch locally and pushing the resolved changes.
+          labels: |
+            merge-conflict
+            automated-pr

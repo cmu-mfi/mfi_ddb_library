@@ -14,6 +14,8 @@ This repository uses GitHub Actions for continuous integration and automation. B
 | 1     | check-lockfile-admin | check-lockfile   | Update uv.lock (main branch)   | update-uv-lock-admin.yml      | workflow_dispatch                                                                                    | Admin: Updates uv.lock on main branch with PAT authentication  |
 | 2     | generate-configs   | generate-configs   | Generate Config Examples       | generate_config_examples.yaml | pull_request (data_adapters/\*\*, streamer.py), workflow_dispatch                                   | Auto-generates configuration examples from source code           |
 | 3     | sync-dev-to-main   | sync-dev-to-main   | Sync Dev to Main               | sync-dev-to-main.yml          | workflow_dispatch                                                                                    | Merges dev branch into main branch                                |
+| 4     | sync-main-to-pt   | sync-main-to-pt   | Sync feature/performance-testing with Main               | sync-main-to-pt.yml          | push to main, workflow_dispatch                                                                                    | Merges main branch into feature/performance-testing branch                                |
+| 5     | build-and-push   | build-and-push   | Build and Push Docker Images               | docker-release.yml          | push to main                                                                                    | Build newer docker images and push to Docker Hub                                |
 
 
 ## Stage Priority
