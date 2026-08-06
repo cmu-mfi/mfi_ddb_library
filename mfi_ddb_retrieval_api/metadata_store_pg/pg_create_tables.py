@@ -137,7 +137,7 @@ def create_tables(config_path='pg_database.ini'):
         INSERT INTO ddb_user (
             user_id, domain, created_by_user_id, created_by_domain, email, name
         ) VALUES (
-            'test_user', 'default', 'superadmin', 'superadmin', 'test_user@example.com', 'Test User'
+            'test_user', 'default', 'superadmin', 'superadmin', 'test_user@default.com', 'Test User'
         ) ON CONFLICT (user_id, domain) DO NOTHING;
 
         DO $$

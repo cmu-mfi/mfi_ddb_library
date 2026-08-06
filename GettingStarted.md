@@ -25,17 +25,47 @@
         docker compose --profile '<profile-name1>' --profile '<profile-name2>' ... up -d
         ```
 
-8. Use command `docker ps` to check if all services are up and healthy
+8. Use command `docker ps` to check if all services are up and healthy. Make sure `mock-publisher` and `dev-tools` are up to test a dummy flow.
 9. Now if you are using the Data Adapter App, you can create a connection with the data generator to start streaming.
 10. Select the Data Adapter your Data Generator requires.
 11. You will now have to fill in the Adapter and Streamer. You can click the (?) help icon to understand a parameter and expected input.
     - The configs won't be validated if incorrect config is put in. Make sure that correct config format is put in.
     - add in the test.mosqiutto.org as url and port is 1883 etc etc
+
+        **Adapter Config**
+        ```
+        mqtt:
+        broker_address: test.mosquitto.org
+        broker_port: 1883
+        trial_id: test_trial_001
+        queue_size: 10
+        topics:
+        - component_id: telemetry
+        topic: admin/feeds/avroom/telemetry/#
+        ```
+        **Streamer Config**
+        ```
+        user:
+        user_id: test_user
+        domain: default
+        mqtt:
+        broker_address: localhost
+        broker_port: 1883
+        enterprise: test_ent
+        site: Test-Siteuser:
+        user_id: test_user
+        domain: default
+        mqtt:
+        broker_address: localhost
+        broker_port: 1883
+        enterprise: test_ent
+        site: Test-Site
+        ```
 12. Click `Save` and the connection will initialize. The connection will show up on your screen as connected and streaming.
 
 ## Retrieval 
 Now that you have a connection established we can look at the aspect of how to retrieve the data and visualize it using Grafana Infinity.
-Open up grafana on port: <enter port number>
+Open up grafana on port: 3005
 
 You can see a dashboard named Retrieval Web Service. You can use the visualizations inside this dashboard to see how your data is evolving over a given period of time.
 You can check data corresponding to the give user ID
