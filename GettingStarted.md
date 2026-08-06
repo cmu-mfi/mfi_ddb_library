@@ -30,7 +30,12 @@
 10. Select the Data Adapter your Data Generator requires.
 11. You will now have to fill in the Adapter and Streamer. You can click the (?) help icon to understand a parameter and expected input.
     - The configs won't be validated if incorrect config is put in. Make sure that correct config format is put in.
+    - add in the test.mosqiutto.org as url and port is 1883 etc etc
 12. Click `Save` and the connection will initialize. The connection will show up on your screen as connected and streaming.
 
 ## Retrieval 
 Now that you have a connection established we can look at the aspect of how to retrieve the data and visualize it using Grafana Infinity.
+Open up grafana on port: <enter port number>
+
+You can see a dashboard named Retrieval Web Service. You can use the visualizations inside this dashboard to see how your data is evolving over a given period of time.
+You can check data corresponding to the give user ID
