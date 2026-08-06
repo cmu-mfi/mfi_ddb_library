@@ -1,71 +1,71 @@
 # Getting Started With MFI DDB
 
-## Pre-requisites
+## Prerequisites
+
 1. Docker Engine
-    - Download Docker using the instructions here ()
+   - Download and install Docker using the instructions here: [Docker Installation](https://docs.docker.com/desktop/?_gl=1*vyg1ud*_gcl_au*NjIxOTgxMjcwLjE3ODE1MzQ2NzQ.*_ga*MTc2NzQzNDQxMC4xNzczNTE0NDY5*_ga_XJWPQMJYHQ*czE3ODYwNDI1MjckbzM1JGcxJHQxNzg2MDQyNTMzJGo1NCRsMCRoMA..)
 
-## Steps to Follow
+## Setup Steps
+
 1. Go to the `docker` folder.
-2. In each folder, there are config yaml files for each of the services. The config yaml files are pre-populated with configs which you can directly use.
-    - If you need to change the configs, you can traverse each folder and adjust the config files according to yourself. The config files have commented instructions above each of the parameters, which you can use to fill the configs accordingly.
-4. Once the configs are filled, open a terminal window in `docker` folder.
-5. Select the services you want to use. Make sure that all the pre-requisites are available on your machine. It is recommended to use the Data Adapter App in our stack, to establish connection between broker and the data generator.
-6. If you don't have a data generator, you can use `mqttmock.py` file to replicate a data generator behaviour.
-    - //add the pre-reqs for this too//
-    - You can start publishing using the command `python mqttmock.py`.
-7. Use the following command to start you required services
+2. Each subfolder contains a config YAML file for its corresponding service. These files come pre-populated with default values that work out of the box.
+3. To change a config, open the relevant file and edit the parameters. Each parameter has a comment above it explaining its purpose and expected value.
+4. Open a terminal in the `docker` folder.
+5. Decide which services you want to run, and confirm their prerequisites are installed on your machine. Using the Data Adapter App is recommended for connecting the broker to your data generator.
+6. If you don't have a data generator, use `mock-publisher` service to simulate one. Information is given ahead in steps.
+7. Start the services you selected:
 
-    - **For all services**
-        ```
-        docker compose --profile '*' up -d
-        ```
+   **All services:**
+   ```
+   docker compose --profile '*' up -d
+   ```
 
-    - **For specific services**
-        ```
-        docker compose --profile '<profile-name1>' --profile '<profile-name2>' ... up -d
-        ```
+   **Specific services:**
+   ```
+   docker compose --profile '<profile-name-1>' --profile '<profile-name-2>' up -d
+   ```
 
-8. Use command `docker ps` to check if all services are up and healthy. Make sure `mock-publisher` and `dev-tools` are up to test a dummy flow.
-9. Now if you are using the Data Adapter App, you can create a connection with the data generator to start streaming.
-10. Select the Data Adapter your Data Generator requires.
-11. You will now have to fill in the Adapter and Streamer. You can click the (?) help icon to understand a parameter and expected input.
-    - The configs won't be validated if incorrect config is put in. Make sure that correct config format is put in.
-    - add in the test.mosqiutto.org as url and port is 1883 etc etc
+8. Run `docker ps` to confirm all services are up and healthy. Confirm that `mock-publisher` and `dev-tools` are running before testing a sample flow.
 
-        **Adapter Config**
-        ```
-        mqtt:
-        broker_address: test.mosquitto.org
-        broker_port: 1883
-        trial_id: test_trial_001
-        queue_size: 10
-        topics:
-        - component_id: telemetry
-        topic: admin/feeds/avroom/telemetry/#
-        ```
-        **Streamer Config**
-        ```
-        user:
-        user_id: test_user
-        domain: default
-        mqtt:
-        broker_address: localhost
-        broker_port: 1883
-        enterprise: test_ent
-        site: Test-Siteuser:
-        user_id: test_user
-        domain: default
-        mqtt:
-        broker_address: localhost
-        broker_port: 1883
-        enterprise: test_ent
-        site: Test-Site
-        ```
-12. Click `Save` and the connection will initialize. The connection will show up on your screen as connected and streaming.
+## Setting Up a Connection (Data Adapter App)
 
-## Retrieval 
-Now that you have a connection established we can look at the aspect of how to retrieve the data and visualize it using Grafana Infinity.
-Open up grafana on port: 3005
+1. Open the Data Adapter App and create a new connection between your data generator and the broker.
+2. Select the Data Adapter that matches your data generator.
+3. Fill in the **Adapter Config** and **Streamer Config** fields. Click the `(?)` icon next to any field for a description and expected input format.
+   - Invalid configs are not validated automatically and double-check the format before saving.
+   - For testing, you can use `test.mosquitto.org` as the broker address with port `1883`.
 
-You can see a dashboard named Retrieval Web Service. You can use the visualizations inside this dashboard to see how your data is evolving over a given period of time.
-You can check data corresponding to the give user ID
+   **Adapter Config**
+   ```yaml
+   mqtt:
+     broker_address: test.mosquitto.org
+     broker_port: 1883
+     trial_id: test_trial_001
+     queue_size: 10
+     topics:
+       - component_id: telemetry
+         topic: admin/feeds/avroom/telemetry/#
+   ```
+
+   **Streamer Config**
+   ```yaml
+   user:
+     user_id: test_user
+     domain: default
+   mqtt:
+     broker_address: localhost
+     broker_port: 1883
+   enterprise: test_ent
+   site: Test-Site
+   ```
+
+4. Click **Save**. Once initialized, the connection will show as connected and streaming on screen.
+
+## Retrieving and Visualizing Data
+
+Once a connection is established, you can retrieve and visualize data using Grafana Infinity.
+
+1. Open Grafana on port `3005`.
+2. Go to the **Retrieval Web Service** dashboard.
+3. Use the dashboard's visualizations to view how your data changes over a selected time period.
+4. Filter by user ID to check data for a specific user.
