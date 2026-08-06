@@ -335,8 +335,8 @@ class Ros2DataAdapter(BaseDataAdapter):
         
     def __del__(self):
         """Destructor to ensure node is properly shut down."""
-        self.shutdown()
-            
+        self.disconnect()
+                    
     def __start_executor(self):
 
         self.executor = self.MultiThreadedExecutor()
