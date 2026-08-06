@@ -131,6 +131,39 @@ def create_tables(config_path='pg_database.ini'):
             target_entity_type VARCHAR(50) NOT NULL, --  ('trial', 'project', 'tag')
             CONSTRAINT pk_graph_edges PRIMARY KEY (edge_id)
         );
+        """,
+        """
+        -- DUMMY DATA SEEDING
+        INSERT INTO ddb_user (
+            user_id, domain, created_by_user_id, created_by_domain, email, name
+        ) VALUES (
+            'test_user', 'default', 'superadmin', 'superadmin', 'test_user@example.com', 'Test User'
+        ) ON CONFLICT (user_id, domain) DO NOTHING;
+
+        DO $$
+        DECLARE
+            v_project_id UUID;
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM project WHERE project_name = 'Test Trial Project') THEN
+                INSERT INTO project (
+                    project_name, created_by_user_id, created_by_domain, details
+                ) VALUES (
+                    'Test Trial Project', 'test_user', 'default', '{"description": "Dummy project for initial container testing"}'::jsonb
+                ) RETURNING project_id INTO v_project_id;
+
+                INSERT INTO user_project_role_linking (
+                    user_id, domain, project_id, role
+                ) VALUES (
+                    'test_user', 'default', v_project_id, 'admin'
+                );
+
+                INSERT INTO trial (
+                    trial_name, user_id, user_domain, project_id, metadata, data_topics
+                ) VALUES (
+                    'test_trial_001', 'test_user', 'default', v_project_id, '{"environment": "test", "auto_generated": true}'::jsonb, ARRAY['test/topic']
+                );
+            END IF;
+        END $$;
         """
         )
     try:
