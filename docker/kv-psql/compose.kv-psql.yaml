@@ -34,8 +34,6 @@ services:
       - "kv"
       - "dbn"
     depends_on:
-      mqtt-broker:
-        condition: service_started
       kv-psql-db:
         condition: service_healthy
     networks:
