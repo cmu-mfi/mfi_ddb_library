@@ -77,7 +77,7 @@ ALL OK!
    mqtt:
      broker_address: localhost
      broker_port: 1883
-     enterprise: test_ent
+     enterprise: CMU
      site: Test-Site
    project:
      project_name: Test Trial Project
@@ -93,7 +93,13 @@ ALL OK!
 
 Once a connection is established, you can retrieve and visualize data using Grafana Infinity.
 
-1. Open Grafana on port `3005`.
-2. Go to the **Retrieval Web Service** dashboard.
-3. Use the dashboard's visualizations to view how your data changes over a selected time period.
-4. Filter by user ID to check data for a specific user.
+1. Open Grafana: [http://localhost:3005](http://localhost:3005).
+2. Use `admin`/`admin` for username password.
+3. Dashboards --> RWS Infinity
+
+<!-- insert screenshot -->
+
+4. Use the dashboard's visualizations to view how your data changes over a selected time period.
+5. Filter by user ID to check data for a specific user.
+
+<!-- insert screenshot -->
