@@ -4,6 +4,7 @@ services:
     container_name: mfi-portainer
     profiles:
       - "dev-tools"
+    user: "0:0"
     ports:
       - "9000:9000"     # HTTP Web UI access
       - "9443:9443"     # HTTPS Web UI access (Optional)
@@ -17,6 +18,7 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
+    user: "0:0"
     ports:
       - "3005:3000"
     profiles:
