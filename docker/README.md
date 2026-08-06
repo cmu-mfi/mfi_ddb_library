@@ -117,6 +117,12 @@ Each database node consists of three services: a database, a connector (MQTT-to-
 |---------|---------|-------------|---------|
 | `portainer` | 9000, 9443 | Portainer CE Docker management web UI | `dev-tools` |
 
+### Utilities
+
+| Service | Port(s) | Description | Profile |
+|---------|---------|-------------|---------|
+| `mock-publisher` | 1883 | Mock publisher using test.mosquitto.org | `mock-publisher` |
+
 ## Quick Start
 
 Start all services:
