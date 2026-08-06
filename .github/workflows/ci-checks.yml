@@ -2,9 +2,8 @@ name: MFI-DDB Package CI Checks
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ dev ]
   pull_request:
-    branches: [ main, dev ]
     paths:
       - 'mfi_ddb_package/src/**'
   workflow_dispatch:
