@@ -51,77 +51,59 @@ flowchart BT
 ```
 
 > [!Note]
-> Arrow direction shows data flow in the framework. For service ports and descriptions, see the Services section below.
+> Arrow direction shows data flow in the framework. For service profiles, ports, and descriptions, see the Docker Profiles section below.
 
-## Services
+## Docker Profiles
 
-### Shared Infrastructure
+The following sections organize the services by their Docker profiles for easier management. Each profile represents a logical grouping of related services that can be started together.
 
-| Service | Port(s) | Description | Profile |
-|---------|---------|-------------|---------|
-| `mqtt-broker` | 1883, 8083, 18083 | EMQX MQTT broker with WebSocket and dashboard | `mqtt-broker` |
+* **Profile: `daa` — Data Adapter Applications**
 
-### Database Nodes
+    - `data-adapter-backend` — Data adapter FastAPI backend
+    - `data-adapter-frontend` — Data adapter frontend (Nginx)
 
-Each database node consists of three services: a database, a connector (MQTT-to-DB), and a DWS gRPC service.
+* **Profile: `mqtt-broker` — Shared Infrastructure**
 
-| Node | Database Port | DWS Port | Description |
-|------|---------------|----------|-------------|
-| **KV-PSQL** | 5431 | 50051 | Key-value PostgreSQL (mfi_kv) with connector + DWS |
-| **TimescaleDB** | 5432 | 50052 | Time-series database (ddb_ts) with connector + DWS |
-| **Metadata RWS** | 5430 | - | Metadata store (mds) with connector + RWS API |
+    - `mqtt-broker` — EMQX MQTT broker with WebSocket and dashboard UI
 
-#### KV-PSQL Node
-| Service | Description | Profile |
-|---------|-------------|---------|
-| `kv-psql-db` | PostgreSQL database (port 5431) | `kv`, `dbn`|
-| `kv-psql-connector` | Reads MQTT, writes to KV PostgreSQL | `kv`, `dbn`|
-| `kv-psql-dws` | gRPC service (port 50051) | `kv`, `dbn`|
+* **Profile: `retrieval` — Metadata and Retrieval Services**
 
-#### TimescaleDB Node
-| Service | Description | Profile |
-|---------|-------------|---------|
-| `timescaledb-db` | PostgreSQL/TimescaleDB database (port 5432) | `ts`, `dbn` |
-| `timescaledb-connector` | Reads MQTT, writes to TimescaleDB | `ts`, `dbn` |
-| `timescaledb-dws` | gRPC service (port 50052) | `ts`, `dbn` |
+    - `metadata-store-db` — PostgreSQL metadata database (mds)
+    - `metadata-store-connector` — Reads MQTT, writes to metadata store
+    - `rws-app` — REST API service for retrieval workflows
 
-#### Metadata RWS Node
-| Service | Description | Profile |
-|---------|-------------|---------|
-| `metadata-store-db` | PostgreSQL metadata database (port 5430) | `retrieval` |
-| `metadata-store-connector` | Reads MQTT, writes to metadata store | `retrieval` |
-| `rws-app` | REST API service (port 8000) | `retrieval` |
+* The **`dbn`** (Database Node) profile is a supplementary profile used across multiple database nodes. Specific DBNs can be deployed using their profile tags, like `kv`, `blob`, etc. `dbn` profile deploys them all.
 
-#### Blob Storage Node
-| Service | Description | Profile |
-|---------|-------------|---------|
-| `blob-connector` | Stores binary data from MQTT to blob storage | `blob`, `dbn` |
-| `blob-dws` | gRPC service for blob access (port 50053) | `blob`, `dbn` |
+* **Profile: `kv` — Key-Value PostgreSQL Database Node**
 
-#### Database-Specific Services
-| Service | Port | Description | Profile |
-|---------|------|-------------|---------|
-| `aveva-pi-dws` | 50054 | Aveva PI integration via PI Web API gRPC service | `aveva`, `dbn` |
+    - `kv-psql-db` — PostgreSQL database (mfi_kv)
+    - `kv-psql-connector` — Reads MQTT, writes to KV PostgreSQL
+    - `kv-psql-dws` — gRPC service for key-value access
 
-### Web Applications
+* **Profile: `ts` — Time-Series Database Node**
 
-| Service | Port | Description | Profile |
-|---------|------|-------------|---------|
-| `data-adapter-backend` | 8001 | Data adapter FastAPI backend | `daa` |
-| `data-adapter-frontend` | 3001 | Data adapter frontend (Nginx) | `daa` |
+    - `timescaledb-db` — PostgreSQL/TimescaleDB database (ddb_ts)
+    - `timescaledb-connector` — Reads MQTT, writes to TimescaleDB
+    - `timescaledb-dws` — gRPC service for time-series data access
 
+* **Profile: `blob` — Blob Storage Node**
 
-### Development & Management Tools
+    - `blob-connector` — Stores binary data from MQTT to blob storage
+    - `blob-dws` — gRPC service for blob access
 
-| Service | Port(s) | Description | Profile |
-|---------|---------|-------------|---------|
-| `portainer` | 9000, 9443 | Portainer CE Docker management web UI | `dev-tools` |
+* **Profile: `aveva` — Aveva PI Integration**
 
-### Utilities
+    - `aveva-pi-dws` — Aveva PI integration via PI Web API gRPC service
 
-| Service | Port(s) | Description | Profile |
-|---------|---------|-------------|---------|
-| `mock-publisher` | 1883 | Mock publisher using test.mosquitto.org | `mock-publisher` |
+* **Profile: `utilities` — Monitoring & Debugging Tools**
+
+    - `grafana` — Grafana dashboard for monitoring and visualization
+    - `mock-mqtt-publisher` — Mock MQTT publisher with configurable settings
+
+* **Profile: `dev-tools` — Development & Management Tools**
+
+    - `portainer` — Portainer CE Docker management web UI
+
 
 ## Quick Start
 
@@ -150,6 +132,10 @@ Stop and remove volumes:
 ```bash
 docker compose --profile '*' down -v
 ```
+
+> [!NOTE]
+> For more step-by-step info about how to use the MFI_DDB stack using the docker services, refer to the ["Getting Started Guide"](./GettingStarted.md)
+
 
 ## Configuration Files
 
@@ -181,6 +167,7 @@ Each service directory contains configuration files that need to be edited befor
 | 8000 | RWS API |
 | 8001 | Data Adapter Backend |
 | 3001 | Data Adapter Frontend |
+| 3005 | Grafana dashboard |
 
 ## Volumes
 
@@ -191,6 +178,7 @@ Data is persisted in `.data/` directory:
 - `.data/kv_psql_storage` - KV PostgreSQL data
 - `.data/timescale_storage` - TimescaleDB data
 - `.data/mds_storage` - Metadata Store data
+- `.data/grafana` - Grafana data and dashboards
 - `.data/blob_storage` - Blob storage
 
 ## Network
