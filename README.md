@@ -130,6 +130,11 @@ docker compose up -d
 > [!Note]
 > You can pick and choose services for multi-node setup. Make sure to use right config by editing the yaml files of respective services.
 
+
+> [!NOTE]
+> For more step-by-step info about how to use the MFI_DDB stack using the docker services, refer to the ["Getting Started Guide"](./GettingStarted.md)
+
+
 ---
 
 ## Directory Structure

@@ -7,4 +7,4 @@ services:
       # Mount config.yaml so users can edit settings without rebuilding the Docker image
       - ./config.yaml:/app/config.yaml:ro
     profiles:
-      - "mock-mqtt-publisher"
+      - "utilities"
