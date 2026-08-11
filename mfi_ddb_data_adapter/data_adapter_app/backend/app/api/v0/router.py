@@ -8,8 +8,6 @@ API Endpoints:
   GET    /all               : List every connection this backend knows about, with config and live status
   GET    /adapters          : List all available adapters with metadata
   GET    /streamer          : Streamer configuration metadata (example, help text, schema)
-  GET    /streamer-defaults : Saved streamer defaults profile (user.domain + mqtt.*), plus its schema
-  PUT    /streamer-defaults : Validate and save the streamer defaults profile
   GET    /health            : Service health check
   POST   /validate/adapter  : Validate adapter YAML configuration against its schema
   POST   /validate/streamer : Validate streamer YAML configuration against its schema
@@ -47,90 +45,12 @@ import yaml
 from app.services.adapter_factory import AdapterFactory
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi import Path as FastAPIPath
-from pydantic import BaseModel, Field, ValidationError
 from starlette.concurrency import run_in_threadpool
 
 logger = logging.getLogger(__name__)
 
 # FastAPI router and adapter factory initialization
 router = APIRouter()
-
-
-class StreamerDefaults(BaseModel):
-    """
-    The subset of mfi_ddb.Streamer.SCHEMA that's shared across every
-    connection rather than re-entered per connection. Field names/
-    descriptions mirror Streamer's private _USER/_MQTT classes for the
-    fields in scope - not a trimmed copy of that schema, since those
-    classes are internal to the mfi_ddb package and not meant for reuse.
-    Per-connection-only streamer fields (user_id, email, name, mqtt.site,
-    topic_family, project) are intentionally not part of this model.
-    """
-    class _User(BaseModel):
-        domain: str = Field(..., description="Domain of the user")
-
-    class _Mqtt(BaseModel):
-        broker_address: str = Field(..., description="Address of the MQTT broker")
-        broker_port: int = Field(1883, description="Port of the MQTT broker (default: 1883)")
-        username: str = Field("", description="Username for MQTT broker authentication")
-        password: str = Field("", description="Password for MQTT broker authentication")
-        enterprise: str = Field(..., description="Enterprise name for MQTT connection")
-        tls_enabled: bool = Field(False, description="Enable TLS for MQTT connection (default: False)")
-        debug: bool = Field(False, description="Enable debug mode for MQTT client (default: False)")
-        timeout: int = Field(5, description="Timeout in seconds for connecting to the MQTT broker (default: 5)")
-
-    user: _User
-    mqtt: _Mqtt
-
-
-def _collapse_optional_anyof(node: Any) -> Any:
-    """
-    Recursively collapse Pydantic's `Optional[X]` JSON Schema shape
-    (`anyOf: [{type: X}, {type: "null"}]`) down to just X's shape, merged
-    with the outer node's own title/description/default.
-
-    Without this, RJSF renders every Optional field as a confusing "pick a
-    variant" selector plus a separate input, instead of one plain nullable
-    field - it treats any anyOf as a multi-schema choice by default.
-    """
-    if isinstance(node, dict):
-        node = {k: _collapse_optional_anyof(v) for k, v in node.items()}
-        any_of = node.get("anyOf")
-        if isinstance(any_of, list) and len(any_of) == 2:
-            non_null = [b for b in any_of if b.get("type") != "null"]
-            has_null = any(b.get("type") == "null" for b in any_of)
-            if has_null and len(non_null) == 1:
-                return {**non_null[0], **{k: v for k, v in node.items() if k != "anyOf"}}
-        return node
-    if isinstance(node, list):
-        return [_collapse_optional_anyof(v) for v in node]
-    return node
-
-
-def _strip_class_name_titles(schema: Dict) -> Dict:
-    """
-    Drop the auto-generated `title` (the raw Python class name, e.g.
-    "_MQTT") and the root's docstring-derived `description` (e.g. "Schema
-    for the MTConnect data adapter configuration.", redundant with the
-    modal's own "Configuration:" label) so RJSF falls back to humanizing
-    the referencing property name (e.g. "mqtt" -> "Mqtt") instead of
-    showing the private class name, and doesn't render a stray top line.
-    """
-    schema = dict(schema)
-    schema.pop("title", None)
-    schema.pop("description", None)
-    defs = schema.get("$defs")
-    if isinstance(defs, dict):
-        schema["$defs"] = {
-            name: {k: v for k, v in def_schema.items() if k != "title"}
-            for name, def_schema in defs.items()
-        }
-    return schema
-
-
-def clean_json_schema(schema: Dict) -> Dict:
-    """Make a Pydantic-generated JSON Schema render well as an RJSF form."""
-    return _strip_class_name_titles(_collapse_optional_anyof(schema))
 
 # Connection: conn_id -> AdapterFactory instance
 active_connections: Dict[str, AdapterFactory] = {}
@@ -142,14 +62,9 @@ DB_PATH = FilePath(os.environ.get("MFI_DAA_DB_PATH", "data/connections.db"))
 async def lifespan(_app):
     """
     On startup, load every connection known from the SQLite store, but do
-    NOT reconnect/resume streaming automatically - reconnecting would
-    publish a fresh birth message while reusing the previous run's
-    metadata (component ids, attributes, sample data) rather than
-    generating an honestly new one. Every loaded connection comes back
-    known but stopped; the user has to explicitly Reconnect it, so a
-    restart is never silently invisible to them. Each load is
-    independent - one connection failing to construct (bad saved config,
-    etc.) is logged and skipped rather than blocking the rest.
+    NOT reconnect/resume streaming automatically. Every loaded connection comes back
+    known but stopped; the user has to explicitly reconnect it, so a
+    restart is never silently invisible to them. 
     """
     connection_store.init_db(DB_PATH)
     for entry in connection_store.load_all_connections(DB_PATH):
@@ -256,7 +171,7 @@ async def list_adapters() -> List[Dict]:
                 "configHelpText": yaml.dump(config_help),
                 "configExample": {"configuration": example_yaml, "raw": config_example},
                 "recommendedTopicFamily": recommended_topic_family,
-                "configSchema": clean_json_schema(adapter_cls.SCHEMA.model_json_schema()),
+                "configSchema": adapter_cls.SCHEMA.model_json_schema(),
                 "selfUpdate": getattr(adapter_cls, "SELF_UPDATE", False),
             }
         )
@@ -291,48 +206,8 @@ async def get_streamer_config() -> Dict:
     return {
         "configHelpText": yaml.dump(config_help),
         "configExample": {"configuration": example_yaml, "raw": config_example},
-        "configSchema": clean_json_schema(mfi_ddb.Streamer.SCHEMA.model_json_schema()),
+        "configSchema": mfi_ddb.Streamer.SCHEMA.model_json_schema(),
     }
-
-
-@router.get("/streamer-defaults")
-async def get_streamer_defaults() -> Dict:
-    """
-    Return the saved streamer defaults profile (user.domain + mqtt.*),
-    if one has been saved, plus the schema for editing it.
-
-    Returns:
-        Dictionary with keys:
-        - profile: the saved profile dict, or {} if none saved yet
-        - configSchema: JSON schema for the profile (StreamerDefaults)
-    """
-    profile = connection_store.load_streamer_defaults(db_path=DB_PATH) or {}
-    return {
-        "profile": profile,
-        "configSchema": clean_json_schema(StreamerDefaults.model_json_schema()),
-    }
-
-
-@router.put("/streamer-defaults")
-async def put_streamer_defaults(
-    file: UploadFile = File(None),
-    text: str = Form(None),
-) -> Dict:
-    """
-    Validate and persist the streamer defaults profile.
-
-    Raises:
-        HTTPException: 400 if the profile fails validation against
-        StreamerDefaults (e.g. missing broker_address/enterprise).
-    """
-    profile_dict = utils.load_config(file, text)
-    try:
-        validated = StreamerDefaults.model_validate(profile_dict)
-    except ValidationError as e:
-        raise HTTPException(400, f"Invalid streamer defaults profile: {e}")
-
-    connection_store.save_streamer_defaults(validated.model_dump(), db_path=DB_PATH)
-    return {"saved": True, "profile": validated.model_dump()}
 
 
 @router.get("/health")
