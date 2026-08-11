@@ -153,6 +153,36 @@ optional arguments:
                         Polling rate in Hz. Default is 1 Hz, if --polling is set to True.
 ```
 
+## Development
+
+### Pre-commit hooks
+
+Hooks run linting, formatting, and hygiene checks before each commit. They are scoped to `mfi_ddb_package/` and live in [`mfi_ddb_package/.pre-commit-config.yaml`](.pre-commit-config.yaml).
+
+1. Install `pre-commit` once (any Python environment on your machine):
+   ```
+   uv tool install pre-commit     # or: pipx install pre-commit
+   ```
+2. Install dependencies (provides `ruff`):
+   ```
+   uv sync --dev
+   ```
+3. Install the hook (run from the **repository root**, i.e. `ddb-workflows/`):
+   ```
+   pre-commit install --config mfi_ddb_package/.pre-commit-config.yaml
+   ```
+
+The ruff hooks auto-fix and reformat files in place and re-stage the changes. The first run after enabling hooks may rewrite a number of files (import sorting, etc.); to keep history clean, you can apply the bulk reformat manually once and commit it separately before relying on the hook:
+
+```
+uv run ruff check --fix . && uv run ruff format .
+```
+
+To run all hooks manually against the whole repo:
+```
+pre-commit run --config mfi_ddb_package/.pre-commit-config.yaml --all-files
+```
+
 ## License
 
 This project is licensed under the BSD-3-Clause License - see the [LICENSE](LICENSE) file for details.

@@ -40,4 +40,28 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "pytest<=8.0",
+    "ruff>=0.6.0",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+extend-exclude = [
+    "notebooks",
+    "src/mfi_ddb/topic_families/schema/blob_pb2.py",
+    "tests/evaluate_serialization/test_pb2.py",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+# UP (pyupgrade) may rewrite code in ways that break 3.8 compat; keep it conservative.
+ignore = [
+    "UP007",  # use `X | Y` type annotations (PEP 604) - requires 3.10+
+    "UP045",  # use `X | None` - requires 3.10+
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]  # allow long lines in tests
+
+[tool.ruff.format]
+line-ending = "lf"
