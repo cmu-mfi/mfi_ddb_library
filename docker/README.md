@@ -2,6 +2,18 @@
 
 This directory contains Docker Compose configurations for the MFI Data-Driven Building (DDB) Library pipeline.
 
+<!-- TOC -->
+## Table of Contents
+
+- [Overview](#overview)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Docker Profiles](#docker-profiles)
+- [Configuration Files](#configuration-files)
+- [Ports Reference](#ports-reference)
+- [Volumes](#volumes)
+- [Network](#network)
+
 ## Overview
 
 The Docker pipeline implements the MFI DDB architecture with MQTT as the central pub-sub broker:
@@ -53,6 +65,59 @@ flowchart BT
 > [!Note]
 > Arrow direction shows data flow in the framework. For service profiles, ports, and descriptions, see the Docker Profiles section below.
 
+
+## Installation
+
+All released versions are available on docker hub. If you want to build images from source code, follow steps in [Build from source](#build-from-source)
+
+Start all services:
+```bash
+cd docker
+docker compose --profile '*' up -d
+```
+
+Start a particular service. Can add multiple profile names of only one of them.
+```bash
+docker compose --profile <profile-name> <profile-name> up -d
+```
+
+View all logs (for specific, mention the profile you want to see the logs for, otherwise use `docker logs <container-name>`):
+```bash
+docker compose --profile '*' logs -f
+```
+
+Stop all services:
+```bash
+docker compose --profile '*' down
+```
+
+Stop and remove volumes:
+```bash
+docker compose --profile '*' down -v
+```
+
+> [!TIP]
+> If you clone the git repo, you can use `--pull always` to use released versions.
+> Example: `docker compose --profile '*' up -d --pull always`
+
+> [!NOTE]
+> For more step-by-step info about how to use the MFI_DDB stack using the docker services, refer to the ["Getting Started Guide"](./GettingStarted.md)
+
+
+### Build from source
+
+```bash
+git clone https://github.com/cmu-mfi/mfi_ddb_library.git
+cd mfi_ddb_library/docker
+
+docker compose --profile '*' build
+docker compose --profile '*' up -d
+
+or 
+
+docker compose --profile '*' up -d --build
+```
+
 ## Docker Profiles
 
 The following sections organize the services by their Docker profiles for easier management. Each profile represents a logical grouping of related services that can be started together.
@@ -103,38 +168,6 @@ The following sections organize the services by their Docker profiles for easier
 * **Profile: `dev-tools` — Development & Management Tools**
 
     - `portainer` — Portainer CE Docker management web UI
-
-
-## Quick Start
-
-Start all services:
-```bash
-cd docker
-docker compose --profile '*' up -d
-```
-
-Start a particular service. Can add multiple profile names of only one of them.
-```bash
-docker compose --profile <profile-name> <profile-name> up -d
-```
-
-View all logs (for specific, mention the profile you want to see the logs for, otherwise use `docker logs <container-name>`):
-```bash
-docker compose --profile '*' logs -f
-```
-
-Stop all services:
-```bash
-docker compose --profile '*' down
-```
-
-Stop and remove volumes:
-```bash
-docker compose --profile '*' down -v
-```
-
-> [!NOTE]
-> For more step-by-step info about how to use the MFI_DDB stack using the docker services, refer to the ["Getting Started Guide"](./GettingStarted.md)
 
 
 ## Configuration Files
