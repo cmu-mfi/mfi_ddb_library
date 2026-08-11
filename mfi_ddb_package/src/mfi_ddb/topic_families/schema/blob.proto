@@ -10,7 +10,7 @@
 // *   Cirrus Link Solutions - initial implementation
 
 // Source: https://github.com/eclipse-tahu/tahu/blob/master/sparkplug_b/sparkplug_b.proto
-// 
+//
 // To compile:
 // cd client_libraries/java
 // protoc --proto_path=../../ --java_out=src/main/java ../../sparkplug_b.proto

@@ -1,65 +1,80 @@
-import threading
 import logging
+import threading
 
 from pydantic import BaseModel
 
 
 class BaseDataAdapter:
     """
-    Base class for data adapters. Use as a super class for the data adapters that will be used in the PullStreamToMqtt(Spb) and PushStreamToMqtt(Spb) classes.
+    Base class for data adapters. Use as a super class for the data adapters that will be
+    used in the PullStreamToMqtt(Spb) and PushStreamToMqtt(Spb) classes.
     """
 
     NAME = "Base"
     CONFIG_EXAMPLE = {}
     CONFIG_HELP = {}
     RECOMMENDED_TOPIC_FAMILY = ""
-    SELF_UPDATE = False  # If True, the data adapter will update the data by itself in a separate thread.
+    SELF_UPDATE = (
+        False  # If True, the data adapter will update the data by itself in a separate thread.
+    )
 
     class SCHEMA(BaseModel):
         """
-        Schema for the data adapter configuration. 
-        Override this class in the child class to define the schema for the data adapter configuration.
+        Schema for the data adapter configuration. Override this class in the child class to
+        define the schema for the data adapter configuration.
         """
+
         pass
 
-    def __init__(self, config: dict = {}) -> None:
+    def __init__(self, config: dict = {}) -> None:  # noqa: B006
         self.component_ids = []
-        # component_ids is a list of identifiers for the components that are part of the data object.
+        # component_ids is a list of components identifiers that are part of the data object.
         # e.g.: self.component_ids = ["robot-arm-1", "machine-a"]
 
         self._data = {}
         # data is a dictionary that contains the data of the components.
         # e.g.: self.data = {"robot-arm-1": {"estop": 0, "joint-1": 0.52},
         #                    "machine-a": {"temperature": 30, "pressure": 100}}
-        # It keeps last updated data that has not been streamed yet for each component_id. 
+        # It keeps last updated data that has not been streamed yet for each component_id.
         # If all up-to-date data has been streamed, it will look like this:
-        # e.g.: self.data = {"robot-arm-1": {}, 
+        # e.g.: self.data = {"robot-arm-1": {},
         #                    "machine-a": {}}
 
         self._cb_data = {}
         # cb_data is a dictionary that contains the data of the components for the callback.
         # Any change in value of cb_data will notify all observers (if any)
         # Valid update: self.cb_data = {"robot-arm-1": {"estop": 1, "joint-1": 0.52}}
-        # Invalid update: self.cb_data["robot-arm-1"] = {"estop": 1, "joint-1": 0.52}        
+        # Invalid update: self.cb_data["robot-arm-1"] = {"estop": 1, "joint-1": 0.52}
 
         self.last_updated = {}
-        # last_updated is a dictionary that contains the Unix timestamp in seconds of the last update of the components.
+        # last_updated is a dictionary that contains the Unix timestamp in seconds of the
+        # last update of the components.
         # e.g.: self.last_updated = {"robot-arm-1": 1632900000.0, "machine-a": 1632900000.0}
-        
+
         self.attributes = {}
         # attributes is a dictionary that contains the attributes of the components.
-        # e.g.: self.attributes = {"robot-arm-1": {"manufacturer": "ABB", "model": "IRB 120", "experiment_class": "orange-test-1"},
-        #                          "machine-a": {"manufacturer": "Siemens", "model": "S7-1500", "experiment_class": "orange-test-1"}},
-        
+        # e.g.: self.attributes = {"robot-arm-1": {
+        #                             "manufacturer": "ABB",
+        #                             "model": "IRB 120",
+        #                             "experiment_class": "orange-test-1"
+        #                             },
+        #                          "machine-a": {
+        #                              "manufacturer": "Siemens",
+        #                              "model": "S7-1500",
+        #                              "experiment_class": "orange-test-1"
+        #                             }
+        #                         },
+
         self.cfg = config
         # cfg is a dictionary that contains the configuration of the data object.
         # Note on trial_id:
-        #   * cfg needs to have a key `trial_id` that will be the default trial_id for the data object.
-        #   * if the config file doesn't have a key `trial_id`, use the data adapter class constructor to set it.
+        #   * The key `trial_id` is required. It will be the default trial_id for the data object.
+        #   * if the config file doesn't have a key `trial_id`,
+        #     use the data adapter class constructor to set it.
         #   * default trial_id will be None if not set.
 
         self._observers = []  # List of observers (listeners)
-        
+
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def disconnect(self):
@@ -94,7 +109,7 @@ class BaseDataAdapter:
         Setter for data, notify all observers of the update.
         """
         self._cb_data = new_data
-        
+
         # Notify all observers
         self._notify_observers(new_data)
 
@@ -106,14 +121,15 @@ class BaseDataAdapter:
 
     def update_data(self):
         """
-        Update data from the data source. If not defined in the child class, it will call the get_data() method.
+        Update data from the data source. If not defined in the child class,
+        it will call the get_data() method.
         """
         self.get_data()
-            
+
     def update_config(self, config: dict):
         """
         Update the configuration of the data object with the new configuration.
-        
+
         Args:
             config (dict): The new configuration of the data object.
         """
@@ -121,7 +137,7 @@ class BaseDataAdapter:
             self.cfg = config
         else:
             raise ValueError("The configuration is empty!")
-        
+
     def add_observer(self, observer):
         """
         Add an observer (listener) to the list.
@@ -136,12 +152,12 @@ class BaseDataAdapter:
         for observer in self._observers:
             # Run observer callback in a separate thread
             threading.Thread(target=observer.on_data_update, args=(new_value,), daemon=True).start()
-            
-    def clear_data_buffer(self, component_ids:list=[]):
+
+    def clear_data_buffer(self, component_ids: list = []):  # noqa: B006
         """
         Clear the data buffer of each component_id. Used by streamers to clear already streamed data
         """
         component_ids = component_ids if component_ids else self.component_ids
-        
+
         for component_id in component_ids:
-            self.data[component_id] = {}            
+            self.data[component_id] = {}

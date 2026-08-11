@@ -1,6 +1,6 @@
 # MFI DDB Library
 
-Library to stream data to Digital Data Backend (DDB) for the MFI project. It can be installed using pip. [https://pypi.org/project/mfi-ddb/](https://pypi.org/project/mfi-ddb/) 
+Library to stream data to Digital Data Backend (DDB) for the MFI project. It can be installed using pip. [https://pypi.org/project/mfi-ddb/](https://pypi.org/project/mfi-ddb/)
 
 ```
 pip install mfi_ddb
@@ -46,7 +46,7 @@ flowchart LR;
     D[Streamer] --> M[MQTT Client];
     B --> D;
     C[Topic Family] --> D;
-    M-->X[MQTT Broker];    
+    M-->X[MQTT Broker];
 
     classDef highlight fill:#094d57
     class B,C,D highlight
@@ -104,7 +104,7 @@ When streaming data to the broker, the following metadata is recorded through th
 | location context | The location context of the data being streamed, which includes the enterprise, site, area, and device. | [topic structure](./schema/README.md) |
 | attributes | Key-value pairs that provide additional information about the data being streamed. These are defined in the adapter yaml configuration file. | streamed on the same topic before data using the same topic family encoding |
 | streaming configuration | The configuration of the data stream, which includes broker information, enterprise and site details. | streamed on the `kv` and `blob` at birth and death of data streaming  |
-| adapter configuration | The configuration of the adapter that is streaming the data, which includes all the components and their attributes | streamed on the `kv` and `blob` at birth and death of data streaming |  
+| adapter configuration | The configuration of the adapter that is streaming the data, which includes all the components and their attributes | streamed on the `kv` and `blob` at birth and death of data streaming |
 
 ## Executable Modules
 

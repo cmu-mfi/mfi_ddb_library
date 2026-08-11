@@ -26,6 +26,7 @@ repos:
         files: ^mfi_ddb_package/
       - id: check-json
         files: ^mfi_ddb_package/
+        exclude: \.ipynb$
       - id: check-merge-conflict
         files: ^mfi_ddb_package/
       - id: check-added-large-files
@@ -42,6 +43,7 @@ repos:
         entry: uv run --project mfi_ddb_package ruff check --fix
         language: system
         files: ^mfi_ddb_package/.*\.py$
+        exclude: _pb2\.py$|\.ipynb$
         pass_filenames: true
         types: [python]
       - id: ruff-format
@@ -49,6 +51,7 @@ repos:
         entry: uv run --project mfi_ddb_package ruff format
         language: system
         files: ^mfi_ddb_package/.*\.py$
+        exclude: _pb2\.py$|\.ipynb$
         pass_filenames: true
         types: [python]
 

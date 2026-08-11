@@ -1,55 +1,65 @@
-import datetime
 import math
 import struct
 import sys
 import time
-from ctypes import POINTER, c_float, c_uint32, cast, pointer
-from typing import List, Optional
 import warnings
+from ctypes import POINTER, c_float, c_uint32, cast, pointer
+from typing import List
 
 try:
     import cv2
-except Exception as e:
-    warnings.warn("WARNING: Unable to import cv2. RosFilesDataAdapter unavailable")
+except Exception:
+    warnings.warn("WARNING: Unable to import cv2. RosFilesDataAdapter unavailable", stacklevel=2)
 
 try:
     import open3d as o3d
-except Exception as e:
-    warnings.warn("WARNING: Unable to import open3d. RosFilesDataAdapter unavailable")
+except Exception:
+    warnings.warn("WARNING: Unable to import open3d. RosFilesDataAdapter unavailable", stacklevel=2)
 
-from pydantic import BaseModel, Field
 import numpy as np
+from pydantic import BaseModel, Field
 
 from mfi_ddb.data_adapters.base import BaseDataAdapter
 
 MAX_ARRAY_SIZE = 16
 
 COMPATIBLE_MSG_TYPES = {
-    "sensor_msgs/Image" : "ImageHandler",
+    "sensor_msgs/Image": "ImageHandler",
     "sensor_msgs/PointCloud2": "PCDHandler",
 }
 
-IMG_FILE_TYPE = '.png'
-PCD_FILE_TYPE = '.ply'
+IMG_FILE_TYPE = ".png"
+PCD_FILE_TYPE = ".ply"
+
 
 class _SCHEMA(BaseModel):
     class _DEVICES(BaseModel):
         namespace: str = Field(..., description="Namespace of the device in ROS")
-        rostopics: List[str] = Field(..., description="List of ROS topics to subscribe to for this device")
+        rostopics: List[str] = Field(
+            ..., description="List of ROS topics to subscribe to for this device"
+        )
         attributes: dict = Field({}, description="Attributes of the device. Optional.")
+
     class SCHEMA(BaseModel):
-        trial_id: str = Field(..., description="Trial ID for the ROS device. No spaces or special characters allowed.")
-        set_ros_callback: bool = Field(True, description="Set ROS callback to receive data from ROS topics. If set to False, you need to call get_data() method to get data from ROS topics.")
+        trial_id: str = Field(
+            ..., description="Trial ID for the ROS device. No spaces or special characters allowed."
+        )
+        set_ros_callback: bool = Field(
+            True,
+            description="Set ROS callback to receive data from ROS topics. (default=True)",
+        )
         devices: List["_DEVICES"] = Field(..., description="List of devices to subscribe to.")
 
 
 class RosFilesDataAdapter(BaseDataAdapter):
-    
     NAME = "ROS Files"
     CONFIG_HELP = {
         "trial_id": "Trial ID for the ROS device. No spaces or special characters allowed.",
-        "set_ros_callback": "Set ROS callback to receive data from ROS topics. If set to False, you need to call get_data() method to get data from ROS topics.",
-        "devices": "List of devices to subscribe to. Each device should have a 'namespace' and a list of 'rostopics' to subscribe to. 'attributes' are optional and can be used to set the attributes of the device.",   
+        "set_ros_callback": "Set ROS callback to receive data from ROS topics. (default=True).",
+        "devices": (
+            "List of devices to subscribe. Required keys: ['namespace', 'rostopics']."
+            "'attributes' are optional. Use it to add attributes of the device."
+        ),
     }
     CONFIG_EXAMPLE = {
         "trial_id": "trial_001",
@@ -61,8 +71,8 @@ class RosFilesDataAdapter(BaseDataAdapter):
                 "attributes": {
                     "manufacturer": "RobotCorp",
                     "model": "RobotArmX",
-                    "description": "A robotic arm for testing purposes."
-                }
+                    "description": "A robotic arm for testing purposes.",
+                },
             },
             "device2": {
                 "namespace": "machine_a",
@@ -70,21 +80,21 @@ class RosFilesDataAdapter(BaseDataAdapter):
                 "attributes": {
                     "manufacturer": "MachineCorp",
                     "version": 0.1,
-                    "description": "A machine for testing purposes."
-                }
-            }
-        }
+                    "description": "A machine for testing purposes.",
+                },
+            },
+        },
     }
     RECOMMENDED_TOPIC_FAMILY = "blob"
-    
+
     SELF_UPDATE = True
-    
+
     class SCHEMA(BaseDataAdapter.SCHEMA, _SCHEMA.SCHEMA):
         pass
 
     def __init__(self, config: dict) -> None:
         super().__init__()
-        
+
         # IMPORT ROS1 LIBRARIES
         try:
             import rosgraph
@@ -98,19 +108,19 @@ class RosFilesDataAdapter(BaseDataAdapter):
             self.rostopic = rostopic
             self.rospy = rospy
 
-        except ImportError as e:
+        except ImportError:
             raise Exception(
-                "ROS1 libraries not found. Please install/source ROS1 libraries to use RosDataAdapter."
-            )
+                "ROS1 libraries not found. Please source ROS1 setup.bash to use RosDataAdapter."
+            ) from None
 
         # CHECK CONFIG FOR REQUIRED KEYS
-        if "devices" not in config.keys():
+        if "devices" not in config:
             raise Exception("No devices found in the config file.")
 
-        if "max_wait_per_topic" not in config.keys():
+        if "max_wait_per_topic" not in config:
             config["max_wait_per_topic"] = 1
 
-        if "set_ros_callback" not in config.keys():
+        if "set_ros_callback" not in config:
             config["set_ros_callback"] = True
 
         # INIT DATA MEMBERS FROM CONFIG
@@ -122,24 +132,20 @@ class RosFilesDataAdapter(BaseDataAdapter):
             namespace = cfg["namespace"]
 
             for topic in cfg["rostopics"]:
-                if namespace != "/":
-                    topic = f"/{namespace}/{topic}"
-                else:
-                    topic = f"/{topic}"
-                    
+                topic = f"/{namespace}/{topic}" if namespace != "/" else f"/{topic}"
+
                 self.raw_data[device][topic] = {}
-                
-                # Since we are sending files using blob schema, 
+
+                # Since we are sending files using blob schema,
                 # each topic needs to be a separate component.
                 # In RosDataAdapter, we are using the namespace as component_id like below:
                 # self.component_ids.append(namespace)
 
-                self.component_ids.append(topic)              
+                self.component_ids.append(topic)
 
                 self.attributes[topic] = cfg["attributes"]
-                if "trial_id" not in cfg["attributes"].keys():
-                    if "trial_id" in self.cfg.keys():
-                        self.attributes[topic]["trial_id"] = self.cfg["trial_id"]
+                if "trial_id" not in cfg["attributes"] and "trial_id" in self.cfg:
+                    self.attributes[topic]["trial_id"] = self.cfg["trial_id"]
 
                 self._data[topic] = {}
                 self.last_updated[topic] = 0
@@ -149,10 +155,8 @@ class RosFilesDataAdapter(BaseDataAdapter):
         # REF: https://github.com/ros/ros_comm/blob/8250c7d434ea34d0589eb8b6eaab5df1b11fd325/tools/rostopic/src/rostopic/__init__.py#L84
         try:
             rosgraph.Master("/rostopic").getPid()
-        except Exception as e:
-            raise Exception(
-                "ROS master is not running. Can't initialize RosDataAdapter."
-            )
+        except Exception:
+            raise Exception("ROS master is not running. Can't initialize RosDataAdapter.") from None
 
         # INIT ROS NODE IF NOT ALREADY INITIALIZED
         print("Initializing ROS node...")
@@ -166,25 +170,22 @@ class RosFilesDataAdapter(BaseDataAdapter):
             for topic in self.raw_data[device]:
                 try:
                     topic_type = self.rostopic.get_topic_type(topic)[0]
-                    if topic_type not in COMPATIBLE_MSG_TYPES.keys():
+                    if topic_type not in COMPATIBLE_MSG_TYPES:
                         print(
-                            f"WARNING: {topic_type} not supported by RosFilesDataAdapter. Use RosDataAdapter instead."
+                            f"WARNING: {topic_type} not supported by RosFilesDataAdapter.",
+                            "Use RosDataAdapter instead.",
                         )
                         del self.raw_data[device][topic]
                         continue
-                except:
-                    rospy.logerr(
-                        f"Topic {topic} not found. Removing from the RosDataAdapter."
-                    )
-                    print(
-                        f"Error: Topic {topic} not found. Removing from the RosDataAdapter."
-                    )
+                except Exception as _:
+                    rospy.logerr(f"Topic {topic} not found. Removing from the RosDataAdapter.")
+                    print(f"Error: Topic {topic} not found. Removing from the RosDataAdapter.")
 
                     del self.raw_data[device][topic]
                     continue
 
         print("RosDataAdapter initialized successfully.")
-        
+
         # SET ROS CALLBACK
         if self.cfg["set_ros_callback"]:
             self.__init_callback()
@@ -217,7 +218,8 @@ class RosFilesDataAdapter(BaseDataAdapter):
                 except Exception as e:
                     print(f"Exception: {e}")
                     print(
-                        f"Warning: Could not get data from topic {topic}. Try increasing max_wait_per_topic in config file."
+                        f"Warning: Could not get data from topic {topic}.",
+                        "Try increasing max_wait_per_topic in config file.",
                     )
 
     def __process_rawdata(self, device, topic):
@@ -227,20 +229,20 @@ class RosFilesDataAdapter(BaseDataAdapter):
         * get variable types using `_get_types` method or `_slot_types` of the message class
         * filter out the variables that are not needed using .__slots__.remove(<variable_name>)
         """
-            
+
         ### PROCESS BYTE DATA ###
         # raise NotImplementedError(
         #     "ROS1 data processing is not implemented yet. Please use RosDataAdapter instead."
         # )
         # data = self.__get_keyvalue_from_msg(msg, f"{topic}/")
         data = globals()[COMPATIBLE_MSG_TYPES[msg._type]].get_keyvalue_from_msg(msg)
-        
+
         if data is None:
             return
         data["trial_id"] = self.attributes[device]["trial_id"]
         data.update(self.attributes[topic])
         ##########################
-        
+
         self._data[topic].update(data)
         self.last_updated[topic] = time.time()
         self._notify_observers({topic: data})
@@ -279,7 +281,8 @@ class RosFilesDataAdapter(BaseDataAdapter):
 
     def __ros_shutdown(self):
         raise KeyboardInterrupt("ROS shutdown signal received.")
-    
+
+
 class ImageHandler:
     @staticmethod
     def get_keyvalue_from_msg(msg):
@@ -290,58 +293,65 @@ class ImageHandler:
         data["file"] = ImageHandler.get_image_bytes(msg)
         data["size"] = sys.getsizeof(data["file"])
 
-        return data        
-    
+        return data
+
     @staticmethod
     def get_image_bytes(img_msg):
         def encoding_to_dtype_with_channels(encoding):
-            if encoding == 'mono8':
+            if encoding == "mono8":
                 return np.uint8, 1
-            elif encoding == 'bgr8':
+            elif encoding == "bgr8" or encoding == "rgb8":
                 return np.uint8, 3
-            elif encoding == 'rgb8':
-                return np.uint8, 3
-            elif encoding == 'mono16':
+            elif encoding == "mono16":
                 return np.uint16, 1
-            elif encoding == 'rgba8':
+            elif encoding == "rgba8" or encoding == "bgra8":
                 return np.uint8, 4
-            elif encoding == 'bgra8':
-                return np.uint8, 4
-            elif encoding == '32FC1':
+            elif encoding == "32FC1":
                 return np.float32, 1
-            elif encoding == '32FC2':
+            elif encoding == "32FC2":
                 return np.float32, 2
-            elif encoding == '32FC3':
+            elif encoding == "32FC3":
                 return np.float32, 3
-            elif encoding == '32FC4':
+            elif encoding == "32FC4":
                 return np.float32, 4
             else:
-                raise TypeError(f'Unsupported encoding: {encoding}')
-            
+                raise TypeError(f"Unsupported encoding: {encoding}")
+
         dtype, n_channels = encoding_to_dtype_with_channels(img_msg.encoding)
         dtype = np.dtype(dtype)
-        dtype = dtype.newbyteorder('>' if img_msg.is_bigendian else '<')
+        dtype = dtype.newbyteorder(">" if img_msg.is_bigendian else "<")
 
-        img_buf = np.asarray(img_msg.data, dtype=dtype) if isinstance(img_msg.data, list) else img_msg.data
+        img_buf = (
+            np.asarray(img_msg.data, dtype=dtype)
+            if isinstance(img_msg.data, list)
+            else img_msg.data
+        )
 
         if n_channels == 1:
-            im = np.ndarray(shape=(img_msg.height, int(img_msg.step/dtype.itemsize)),
-                            dtype=dtype, buffer=img_buf)
-            im = np.ascontiguousarray(im[:img_msg.height, :img_msg.width])
+            im = np.ndarray(
+                shape=(img_msg.height, int(img_msg.step / dtype.itemsize)),
+                dtype=dtype,
+                buffer=img_buf,
+            )
+            im = np.ascontiguousarray(im[: img_msg.height, : img_msg.width])
         else:
-            im = np.ndarray(shape=(img_msg.height, int(img_msg.step/dtype.itemsize/n_channels), n_channels),
-                            dtype=dtype, buffer=img_buf)
-            im = np.ascontiguousarray(im[:img_msg.height, :img_msg.width, :])
+            im = np.ndarray(
+                shape=(img_msg.height, int(img_msg.step / dtype.itemsize / n_channels), n_channels),
+                dtype=dtype,
+                buffer=img_buf,
+            )
+            im = np.ascontiguousarray(im[: img_msg.height, : img_msg.width, :])
 
         # If the byte order is different between the message and the system.
-        if img_msg.is_bigendian == (sys.byteorder == 'little'):
+        if img_msg.is_bigendian == (sys.byteorder == "little"):
             im = im.byteswap().newbyteorder()
 
-        image = np.array(im[:,:,0:3])
+        image = np.array(im[:, :, 0:3])
         image = cv2.imencode(IMG_FILE_TYPE, image)[1]
         image = image.tobytes()
-        
+
         return image
+
 
 class PCDHandler:
     @staticmethod
@@ -354,25 +364,26 @@ class PCDHandler:
         data["size"] = sys.getsizeof(data["file"])
 
         return data
-    
+
     @staticmethod
     def get_pcd_bytes(message):
         pcd_data = message
 
-        def convert_rgbUint32_to_tuple(rgb_uint32): return (
-            (rgb_uint32 & 0x00FF0000) >> 16,
-            (rgb_uint32 & 0x0000FF00) >> 8,
-            (rgb_uint32 & 0x000000FF),
-        )
+        def convert_rgbUint32_to_tuple(rgb_uint32):
+            return (
+                (rgb_uint32 & 0x00FF0000) >> 16,
+                (rgb_uint32 & 0x0000FF00) >> 8,
+                (rgb_uint32 & 0x000000FF),
+            )
 
-        def convert_rgbFloat_to_tuple(rgb_float): return convert_rgbUint32_to_tuple(
-            int(cast(pointer(c_float(rgb_float)), POINTER(c_uint32)).contents.value)
-        )
+        def convert_rgbFloat_to_tuple(rgb_float):
+            return convert_rgbUint32_to_tuple(
+                int(cast(pointer(c_float(rgb_float)), POINTER(c_uint32)).contents.value)
+            )
 
         # Get cloud data from ros_cloud
         field_names = [field.name for field in pcd_data.fields]
-        cloud_data = list(PCDHandler.read_points(
-            pcd_data, skip_nans=True, field_names=field_names))
+        cloud_data = list(PCDHandler.read_points(pcd_data, skip_nans=True, field_names=field_names))
 
         # Check empty
         open3d_cloud = o3d.geometry.PointCloud()
@@ -392,29 +403,25 @@ class PCDHandler:
 
             # Get rgb
             # Check whether int or float
-            if (
-                type(cloud_data[0][IDX_RGB_IN_FIELD]) == float
-            ):  # if float (from pcl::toROSMsg)
-                rgb = [convert_rgbFloat_to_tuple(rgb)
-                       for x, y, z, rgb in cloud_data]
+            if type(cloud_data[0][IDX_RGB_IN_FIELD]) is float:  # if float (from pcl::toROSMsg)
+                rgb = [convert_rgbFloat_to_tuple(rgb) for x, y, z, rgb in cloud_data]
             else:
-                rgb = [convert_rgbUint32_to_tuple(
-                    rgb) for x, y, z, rgb in cloud_data]
+                rgb = [convert_rgbUint32_to_tuple(rgb) for x, y, z, rgb in cloud_data]
 
             # combine
-            open3d_cloud.points = o3d.utility.Vector3dVector(
-                np.array(xyz) * 1000)
-            open3d_cloud.colors = o3d.utility.Vector3dVector(
-                np.array(rgb) / 255.0)
+            open3d_cloud.points = o3d.utility.Vector3dVector(np.array(xyz) * 1000)
+            open3d_cloud.colors = o3d.utility.Vector3dVector(np.array(rgb) / 255.0)
         else:
             xyz = [(x, y, z) for x, y, z in cloud_data]  # get xyz
             open3d_cloud.points = o3d.Vector3dVector(np.array(xyz))
-        
-        pcd_bytes = o3d.io.write_point_cloud_to_bytes(pcd_data, format=PCD_FILE_TYPE[1:], compressed=False)
-        
+
+        pcd_bytes = o3d.io.write_point_cloud_to_bytes(
+            pcd_data, format=PCD_FILE_TYPE[1:], compressed=False
+        )
+
         return pcd_bytes
 
-    def read_points(cloud, field_names=None, skip_nans=False, uvs=[]):
+    def read_points(cloud, field_names=None, skip_nans=False, uvs=[]):  # noqa: B006
         """
         Read points from a {sensor_msgs.PointCloud2} message.
         Implementation based on code from:
@@ -425,21 +432,21 @@ class PCDHandler:
         @type  field_names: iterable
         @param skip_nans: If True, then don't return any point with a NaN value.
         @type  skip_nans: bool [default: False]
-        @param uvs: If specified, then only return the points at the given coordinates. [default: empty list]
+        @param uvs:  only return the points at the given coordinates. [default: empty list]
         @type  uvs: iterable
         @return: Generator which yields a list of values for each point.
         @rtype:  generator
         """
         _DATATYPES = {}
 
-        _DATATYPES[1] = ('b', 1)  # _DATATYPES[PointField.INT8]    = ('b', 1)
-        _DATATYPES[2] = ('B', 1)  # _DATATYPES[PointField.UINT8]   = ('B', 1)
-        _DATATYPES[3] = ('h', 2)  # _DATATYPES[PointField.INT16]   = ('h', 2)
-        _DATATYPES[4] = ('H', 2)  # _DATATYPES[PointField.UINT16]  = ('H', 2)
-        _DATATYPES[5] = ('i', 4)  # _DATATYPES[PointField.INT32]   = ('i', 4)
-        _DATATYPES[6] = ('I', 4)  # _DATATYPES[PointField.UINT32]  = ('I', 4)
-        _DATATYPES[7] = ('f', 4)  # _DATATYPES[PointField.FLOAT32] = ('f', 4)
-        _DATATYPES[8] = ('d', 8)  # _DATATYPES[PointField.FLOAT64] = ('d', 8)
+        _DATATYPES[1] = ("b", 1)  # _DATATYPES[PointField.INT8]    = ('b', 1)
+        _DATATYPES[2] = ("B", 1)  # _DATATYPES[PointField.UINT8]   = ('B', 1)
+        _DATATYPES[3] = ("h", 2)  # _DATATYPES[PointField.INT16]   = ('h', 2)
+        _DATATYPES[4] = ("H", 2)  # _DATATYPES[PointField.UINT16]  = ('H', 2)
+        _DATATYPES[5] = ("i", 4)  # _DATATYPES[PointField.INT32]   = ('i', 4)
+        _DATATYPES[6] = ("I", 4)  # _DATATYPES[PointField.UINT32]  = ('I', 4)
+        _DATATYPES[7] = ("f", 4)  # _DATATYPES[PointField.FLOAT32] = ('f', 4)
+        _DATATYPES[8] = ("d", 8)  # _DATATYPES[PointField.FLOAT64] = ('d', 8)
 
         def get_struct_fmt(is_bigendian, fields, field_names=None):
             fmt = ">" if is_bigendian else "<"
@@ -455,7 +462,7 @@ class PCDHandler:
                     offset = field.offset
                 if field.datatype not in _DATATYPES:
                     print(
-                        "Skipping unknown PointField datatype [%d]" % field.datatype,
+                        f"Skipping unknown PointField datatype {field.datatype}",
                         file=sys.stderr,
                     )
                 else:
@@ -465,8 +472,7 @@ class PCDHandler:
 
             return fmt
 
-        fmt = get_struct_fmt(cloud.is_bigendian,
-                             cloud.fields, field_names)
+        fmt = get_struct_fmt(cloud.is_bigendian, cloud.fields, field_names)
         width, height, point_step, row_step, data, isnan = (
             cloud.width,
             cloud.height,
@@ -492,7 +498,7 @@ class PCDHandler:
             else:
                 for v in range(height):
                     offset = row_step * v
-                    for u in range(width):
+                    for _ in range(width):
                         p = unpack_from(data, offset)
                         has_nan = False
                         for pv in p:
@@ -509,6 +515,6 @@ class PCDHandler:
             else:
                 for v in range(height):
                     offset = row_step * v
-                    for u in range(width):
+                    for _ in range(width):
                         yield unpack_from(data, offset)
                         offset += point_step
