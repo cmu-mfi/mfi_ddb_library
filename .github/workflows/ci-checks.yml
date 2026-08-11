@@ -104,9 +104,8 @@ jobs:
   pre-commit-check:
     needs: lint-check
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: mfi_ddb_package    
+    # NOTE: Run from repo root so that .pre-commit-config.yaml patterns (which reference
+    # "mfi_ddb_package/") resolve correctly. The config is invoked via explicit paths below.
 
     permissions:
       contents: write
@@ -129,7 +128,8 @@ jobs:
         run: uv tool install pre-commit          
 
       - name: Install hooks from project-local config
-        run: pre-commit install --config .pre-commit-config.yaml
+        # Use the full path to the config file (located in mfi_ddb_package/)
+        run: pre-commit install --config mfi_ddb_package/.pre-commit-config.yaml
 
       - name: Run full pre-commit suite (with automatic fixes)
         env:
@@ -138,12 +138,12 @@ jobs:
           LC_ALL: C.UTF-8
         run: |
           set -uo pipefail
-          pre-commit run --all-files
+          pre-commit run --all-files --config mfi_ddb_package/.pre-commit-config.yaml
 
       - name: Commit and Push generated files
         # Ref: https://github.com/marketplace/actions/git-auto-commit
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: "CI: apply pre-commit auto-fixes"
-          file_pattern: "mfi_ddb_package/examples/configs/*.yaml"
+          file_pattern: "*"
           branch: ${{ github.head_ref || github.ref_name }}
