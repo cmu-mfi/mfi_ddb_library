@@ -98,7 +98,7 @@ jobs:
   # JOB 3: Run ROS2 tests
   ros2-check:
     needs: installation-check
-    uses: ./.github/workflows/ci-checks.yml
+    uses: ./.github/workflows/ros2.yaml
 
   # JOB 4: PR auto-fix via pre-commit hooks (commit any automatic fixes back to the PR branch)
   pre-commit-check:
