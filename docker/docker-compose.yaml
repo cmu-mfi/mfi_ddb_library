@@ -11,7 +11,9 @@ include:
   - path: blob/compose.blob.yaml
   - path: data-adapter-app/compose.data-adapter-app.yaml
   - path: aveva/compose.aveva.yaml
-  - path: dev-tools/compose.dev-tools.yaml
+  - path: utilities/grafana/compose.grafana.yaml
+  - path: utilities/mock-publisher/compose.mockpub.yaml
+  - path: dev-tools/compose.portainer.yaml
 
 services:
   # SHARED INFRASTRUCTURE

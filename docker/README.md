@@ -2,6 +2,18 @@
 
 This directory contains Docker Compose configurations for the MFI Data-Driven Building (DDB) Library pipeline.
 
+<!-- TOC -->
+## Table of Contents
+
+- [Overview](#overview)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Docker Profiles](#docker-profiles)
+- [Configuration Files](#configuration-files)
+- [Ports Reference](#ports-reference)
+- [Volumes](#volumes)
+- [Network](#network)
+
 ## Overview
 
 The Docker pipeline implements the MFI DDB architecture with MQTT as the central pub-sub broker:
@@ -51,73 +63,12 @@ flowchart BT
 ```
 
 > [!Note]
-> Arrow direction shows data flow in the framework. For service ports and descriptions, see the Services section below.
-
-## Services
-
-### Shared Infrastructure
-
-| Service | Port(s) | Description | Profile |
-|---------|---------|-------------|---------|
-| `mqtt-broker` | 1883, 8083, 18083 | EMQX MQTT broker with WebSocket and dashboard | `mqtt-broker` |
-
-### Database Nodes
-
-Each database node consists of three services: a database, a connector (MQTT-to-DB), and a DWS gRPC service.
-
-| Node | Database Port | DWS Port | Description |
-|------|---------------|----------|-------------|
-| **KV-PSQL** | 5431 | 50051 | Key-value PostgreSQL (mfi_kv) with connector + DWS |
-| **TimescaleDB** | 5432 | 50052 | Time-series database (ddb_ts) with connector + DWS |
-| **Metadata RWS** | 5430 | - | Metadata store (mds) with connector + RWS API |
-
-#### KV-PSQL Node
-| Service | Description | Profile |
-|---------|-------------|---------|
-| `kv-psql-db` | PostgreSQL database (port 5431) | `kv`, `dbn`|
-| `kv-psql-connector` | Reads MQTT, writes to KV PostgreSQL | `kv`, `dbn`|
-| `kv-psql-dws` | gRPC service (port 50051) | `kv`, `dbn`|
-
-#### TimescaleDB Node
-| Service | Description | Profile |
-|---------|-------------|---------|
-| `timescaledb-db` | PostgreSQL/TimescaleDB database (port 5432) | `ts`, `dbn` |
-| `timescaledb-connector` | Reads MQTT, writes to TimescaleDB | `ts`, `dbn` |
-| `timescaledb-dws` | gRPC service (port 50052) | `ts`, `dbn` |
-
-#### Metadata RWS Node
-| Service | Description | Profile |
-|---------|-------------|---------|
-| `metadata-store-db` | PostgreSQL metadata database (port 5430) | `retrieval` |
-| `metadata-store-connector` | Reads MQTT, writes to metadata store | `retrieval` |
-| `rws-app` | REST API service (port 8000) | `retrieval` |
-
-#### Blob Storage Node
-| Service | Description | Profile |
-|---------|-------------|---------|
-| `blob-connector` | Stores binary data from MQTT to blob storage | `blob`, `dbn` |
-| `blob-dws` | gRPC service for blob access (port 50053) | `blob`, `dbn` |
-
-#### Database-Specific Services
-| Service | Port | Description | Profile |
-|---------|------|-------------|---------|
-| `aveva-pi-dws` | 50054 | Aveva PI integration via PI Web API gRPC service | `aveva`, `dbn` |
-
-### Web Applications
-
-| Service | Port | Description | Profile |
-|---------|------|-------------|---------|
-| `data-adapter-backend` | 8001 | Data adapter FastAPI backend | `daa` |
-| `data-adapter-frontend` | 3001 | Data adapter frontend (Nginx) | `daa` |
+> Arrow direction shows data flow in the framework. For service profiles, ports, and descriptions, see the Docker Profiles section below.
 
 
-### Development & Management Tools
+## Installation
 
-| Service | Port(s) | Description | Profile |
-|---------|---------|-------------|---------|
-| `portainer` | 9000, 9443 | Portainer CE Docker management web UI | `dev-tools` |
-
-## Quick Start
+All released versions are available on docker hub. If you want to build images from source code, follow steps in [Build from source](#build-from-source)
 
 Start all services:
 ```bash
@@ -144,6 +95,80 @@ Stop and remove volumes:
 ```bash
 docker compose --profile '*' down -v
 ```
+
+> [!TIP]
+> If you clone the git repo, you can use `--pull always` to use released versions.
+> Example: `docker compose --profile '*' up -d --pull always`
+
+> [!NOTE]
+> For more step-by-step info about how to use the MFI_DDB stack using the docker services, refer to the ["Getting Started Guide"](./GettingStarted.md)
+
+
+### Build from source
+
+```bash
+git clone https://github.com/cmu-mfi/mfi_ddb_library.git
+cd mfi_ddb_library/docker
+
+docker compose --profile '*' build
+docker compose --profile '*' up -d
+
+or 
+
+docker compose --profile '*' up -d --build
+```
+
+## Docker Profiles
+
+The following sections organize the services by their Docker profiles for easier management. Each profile represents a logical grouping of related services that can be started together.
+
+* **Profile: `daa` — Data Adapter Applications**
+
+    - `data-adapter-backend` — Data adapter FastAPI backend
+    - `data-adapter-frontend` — Data adapter frontend (Nginx)
+
+* **Profile: `mqtt-broker` — Shared Infrastructure**
+
+    - `mqtt-broker` — EMQX MQTT broker with WebSocket and dashboard UI
+
+* **Profile: `retrieval` — Metadata and Retrieval Services**
+
+    - `metadata-store-db` — PostgreSQL metadata database (mds)
+    - `metadata-store-connector` — Reads MQTT, writes to metadata store
+    - `rws-app` — REST API service for retrieval workflows
+
+* The **`dbn`** (Database Node) profile is a supplementary profile used across multiple database nodes. Specific DBNs can be deployed using their profile tags, like `kv`, `blob`, etc. `dbn` profile deploys them all.
+
+* **Profile: `kv` — Key-Value PostgreSQL Database Node**
+
+    - `kv-psql-db` — PostgreSQL database (mfi_kv)
+    - `kv-psql-connector` — Reads MQTT, writes to KV PostgreSQL
+    - `kv-psql-dws` — gRPC service for key-value access
+
+* **Profile: `ts` — Time-Series Database Node**
+
+    - `timescaledb-db` — PostgreSQL/TimescaleDB database (ddb_ts)
+    - `timescaledb-connector` — Reads MQTT, writes to TimescaleDB
+    - `timescaledb-dws` — gRPC service for time-series data access
+
+* **Profile: `blob` — Blob Storage Node**
+
+    - `blob-connector` — Stores binary data from MQTT to blob storage
+    - `blob-dws` — gRPC service for blob access
+
+* **Profile: `aveva` — Aveva PI Integration**
+
+    - `aveva-pi-dws` — Aveva PI integration via PI Web API gRPC service
+
+* **Profile: `utilities` — Monitoring & Debugging Tools**
+
+    - `grafana` — Grafana dashboard for monitoring and visualization
+    - `mock-mqtt-publisher` — Mock MQTT publisher with configurable settings
+
+* **Profile: `dev-tools` — Development & Management Tools**
+
+    - `portainer` — Portainer CE Docker management web UI
+
 
 ## Configuration Files
 
@@ -175,6 +200,7 @@ Each service directory contains configuration files that need to be edited befor
 | 8000 | RWS API |
 | 8001 | Data Adapter Backend |
 | 3001 | Data Adapter Frontend |
+| 3005 | Grafana dashboard |
 
 ## Volumes
 
@@ -185,6 +211,7 @@ Data is persisted in `.data/` directory:
 - `.data/kv_psql_storage` - KV PostgreSQL data
 - `.data/timescale_storage` - TimescaleDB data
 - `.data/mds_storage` - Metadata Store data
+- `.data/grafana` - Grafana data and dashboards
 - `.data/blob_storage` - Blob storage
 
 ## Network

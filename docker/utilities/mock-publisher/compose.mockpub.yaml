@@ -1,0 +1,10 @@
+services:
+  mock-mqtt-publisher:
+    build: .
+    container_name: mock-mqtt-publisher
+    restart: unless-stopped
+    volumes:
+      # Mount config.yaml so users can edit settings without rebuilding the Docker image
+      - ./config.yaml:/app/config.yaml:ro
+    profiles:
+      - "utilities"

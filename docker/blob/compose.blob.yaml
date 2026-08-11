@@ -9,9 +9,6 @@ services:
     profiles:
       - "blob"
       - "dbn"
-    depends_on:
-      mqtt-broker:
-        condition: service_started
     volumes:
       - ../.data/blob_storage:/data/blob_storage
       - ./connector-config.yaml:/app/config.yaml:ro
