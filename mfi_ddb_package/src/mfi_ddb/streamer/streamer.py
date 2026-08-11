@@ -12,6 +12,8 @@ from mfi_ddb.topic_families import *
 from mfi_ddb.utils.exceptions import ConfigError
 from mfi_ddb.utils.script_utils import get_blob_json_payload_from_dict
 
+from ._mqtt import Mqtt  # noqa: F401 (Imported using globals())
+from ._mqtt_spb import MqttSpb  # noqa: F401 (Imported using globals())
 from .observer import Observer
 
 TOPIC_CLIENTS = {
