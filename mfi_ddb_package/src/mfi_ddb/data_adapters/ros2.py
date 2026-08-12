@@ -26,6 +26,7 @@ class Ros2DataAdapter(BaseDataAdapter):
         "devices": "List of devices to subscribe to. Each device should have a 'namespace' and a list of 'rostopics' to subscribe to. 'attributes' are optional and can be used to set the attributes of the device.",
     }
     CONFIG_EXAMPLE = {
+        "adapter_name": "my_ros2_adapter",
         "trial_id": "trial_001",
         "devices": {
             "device1": {
@@ -334,8 +335,8 @@ class Ros2DataAdapter(BaseDataAdapter):
         
     def __del__(self):
         """Destructor to ensure node is properly shut down."""
-        self.shutdown()
-            
+        self.disconnect()
+                    
     def __start_executor(self):
 
         self.executor = self.MultiThreadedExecutor()
