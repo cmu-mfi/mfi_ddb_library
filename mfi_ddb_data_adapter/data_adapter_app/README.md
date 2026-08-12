@@ -2,10 +2,17 @@
 
 The application gives a REST API interface (`backend`) to the mfi-ddb library for data adapter connections. It also provides a ReactJS (Vite) based frontend (`frontend`) to interact with the backend API and display the data adapter connections.
 
+
 > [!Note]
 > Details of both the backend and frontend are provided in respective README.md files. \
 > Backend: [backend/README.md](backend/README.md) \
 > Frontend: [frontend/README.md](frontend/README.md)
+
+<p align="center">
+  <img src="../images/adapter.png" width="260" alt="Adapter configuration form">
+  <img src="../images/connection.png" width="260" alt="Connection list view">
+  <img src="../images/disconnect.png" width="260" alt="Disconnecting a connection">
+</p>
 
 ## Docker Setup
 
