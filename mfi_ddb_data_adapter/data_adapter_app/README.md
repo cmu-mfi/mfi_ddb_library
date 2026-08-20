@@ -9,9 +9,9 @@ The application gives a REST API interface (`backend`) to the mfi-ddb library fo
 > Frontend: [frontend/README.md](frontend/README.md)
 
 <p align="center">
-  <img src="../images/adapter.png" width="260" height="400" alt="Adapter configuration form">
-  <img src="../images/connection.png" width="260" height="400" alt="Connection list view">
-  <img src="../images/disconnect.png" width="260" height="400" alt="Disconnecting a connection">
+  <img src="../images/adapter.png" height="200" alt="Adapter configuration form">
+  <img src="../images/connection.png" height="200" alt="Connection list view">
+  <img src="../images/disconnect.png" height="200" alt="Disconnecting a connection">
 </p>
 
 ## Docker Setup
