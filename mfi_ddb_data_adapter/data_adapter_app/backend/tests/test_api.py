@@ -218,10 +218,10 @@ def test_single_adapter_connection():
     publish_thread.start()
     
     # =======================================================
-    # CONNECT THE ADAPTER
-    # =======================================================           
-    
-    response_connect = client.post("/connections/connect/100", 
+    # CONNECT THE ADAPTER (backend generates the id)
+    # =======================================================
+
+    response_connect = client.post("/connections/connect",
         data={
             "adapter_name": "MQTT",
             "adapter_text": adapter_cfg_text,
@@ -231,17 +231,27 @@ def test_single_adapter_connection():
         }
     )
 
+    assert response_connect.status_code == 200
     assert response_connect.json().get("is_connected")
     assert response_connect.json().get("is_streaming")
-    
+    conn_id = response_connect.json().get("id")
+    assert conn_id
+
     # =======================================================
-    # DISCONNECT THE ADAPTER
+    # STOP THE ADAPTER (delete would also work, stop matches
+    # what the "Stop" UI button does - keeps it known/reconnectable)
     # =======================================================
-    response_disconnect = client.post("/connections/disconnect/100")
-    assert response_disconnect.status_code == 200
-    assert response_disconnect.json().get("disconnected")
-    
-    
+    response_stop = client.post(f"/connections/stop/{conn_id}")
+    assert response_stop.status_code == 200
+    assert response_stop.json().get("stopped")
+
+    # Clean up fully so it doesn't linger in active_connections for
+    # subsequent tests sharing this module-level TestClient/app state.
+    response_delete = client.post(f"/connections/delete/{conn_id}")
+    assert response_delete.status_code == 200
+    assert response_delete.json().get("deleted")
+
+
 def test_multi_adapter_connection():
     # =======================================================
     # TESTING MQTT DATA ADAPTER CONNECTION
@@ -318,11 +328,14 @@ def test_multi_adapter_connection():
     
     # =======================================================
     # CONNECT THE ADAPTER MULTIPLE TIMES AS SEPARATE INSTANCES
-    # =======================================================           
-    
-    for i in range(3):
-        connection_id = 100 + i
-        response_connect = client.post(f"/connections/connect/{connection_id}", 
+    # (backend generates each id - don't assume specific values,
+    # since active_connections is shared module-level state across
+    # every test that runs in this process)
+    # =======================================================
+
+    conn_ids = []
+    for _ in range(3):
+        response_connect = client.post("/connections/connect",
             data={
                 "adapter_name": "MQTT",
                 "adapter_text": adapter_cfg_text,
@@ -334,11 +347,12 @@ def test_multi_adapter_connection():
         assert response_connect.status_code == 200
         assert response_connect.json().get("is_connected")
         assert response_connect.json().get("is_streaming")
-    
+        conn_ids.append(response_connect.json().get("id"))
+
     # =======================================================
     # COUNT ACTIVE CONNECTIONS AND CHECK HEALTH
     # =======================================================
-    pause_response = client.post("/connections/pause/101")
+    pause_response = client.post(f"/connections/pause/{conn_ids[1]}")
     assert pause_response.status_code == 200
 
     count_response = client.get("/connections/health")
@@ -346,15 +360,18 @@ def test_multi_adapter_connection():
     streaming_connections = count_response.json().get("streaming_connections")
     assert active_connections == 3
     assert streaming_connections == 2
-    
+
     # =======================================================
-    # DISCONNECT THE ADAPTER
+    # STOP ONE, THEN CLEAN UP ALL THREE FULLY
     # =======================================================
-    response_disconnect = client.post("/connections/disconnect/100")
-    assert response_disconnect.status_code == 200
-    assert response_disconnect.json().get("disconnected")
-    
-        
+    response_stop = client.post(f"/connections/stop/{conn_ids[0]}")
+    assert response_stop.status_code == 200
+    assert response_stop.json().get("stopped")
+
+    for conn_id in conn_ids:
+        client.post(f"/connections/delete/{conn_id}")
+
+
 if __name__ == "__main__":
     print("\nTEST 1: Get Available Data Adapters")
     print("================================================")

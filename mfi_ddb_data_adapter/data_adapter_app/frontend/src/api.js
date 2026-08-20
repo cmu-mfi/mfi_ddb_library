@@ -39,8 +39,9 @@ export async function resumeConnection(connectionId) {
   }
 }
 
-export async function connectConnection(
-  connectionId,
+// Creates a brand new connection - the backend generates its id (returned
+// as `id` in the response body) rather than the client guessing one.
+export async function createConnection(
   adapter_name,
   adapter_cfg,
   streamer_cfg,
@@ -54,7 +55,20 @@ export async function connectConnection(
   form.append("is_polling", String(is_polling));
   form.append("polling_rate_hz", String(polling_rate_hz));
 
-  console.log(`DEBUG: Calling connection endpoint ${API_BASE_URL}/connections/connect/${connectionId}`);
+  const response = await fetch(`${API_BASE_URL}/connections/connect`, {
+    method: "POST",
+    body: form,
+  });
+
+  return response;
+}
+
+// Reconnects an existing connection (e.g. after it was Stopped) using its
+// already-stored config. Does not create new connections - see createConnection.
+export async function connectConnection(connectionId, adapter_name) {
+  const form = new FormData();
+  form.append("adapter_name", adapter_name);
+
   const response = await fetch(`${API_BASE_URL}/connections/connect/${connectionId}`, {
     method: "POST",
     body: form,
@@ -63,39 +77,73 @@ export async function connectConnection(
   return response;
 }
 
-export async function disconnectConnection(connectionId) {
+// Applies an updated config to an existing connection. Adapter type can't
+// change here - only adp_cfg/streamer_cfg/is_polling/polling_rate_hz.
+export async function updateConnectionConfig(
+  connectionId,
+  adapter_cfg,
+  streamer_cfg,
+  is_polling,
+  polling_rate_hz
+) {
+  const form = new FormData();
+  form.append("adapter_text", adapter_cfg);
+  form.append("streamer_text", streamer_cfg);
+  form.append("is_polling", String(is_polling));
+  form.append("polling_rate_hz", String(polling_rate_hz));
+
+  const response = await fetch(`${API_BASE_URL}/connections/update/${connectionId}`, {
+    method: "POST",
+    body: form,
+  });
+
+  return response;
+}
+
+export async function stopConnection(connectionId) {
   let response;
   try {
-    response = await fetch(`${API_BASE_URL}/connections/disconnect/${connectionId}`, {
+    response = await fetch(`${API_BASE_URL}/connections/stop/${connectionId}`, {
       method: "POST",
     });
   } catch (error) {
-    console.error(`Failed to disconnect ${connectionId} on backend:`, error);
+    console.error(`Failed to stop ${connectionId} on backend:`, error);
     return false;
   }
-  console.log(`DEBUG: Connection ${connectionId} disconnected successfully`);
+  console.log(`DEBUG: Connection ${connectionId} stopped successfully`);
 
   if (response.status === 404) {
     console.error(`Connection ${connectionId} not found on backend.`);
     return true;
   } else if (response.ok) {
     const data = await response.json();
-    return data.disconnected;
+    return data.stopped;
   } else {
-    console.error(`Failed to disconnect ${connectionId} on backend.`);
+    console.error(`Failed to stop ${connectionId} on backend.`);
     return false;
   }
 }
 
-export async function fetchStreamingStatus(connectionId) {
+export async function deleteConnection(connectionId) {
+  let response;
   try {
-    const response = await fetch(`${API_BASE_URL}/connections/streaming-status/${connectionId}`);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return await response.json();
+    response = await fetch(`${API_BASE_URL}/connections/delete/${connectionId}`, {
+      method: "POST",
+    });
   } catch (error) {
-    throw new Error(`Failed to fetch streaming status for ${connectionId}: ${error.message}`);
+    console.error(`Failed to delete ${connectionId} on backend:`, error);
+    return false;
+  }
+
+  if (response.status === 404) {
+    console.error(`Connection ${connectionId} not found on backend.`);
+    return true;
+  } else if (response.ok) {
+    const data = await response.json();
+    return Boolean(data.deleted);
+  } else {
+    console.error(`Failed to delete ${connectionId} on backend.`);
+    return false;
   }
 }
 
@@ -106,6 +154,26 @@ export async function fetchAdapters() {
     return await res.json();
   } catch (e) {
     throw new Error(`Failed to fetch adapters: ${e.message}`);
+  }
+}
+
+export async function fetchAllConnections() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/connections/all`);
+    if (!res.ok) throw new Error("Failed to fetch connections");
+    return await res.json();
+  } catch (e) {
+    throw new Error(`Failed to fetch connections: ${e.message}`);
+  }
+}
+
+export async function fetchStreamerConfig() {
+  try {
+    const res = await fetch(`${API_BASE_URL}/connections/streamer`);
+    if (!res.ok) throw new Error("Failed to fetch streamer config");
+    return await res.json();
+  } catch (e) {
+    throw new Error(`Failed to fetch streamer config: ${e.message}`);
   }
 }
 

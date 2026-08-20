@@ -41,7 +41,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 # Import configuration router and application lifespan manager
-from app.api.v0.router import router
+from app.api.v0.router import lifespan, router
 
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ app = FastAPI(
     title="DAA - DATA ADAPTER APP - CORE API",
     version="0.2.0",
     description="Core API for data adapter application",
-    # lifespan=lifespan  # Manages startup/shutdown tasks for adapters and connections
+    lifespan=lifespan,  # Restores connections from the SQLite store on startup
 )
 
 # Enables cross-origin requests from React development servers and production deployments
