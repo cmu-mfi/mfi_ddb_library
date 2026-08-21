@@ -136,7 +136,7 @@ jobs:
           PRE_COMMIT_NO_INTERACTION: "1"
           LC_ALL: C.UTF-8
         run: |
-          set -uo pipefail
+          set -euo pipefail
           pre-commit run --all-files --config mfi_ddb_package/.pre-commit-config.yaml
           pre-commit run --all-files --config mfi_ddb_package/.pre-commit-config.yaml
       
