@@ -112,7 +112,6 @@ jobs:
 
     steps:
       - name: Checkout with full history for push back to branch
-        if: ${{ github.event_name == 'pull_request' }}
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
