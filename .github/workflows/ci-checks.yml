@@ -138,6 +138,7 @@ jobs:
         run: |
           set -uo pipefail
           pre-commit run --all-files --config mfi_ddb_package/.pre-commit-config.yaml
+          pre-commit run --all-files --config mfi_ddb_package/.pre-commit-config.yaml
       
       - name: Update build section
         run: . mfi_ddb_package/update-build.sh
