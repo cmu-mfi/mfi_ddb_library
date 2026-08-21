@@ -4,8 +4,11 @@ services:
     build:
       context: ../../mfi_ddb_database_nodes/blob/connector
       dockerfile: Dockerfile
+      tags:
+        - cmumfi/mfi-ddb-blob-connector:${VERSION:-latest}
+        - cmumfi/mfi-ddb-blob-connector:latest
     container_name: mfi-blob-connector
-    image: cmumfi/mfi-ddb-blob-connector:latest
+    image: cmumfi/mfi-ddb-blob-connector:${VERSION:-latest}
     profiles:
       - "blob"
       - "dbn"
@@ -24,8 +27,11 @@ services:
     build:
       context: ../../mfi_ddb_database_nodes/blob/dws
       dockerfile: Dockerfile
+      tags:
+        - cmumfi/mfi-ddb-blob-dws:${VERSION:-latest}
+        - cmumfi/mfi-ddb-blob-dws:latest
     container_name: mfi-blob-dws
-    image: cmumfi/mfi-ddb-blob-dws:latest
+    image: cmumfi/mfi-ddb-blob-dws:${VERSION:-latest}
     profiles:
       - "blob"
       - "dbn"

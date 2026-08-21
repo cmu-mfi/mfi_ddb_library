@@ -4,8 +4,11 @@ services:
     build:
       context: ../../mfi_ddb_data_adapter/data_adapter_app/backend
       dockerfile: Dockerfile
+      tags:
+        - cmumfi/mfi-ddb-data-adapter-backend:${VERSION:-latest}
+        - cmumfi/mfi-ddb-data-adapter-backend:latest
     container_name: mfi-data-adapter-backend
-    image: cmumfi/mfi-ddb-data-adapter-backend:latest
+    image: cmumfi/mfi-ddb-data-adapter-backend:${VERSION:-latest}
     profiles:
       - "daa"
     ports:
@@ -22,8 +25,11 @@ services:
     build:
       context: ../../mfi_ddb_data_adapter/data_adapter_app/frontend
       dockerfile: Dockerfile
+      tags:
+        - cmumfi/mfi-ddb-data-adapter-frontend:${VERSION:-latest}
+        - cmumfi/mfi-ddb-data-adapter-frontend:latest
     container_name: mfi-data-adapter-frontend
-    image: cmumfi/mfi-ddb-data-adapter-frontend:latest
+    image: cmumfi/mfi-ddb-data-adapter-frontend:${VERSION:-latest}
     profiles:
       - "daa"
     ports:

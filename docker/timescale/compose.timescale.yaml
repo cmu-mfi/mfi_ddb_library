@@ -28,8 +28,11 @@ services:
     build:
       context: ../../mfi_ddb_database_nodes/timescaledb/connector
       dockerfile: Dockerfile
+      tags:
+        - cmumfi/mfi-ddb-timescaledb-connector:${VERSION:-latest}
+        - cmumfi/mfi-ddb-timescaledb-connector:latest
     container_name: mfi-timescaledb-connector
-    image: cmumfi/mfi-ddb-timescaledb-connector:latest
+    image: cmumfi/mfi-ddb-timescaledb-connector:${VERSION:-latest}
     profiles:
       - "ts"
       - "dbn"
@@ -49,8 +52,11 @@ services:
     build:
       context: ../../mfi_ddb_database_nodes/timescaledb/dws
       dockerfile: Dockerfile
+      tags:
+        - cmumfi/mfi-ddb-timescaledb-dws:${VERSION:-latest}
+        - cmumfi/mfi-ddb-timescaledb-dws:latest
     container_name: mfi-timescaledb-dws
-    image: cmumfi/mfi-ddb-timescaledb-dws:latest
+    image: cmumfi/mfi-ddb-timescaledb-dws:${VERSION:-latest}
     profiles:
       - "ts"
       - "dbn"

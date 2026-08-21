@@ -27,8 +27,11 @@ services:
     build:
       context: ../../mfi_ddb_retrieval_api/metadata_store_pg
       dockerfile: Dockerfile
+      tags:
+        - cmumfi/mfi-ddb-metadata-store-connector:${VERSION:-latest}
+        - cmumfi/mfi-ddb-metadata-store-connector:latest
     container_name: mfi-metadata-store-connector
-    image: cmumfi/mfi-ddb-metadata-store-connector:latest
+    image: cmumfi/mfi-ddb-metadata-store-connector:${VERSION:-latest}
     command: >
       python -u connector.py --broker_config broker.ini --pg_config pg_database.ini
     profiles:
@@ -50,8 +53,11 @@ services:
     build:
       context: ../../mfi_ddb_retrieval_api/rws
       dockerfile: Dockerfile
+      tags:
+        - cmumfi/mfi-ddb-rws-app:${VERSION:-latest}
+        - cmumfi/mfi-ddb-rws-app:latest
     container_name: mfi-rws-app
-    image: cmumfi/mfi-ddb-rws-app:latest
+    image: cmumfi/mfi-ddb-rws-app:${VERSION:-latest}
     ports:
       - "8000:8000"
     profiles:
