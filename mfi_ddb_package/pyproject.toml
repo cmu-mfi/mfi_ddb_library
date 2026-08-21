@@ -1,6 +1,6 @@
 [project]
 name = "mfi_ddb"
-version = "1.0.0"
+version = "1.1.1"
 description = "MFI DDB: Python library for streaming data"
 readme = "README.md"
 requires-python = ">=3.8,<3.13"
@@ -69,3 +69,9 @@ ignore = [
 
 [tool.ruff.format]
 line-ending = "lf"
+
+[tool.mfi_ddb.build]
+date = "2026-08-20T22:20:27Z"
+id = "20260820"
+commit = "a33c77949b2ec8114f13da63e48ca03170316c0f"
+
