@@ -137,7 +137,7 @@ jobs:
           LC_ALL: C.UTF-8
         run: |
           set -euo pipefail
-          pre-commit run --all-files --config mfi_ddb_package/.pre-commit-config.yaml
+          pre-commit run --all-files --config mfi_ddb_package/.pre-commit-config.yaml || true
           pre-commit run --all-files --config mfi_ddb_package/.pre-commit-config.yaml
       
       - name: Update build section
