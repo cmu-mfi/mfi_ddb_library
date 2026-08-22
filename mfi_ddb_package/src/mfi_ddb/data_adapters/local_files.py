@@ -13,6 +13,7 @@ from mfi_ddb.data_adapters.base import BaseDataAdapter
 
 
 class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
+
     NAME = "Local Files"
 
     CONFIG_HELP = {
@@ -31,6 +32,7 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
     }
 
     CONFIG_EXAMPLE = {
+        "adapter_name": "my_local_files_adapter",
         "watch_dir": ["/path/to/watch/dir"],
         "buffer_size": 10,
         "wait_before_read": 2,
@@ -53,7 +55,9 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
         )
         name: str = Field(..., description="Name of the system.")
 
-        model_config = {"extra": "allow"}
+        model_config = {
+            "extra": "allow"
+        }
 
     class SCHEMA(BaseDataAdapter.SCHEMA):
         watch_dir: List[str] = Field(..., description="List of directories to watch for new files.")
@@ -68,11 +72,11 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
         )
 
     def __init__(self, config: dict = None) -> None:
+        config['trial_id'] = config['system']['trial_id']
         super().__init__(config)
-        self.cfg["trial_id"] = self.cfg["system"]["trial_id"]
 
-        system_config = config["system"]
-        self.system_name = system_config["name"]
+        system_config = config['system']
+        self.system_name = system_config['name']
 
         self.component_ids.append(self.system_name)
         self._data[self.system_name] = {}
@@ -83,7 +87,7 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
         # to publish to MQTT yet. LIFO order.
 
         # create a observers for the directories
-        for dir in config["watch_dir"]:
+        for dir in config['watch_dir']:
             observer = Observer()
             observer.schedule(self, path=dir, recursive=True)
             observer.start()
@@ -117,12 +121,12 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
         time.sleep(self.cfg["wait_before_read"])
 
         data = {}
-        data["file_name"] = self.__get_event_data(event, "file_name")
-        data["file_type"] = self.__get_event_data(event, "file_type")
-        data["file_path"] = self.__get_event_data(event, "file_path")
-        data["timestamp"] = self.__get_event_data(event, "timestamp")
-        data["file"] = self.__get_event_data(event, "file")
-        data["size"] = self.__get_event_data(event, "size")
+        data["file_name"] = self.__get_event_data(event, 'file_name')
+        data["file_type"] = self.__get_event_data(event, 'file_type')
+        data["file_path"] = self.__get_event_data(event, 'file_path')
+        data["timestamp"] = self.__get_event_data(event, 'timestamp')
+        data["file"] = self.__get_event_data(event, 'file')
+        data["size"] = self.__get_event_data(event, 'size')
 
         data["trial_id"] = self.cfg["system"]["trial_id"]
         data["system"] = self.cfg["system"]
@@ -181,13 +185,13 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
         filename = os.path.join(target_dir, f"mfi_ddb_start_{time_now}.txt")
 
         source_info = {}
-        source_info["hostname"] = socket.gethostname()
-        source_info["os"] = platform.system()
-        source_info["fqdn"] = socket.getfqdn()
+        source_info['hostname'] = socket.gethostname()
+        source_info['os'] = platform.system()
+        source_info['fqdn'] = socket.getfqdn()
 
         file_dict = {}
-        file_dict["source_info"] = source_info
-        file_dict["config"] = self.cfg
+        file_dict['source_info'] = source_info
+        file_dict['config'] = self.cfg
 
         with open(filename, "w") as file:
             file.write(yaml.dump(file_dict))

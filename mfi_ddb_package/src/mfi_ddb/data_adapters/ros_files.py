@@ -62,6 +62,7 @@ class RosFilesDataAdapter(BaseDataAdapter):
         ),
     }
     CONFIG_EXAMPLE = {
+        "adapter_name": "my_ros_files_adapter",
         "trial_id": "trial_001",
         "set_ros_callback": True,
         "devices": {

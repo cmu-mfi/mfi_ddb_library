@@ -13,9 +13,6 @@ services:
       - "daa"
     ports:
       - "8001:8000"  # Exposes the FastAPI backend to your host machine on port 8001
-    depends_on:
-      mqtt-broker:
-        condition: service_started
     networks:
       - mfi_network
     restart: always

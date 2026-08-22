@@ -37,8 +37,6 @@ services:
       - "ts"
       - "dbn"
     depends_on:
-      mqtt-broker:
-        condition: service_started
       timescaledb-db:
         condition: service_healthy
     volumes:

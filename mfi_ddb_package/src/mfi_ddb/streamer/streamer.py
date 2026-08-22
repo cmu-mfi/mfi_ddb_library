@@ -33,9 +33,7 @@ class _SCHEMA:
             False, description="Enable TLS for MQTT connection (default: False)"
         )
         debug: bool = Field(False, description="Enable debug mode for MQTT client (default: False)")
-        timeout: int = Field(
-            5, description="Timeout in seconds for connecting to the MQTT broker (default: 5)"
-        )
+        timeout: int = Field(5, description="Timeout in seconds for connecting to the MQTT broker (default: 5)")
         enterprise: str = Field(..., description="Enterprise name for MQTT connection")
         site: str = Field("", description="Site name for MQTT connection")
 
@@ -95,20 +93,16 @@ class Streamer(Observer):
             "password": "Password for MQTT broker authentication",
             "tls_enabled": "Enable TLS for MQTT connection (default: False)",
             "debug": "Enable debug mode for MQTT client (default: False)",
-            "timeout": "Timeout in seconds for connecting to the MQTT broker (default: 5)",
+            "timeout": "Timeout in seconds for connecting to the MQTT broker (default: 5)"
         },
     }
 
     class SCHEMA(_SCHEMA.SCHEMA):
         pass
 
-    def __init__(
-        self,
-        config: dict,
-        data_adp: BaseDataAdapter,
-        stream_on_update: bool = False,  # noqa: F405
-    ) -> None:
+    def __init__(self, config: dict, data_adp: BaseDataAdapter, stream_on_update:bool = False) -> None:
         super().__init__()
+
 
         # 1. initialize the data adapter and respective topic family client
         # `````````````````````````````````````````````````````````````````````````
@@ -129,7 +123,7 @@ class Streamer(Observer):
             )
             topic_family_name = data_adp.RECOMMENDED_TOPIC_FAMILY
         else:
-            topic_family_name = config["topic_family"]
+            topic_family_name = config['topic_family']
 
         topic_family = globals()[TOPIC_CLIENTS[topic_family_name][1]]()
         self.__client = globals()[TOPIC_CLIENTS[topic_family_name][0]](self.cfg, topic_family)
@@ -170,10 +164,9 @@ class Streamer(Observer):
             kv_birth_payload = self.__kv_birth_payload
             kv_death_payload = self.__generate_death_kv_payload(kv_birth_payload)
             blob_death_payload = get_blob_json_payload_from_dict(
-                data=kv_death_payload,
-                file_name=f"{trial_id}_metadata_death.json",
-                trial_id=trial_id,
-            )
+                data = kv_death_payload,
+                file_name = f'{trial_id}_metadata_death.json',
+                trial_id = trial_id)
 
             self.__kv_client.set_death_payload("metadata", kv_death_payload)
             self.__blob_client.set_death_payload("metadata", blob_death_payload)
@@ -210,7 +203,7 @@ class Streamer(Observer):
             print(f"WARNING: Invalid polling rate = {polling_rate_hz}. Using 1Hz.")
             polling_rate_hz = 1
 
-        while (time.time() - self.__last_poll_update) < 1 / polling_rate_hz:
+        while (time.time() - self.__last_poll_update) < 1/polling_rate_hz:
             time.sleep(0.1)
 
         self.__data_adp.get_data()
@@ -294,20 +287,20 @@ class Streamer(Observer):
         kv_birth_payload = self.__generate_birth_kv_payload()
         self.__kv_birth_payload = kv_birth_payload
         kv_death_payload = self.__generate_death_kv_payload(kv_birth_payload)
-        blob_birth_payload = get_blob_json_payload_from_dict(
-            data=kv_birth_payload, file_name=f"{trial_id}_metadata_birth.json", trial_id=trial_id
-        )
-        blob_death_payload = get_blob_json_payload_from_dict(
-            data=kv_death_payload, file_name=f"{trial_id}_metadata_death.json", trial_id=trial_id
-        )
+        blob_birth_payload = get_blob_json_payload_from_dict(data = kv_birth_payload,
+                                                             file_name = f'{trial_id}_metadata_birth.json',
+                                                             trial_id = trial_id)
+        blob_death_payload = get_blob_json_payload_from_dict(data = kv_death_payload,
+                                                             file_name = f'{trial_id}_metadata_death.json',
+                                                             trial_id = trial_id)
 
         # 3. publish the key-value metadata birth message with initial data
         # ```````````````````````````````````````````````````````````````````````
         self.__kv_client.set_death_payload("metadata", kv_death_payload)
-        self.__kv_client.connect(["metadata"])
+        self.__kv_client.connect(['metadata'])
 
         self.__blob_client.set_death_payload("metadata", blob_death_payload)
-        self.__blob_client.connect(["metadata"])
+        self.__blob_client.connect(['metadata'])
 
         self.__kv_client.stream_data({"metadata": kv_birth_payload})
         self.__blob_client.stream_data({"metadata": blob_birth_payload})
@@ -355,7 +348,7 @@ class Streamer(Observer):
                 "sample_data": sample_data,
             },
             "broker": {k: v for k, v in self.cfg["mqtt"].items() if k != "password"},
-            "data_topics": list(self.__client.get_data_topics()),
+            "data_topics": list(self.__client.get_data_topics())
         }
 
         return payload

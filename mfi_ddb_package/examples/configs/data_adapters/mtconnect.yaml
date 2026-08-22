@@ -1,3 +1,4 @@
+adapter_name: my_mtconnect_adapter
 mtconnect:
   agent_ip: 192.168.1.1
   agent_url: http://192.168.1.1:5000

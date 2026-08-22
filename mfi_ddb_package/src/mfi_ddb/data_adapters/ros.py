@@ -34,6 +34,7 @@ class RosDataAdapter(BaseDataAdapter):
         ),
     }
     CONFIG_EXAMPLE = {
+        "adapter_name": "my_ros_adapter",
         "trial_id": "trial_001",
         "devices": {
             "device1": {

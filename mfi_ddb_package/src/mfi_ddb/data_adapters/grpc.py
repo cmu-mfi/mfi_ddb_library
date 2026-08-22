@@ -41,25 +41,14 @@ class _SCHEMA(BaseModel):
     class SCHEMA(BaseModel):
         server_address: str = Field(..., description="Network Address of the gRPC server")
         server_port: int = Field(..., description="Port of the gRPC server")
-        certificate_path: str = Field(
-            "", description="Full path to the gRPC server certificate file (optional)"
-        )
-        protobufs_dir: str = Field(
-            ..., description="Full path to the directory containing .proto files"
-        )
-        compiled_protos_dir: str = Field(
-            "./compiled_protos", description="Full path to the compiled protobuf stubs (optional)"
-        )
-        trial_id: str = Field(
-            ...,
-            description="Trial ID for the gRPC device. No spaces or special characters allowed.",
-        )
-        components: List["_GRPCComponent"] = Field(
-            ..., description="List of gRPC components to monitor"
-        )
-
+        certificate_path: str = Field("", description="Full path to the gRPC server certificate file (optional)")
+        protobufs_dir: str = Field(..., description="Full path to the directory containing .proto files")
+        compiled_protos_dir: str = Field("./compiled_protos", description="Full path to the compiled protobuf stubs (optional)")
+        trial_id: str = Field(..., description="Trial ID for the gRPC device. No spaces or special characters allowed.")
+        components: List['_GRPCComponent'] = Field(..., description="List of gRPC components to monitor")
 
 class GrpcDataAdapter(BaseDataAdapter):
+
     NAME = "gRPC"
 
     CONFIG_HELP = {
@@ -76,6 +65,7 @@ class GrpcDataAdapter(BaseDataAdapter):
     }
 
     CONFIG_EXAMPLE = {
+        "adapter_name": "my_grpc_adapter",
         "server_address": "localhost",
         "server_port": 50051,
         "certificate_path": "/full/path/to/cert.pem",
@@ -115,9 +105,7 @@ class GrpcDataAdapter(BaseDataAdapter):
         pass
 
     def __init__(self, config: dict):
-        super().__init__()
-
-        self.cfg = config
+        super().__init__(config)
 
         # 1. OPEN GRPC CHANNEL
         addr = f"{self.cfg['server_address']}:{self.cfg['server_port']}"
@@ -162,7 +150,7 @@ class GrpcDataAdapter(BaseDataAdapter):
                     continue
                 raise ImportError(f"Could not import compiled protobuf module for {proto_name}")
 
-            stub_class = getattr(stub_module, component["stub_class"])
+            stub_class = getattr(stub_module, component['stub_class'])
 
             # Import compiled protobuf request dynamically
             # ``````````````````````````````````````````
@@ -180,6 +168,9 @@ class GrpcDataAdapter(BaseDataAdapter):
             request_class = getattr(request_module, component["request_class"])
             request_dict = component["request"]
 
+            request_class = getattr(request_module, component['request_class'])
+            request_dict = component['request']
+
             # Instantiate stub and request
             # ````````````````````````````
             stub = stub_class(self.channel)
@@ -187,28 +178,27 @@ class GrpcDataAdapter(BaseDataAdapter):
 
             # Populate BaseDataAdapter data members: component_ids and attributes
             # ```````````````````````````````````````````````````````````````````
-            if "trial_id" not in component:
-                component["trial_id"] = self.cfg["trial_id"]
-            self.component_ids.append(component["component_id"])
-            self.attributes[component["component_id"]] = component
-            self._data[component["component_id"]] = {}
+            if 'trial_id' not in component:
+                component['trial_id'] = self.cfg['trial_id']
+            self.component_ids.append(component['component_id'])
+            self.attributes[component['component_id']] = component
+            self._data[component['component_id']] = {}
 
-            self.components.append(
-                {
-                    "component_id": component["component_id"],
-                    "stub": stub,
-                    "request_instance": request_instance,
-                    "request_method": component["request_method"],
-                }
-            )
+
+            self.components.append({
+                'component_id': component['component_id'],
+                'stub': stub,
+                'request_instance': request_instance,
+                'request_method': component['request_method']
+            })
             i = i + 1
 
     def get_data(self):
         for comp in self.components:
             raw_response = getattr(comp["stub"], comp["request_method"])(comp["request_instance"])
             # Assuming response has a 'data' attribute; adjust as needed
-            self._data[comp["component_id"]] = self.__process_data(raw_response)
-            self.last_updated[comp["component_id"]] = time.time()
+            self._data[comp['component_id']] = self.__process_data(raw_response)
+            self.last_updated[comp['component_id']] = time.time()
 
     def __generate_compiled_protos(self):
         """

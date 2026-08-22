@@ -1,3 +1,4 @@
+adapter_name: my_local_files_adapter
 watch_dir:
 - /path/to/watch/dir
 buffer_size: 10

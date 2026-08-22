@@ -57,7 +57,7 @@ class _Mqtt:
 
         start_time = time.time()
         time_elapsed = 0
-        while not self.client.is_connected() or time_elapsed < timeout:
+        while not self.client.is_connected() and time_elapsed < timeout:
             print(f"Connecting to MQTT broker...{int(time_elapsed)}s")
             time.sleep(1)
             self.client.loop()
@@ -150,6 +150,7 @@ class MqttDataAdapter(BaseDataAdapter, _Mqtt):
     }
 
     CONFIG_EXAMPLE = {
+        "adapter_name": "my_mqtt_adapter",
         "mqtt": {
             "broker_address": "mqtt.example.com",
             "broker_port": 1883,

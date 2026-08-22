@@ -14,14 +14,8 @@ class _SCHEMA(BaseModel):
     class _MTCONNECT(BaseModel):
         agent_ip: str = Field(..., description="IP address of the MTConnect agent")
         agent_url: str = Field(..., description="URL of the MTConnect agent")
-        device_name: str = Field(
-            ..., description="Name of the device to be used in the data object"
-        )
-        trial_id: str = Field(
-            ...,
-            description="Trial ID for the MTConnect device. No spaces/special characters allowed.",
-        )
-
+        device_name: str = Field(..., description="Name of the device to be used in the data object")
+        trial_id: str = Field(..., description="Trial ID for the MTConnect device. No spaces or special characters allowed.")
     class SCHEMA(BaseModel):
         mtconnect: "_MTCONNECT" = Field(
             ..., description="Configuration for the MTConnect agent connection"
@@ -29,6 +23,7 @@ class _SCHEMA(BaseModel):
 
 
 class MTconnectDataAdapter(BaseDataAdapter):
+
     NAME = "MTConnect"
 
     CONFIG_HELP = {
@@ -41,6 +36,7 @@ class MTconnectDataAdapter(BaseDataAdapter):
     }
 
     CONFIG_EXAMPLE = {
+        "adapter_name": "my_mtconnect_adapter",
         "mtconnect": {
             "agent_ip": "192.168.1.1",
             "agent_url": "http://192.168.1.1:5000",
@@ -61,12 +57,10 @@ class MTconnectDataAdapter(BaseDataAdapter):
         pass
 
     def __init__(self, config: dict):
-        super().__init__()
+        config['trial_id'] = config['mtconnect']['trial_id']
+        super().__init__(config)
 
-        self.cfg = config
-        self.cfg["trial_id"] = self.cfg["mtconnect"]["trial_id"]
-
-        self.device_name = self.cfg["mtconnect"]["device_name"]
+        self.device_name = self.cfg['mtconnect']['device_name']
         # CHECK IF MTCONNECT AGENT IS ACTIVE
         self.__connect()
 
@@ -112,8 +106,8 @@ class MTconnectDataAdapter(BaseDataAdapter):
             if not isinstance(data_list, omegaconf.listconfig.ListConfig):
                 data_list = [data_list]
             for data_item in data_list:
-                for key in data_item:
-                    self._data[component_id][f"{data_item['@id']}/{key}"] = str(data_item[key])
+                for key in data_item.keys():
+                    self._data[component_id][f'{data_item["@id"]}/{key}'] = str(data_item[key])
 
     def get_data(self):
         raw_data = self.__request_agent("current")
@@ -137,15 +131,14 @@ class MTconnectDataAdapter(BaseDataAdapter):
 
         self.__populate_data(component_stream)
 
+
     def __connect(self):
         # Ping to see if MTConnect agent is active -----------------------------------
         print("Checking if MTConnect agent is active ...")
-        ip = self.cfg["mtconnect"]["agent_ip"]
+        ip = self.cfg['mtconnect']['agent_ip']
 
         response = ping(ip)
-        timeout = (
-            self.cfg["mtconnect"].get("timeout", 5) if "timeout" in self.cfg["mtconnect"] else 5
-        )
+        timeout = self.cfg['mtconnect'].get('timeout', 5) if 'timeout' in self.cfg['mtconnect'] else 5
 
         start_time = time.time()
         time_elapsed = 0
@@ -156,16 +149,14 @@ class MTconnectDataAdapter(BaseDataAdapter):
             time_elapsed = time.time() - start_time
 
         if response is None:
-            raise ConnectionError(
-                f"MTConnect agent at {ip} is not responding after {timeout} seconds."
-            )
+            raise ConnectionError(f"MTConnect agent at {ip} is not responding after {timeout} seconds.")
 
         print(f"MTConnect agent at {ip} is active")
 
     def __request_agent(self, ext: str):
         URL = self.cfg["mtconnect"]["agent_url"]
         response = requests.get(URL + ext)
-        val = xmltodict.parse(response.text, encoding="utf-8")
+        val = xmltodict.parse(response.text, encoding='utf-8')
         val = OmegaConf.create(val)
         return val
 
@@ -189,9 +180,9 @@ class MTconnectDataAdapter(BaseDataAdapter):
         current_time = time.time()
 
         for component_data in raw_data:
-            component_id = f"{self.device_name}/{component_data['@componentId']}"
+            component_id = f'{self.device_name}/{component_data["@componentId"]}'
 
-            def extract_key_value(data_item, data_item_key, component_id):
+            def extract_key_value(data_item, data_item_key):
                 if isinstance(data_item, omegaconf.dictconfig.DictConfig):
                     for key in data_item:
                         substitute_key = key
@@ -215,14 +206,14 @@ class MTconnectDataAdapter(BaseDataAdapter):
                         )
                     self.last_updated[component_id] = current_time
 
-            for key in component_data:
-                if key in ["Events", "Samples"]:
+            for key in component_data.keys():
+                if key in ['Events', 'Samples']:
                     for data_item_list in component_data[key].values():
                         if not isinstance(data_item_list, omegaconf.listconfig.ListConfig):
                             data_item_list = [data_item_list]
                         for data_item in data_item_list:
-                            data_item_id = data_item["@dataItemId"]
-                            extract_key_value(data_item, data_item_id, component_id)
+                            data_item_id = data_item['@dataItemId']
+                            extract_key_value(data_item, data_item_id)
 
     def __autotype(self, value):
         try:

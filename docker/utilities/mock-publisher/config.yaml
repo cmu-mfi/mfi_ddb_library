@@ -1,0 +1,23 @@
+mqtt:
+  broker: "test.mosquitto.org"
+  port: 1883
+  topic: "admin/feeds/avroom/telemetry"
+  client_id: "mock-esp32"
+  publish_rate: 1 # Hz
+  qos: 0
+
+telemetry:
+  location: "AV Room"
+  initial_values:
+    temperature: 24.5
+    humidity: 65.0
+    battery: 12.20
+  fluctuations:
+    temp_min: -0.15
+    temp_max: 0.15
+    humidity_min: -0.4
+    humidity_max: 0.4
+    battery_drain_min: 0.0
+    battery_drain_max: 0.0005
+    rssi_min: -82
+    rssi_max: -74

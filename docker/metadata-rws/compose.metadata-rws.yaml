@@ -34,13 +34,11 @@ services:
     image: cmumfi/mfi-ddb-metadata-store-connector:${VERSION:-latest}
     command: >
       python -u connector.py --broker_config broker.ini --pg_config pg_database.ini
-    profiles:
-      - "retrieval"
     depends_on:
-      mqtt-broker:
-        condition: service_started
       metadata-store-db:
         condition: service_healthy
+    profiles:
+      - "retrieval"
     volumes:
       - ./mds-broker.ini:/app/broker.ini:ro
       - ./mds-pg_database.ini:/app/pg_database.ini:ro    
@@ -64,10 +62,6 @@ services:
       - "retrieval"
     depends_on:
       metadata-store-db:
-        condition: service_healthy
-      kv-psql-db:
-        condition: service_healthy
-      timescaledb-db:
         condition: service_healthy
     volumes:
       - ./rws-dws-endpoints.yaml:/app/app/config/dws.endpoints.yaml:ro
