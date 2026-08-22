@@ -1,4 +1,3 @@
 trial_id: (optional) It is required if one of the payload is of type 'data'
-payloads: 'List of payload messages.Payloads of following types allowed: ''data'',
-  ''project'', ''tp-tag'', and ''user''.Each will be verified against the kv.json
-  schema.'
+payloads: List of payload messages.Payloads of type 'data', 'project', 'tp-tag', and
+  'user' allowed.Each will be verified against the kv.json schema.
