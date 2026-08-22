@@ -67,7 +67,7 @@ class Ros2DataAdapter(BaseDataAdapter):
         pass
 
     def __init__(self, config: dict) -> None:
-        super().__init__()
+        super().__init__(config)
 
         # IMPORT ROS2 LIBRARIES
         try:
@@ -343,7 +343,7 @@ class Ros2DataAdapter(BaseDataAdapter):
     def __del__(self):
         """Destructor to ensure node is properly shut down."""
         self.disconnect()
-                    
+
     def __start_executor(self):
 
         self.executor = self.MultiThreadedExecutor()
