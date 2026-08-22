@@ -1,9 +1,11 @@
+import base64
 import os
 import platform
 import socket
 import time
 from typing import List
 
+import numpy as np
 import yaml
 from pydantic import BaseModel, Field
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
@@ -17,18 +19,15 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
     NAME = "Local Files"
 
     CONFIG_HELP = {
-        "watch_dir": (
-            "List of directories to watch for new files."
-            "The first directory is used to create a starter file."
-        ),
-        "buffer_size": "Maximum number of files to buffer before streaming. First in first out.",
-        "wait_before_read": "Time in seconds to wait to ensure that a new file is fully written.",
+        "watch_dir": "List of directories to watch for new files. The first directory will be used to create a starter file.",
+        "buffer_size": "Maximum number of files to buffer before streaming. If the buffer is full, the oldest file will be removed.",
+        "wait_before_read": "Time in seconds to wait before reading a new file after it is created. This is to ensure the file is fully written.",
         "system": {
             "name": "Name of the system",
             "trial_id": "Trial ID for the system. No spaces or special characters allowed.",
             "description": "Description of the system",
-            "other_attributes": "Other attributes of the system",
-        },
+            "other_attributes": "Other attributes of the system"
+        }
     }
 
     CONFIG_EXAMPLE = {
@@ -41,8 +40,8 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
             "trial_id": "trial_001",
             "description": "Local files data adapter system",
             "manufacturer": "Example Corp",
-            "model": "LocalFilesModel",
-        },
+            "model": "LocalFilesModel"
+        }
     }
 
     RECOMMENDED_TOPIC_FAMILY = "blob"
@@ -50,9 +49,7 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
     SELF_UPDATE = True  # This data adapter will update the data by itself in a separate thread.
 
     class _SystemInfo(BaseModel):
-        trial_id: str = Field(
-            ..., description="Trial ID for the system. No spaces or special characters allowed."
-        )
+        trial_id: str = Field(..., description="Trial ID for the system. No spaces or special characters allowed.")
         name: str = Field(..., description="Name of the system.")
 
         model_config = {
@@ -61,15 +58,9 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
 
     class SCHEMA(BaseDataAdapter.SCHEMA):
         watch_dir: List[str] = Field(..., description="List of directories to watch for new files.")
-        buffer_size: int = Field(
-            ..., description="Maximum number of files to buffer before streaming."
-        )
-        wait_before_read: int = Field(
-            ..., description="Time in seconds to wait before reading a new file."
-        )
-        system: "_SystemInfo" = Field(
-            ..., description="System information including trial ID, name, and other attributes."
-        )
+        buffer_size: int = Field(..., description="Maximum number of files to buffer before streaming.")
+        wait_before_read: int = Field(..., description="Time in seconds to wait before reading a new file.")
+        system: "_SystemInfo" = Field(..., description="System information including trial ID, name, and other attributes.")
 
     def __init__(self, config: dict = None) -> None:
         config['trial_id'] = config['system']['trial_id']
@@ -94,7 +85,7 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
             print(f"Watching directory {dir}")
 
         print("Waiting for LocalFilesDataAdapter to initialize ...")
-        time.sleep(self.cfg["wait_before_read"] * 2)
+        time.sleep(self.cfg["wait_before_read"]*2)
         print("LocalFilesDataAdapter initialized.")
 
         self.__create_starter_file()
@@ -156,31 +147,31 @@ class LocalFilesDataAdapter(BaseDataAdapter, FileSystemEventHandler):
             raise ValueError("The configuration is empty!")
 
     def __get_event_data(self, event, key):
-        if key == "file_name":
-            if platform.system() == "Windows":
-                name = event.src_path.split("\\")[-1]
+        if key == 'file_name':
+            if platform.system() == 'Windows':
+                name = event.src_path.split('\\')[-1]
             else:
-                name = event.src_path.split("/")[-1]
+                name = event.src_path.split('/')[-1]
             print(f"Name: {name}")
             return name
-        elif key == "file_type":
+        elif key == 'file_type':
             return os.path.splitext(event.src_path)[1]
-        elif key == "file_path":
+        elif key == 'file_path':
             return event.src_path
-        elif key == "timestamp":
+        elif key == 'timestamp':
             return int(time.time())
-        elif key == "file":
+        elif key == 'file':
             file_data = None
-            with open(event.src_path, "rb") as file:
+            with open(event.src_path, 'rb') as file:
                 file_data = file.read()
             return file_data
-        elif key == "size":
+        elif key == 'size':
             return os.path.getsize(event.src_path)
         else:
             return None
 
     def __create_starter_file(self):
-        target_dir = self.cfg["watch_dir"][0]
+        target_dir = self.cfg['watch_dir'][0]
         time_now = time.strftime("%Y%m%d-%H%M%S")
         filename = os.path.join(target_dir, f"mfi_ddb_start_{time_now}.txt")
 

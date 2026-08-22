@@ -6,17 +6,14 @@ from pydantic import BaseModel, Field
 
 class BaseDataAdapter:
     """
-    Base class for data adapters. Use as a super class for the data adapters that will be
-    used in the PullStreamToMqtt(Spb) and PushStreamToMqtt(Spb) classes.
+    Base class for data adapters. Use as a super class for the data adapters that will be used in the PullStreamToMqtt(Spb) and PushStreamToMqtt(Spb) classes.
     """
 
     NAME = "Base"
     CONFIG_EXAMPLE = {}
     CONFIG_HELP = {}
     RECOMMENDED_TOPIC_FAMILY = ""
-    SELF_UPDATE = (
-        False  # If True, the data adapter will update the data by itself in a separate thread.
-    )
+    SELF_UPDATE = False  # If True, the data adapter will update the data by itself in a separate thread.
 
     class SCHEMA(BaseModel):
         """
@@ -26,9 +23,9 @@ class BaseDataAdapter:
         trial_id: str = Field(..., description="Trial ID for the system. No spaces or special characters allowed.")
         adapter_name: str = Field("my_adapter", description="(optional) Name of the adapter instance.")
 
-    def __init__(self, config: dict = {}) -> None:  # noqa: B006
+    def __init__(self, config: dict = {}) -> None:
         self.component_ids = []
-        # component_ids is a list of components identifiers that are part of the data object.
+        # component_ids is a list of identifiers for the components that are part of the data object.
         # e.g.: self.component_ids = ["robot-arm-1", "machine-a"]
 
         self._data = {}
@@ -47,8 +44,7 @@ class BaseDataAdapter:
         # Invalid update: self.cb_data["robot-arm-1"] = {"estop": 1, "joint-1": 0.52}
 
         self.last_updated = {}
-        # last_updated is a dictionary that contains the Unix timestamp in seconds of the
-        # last update of the components.
+        # last_updated is a dictionary that contains the Unix timestamp in seconds of the last update of the components.
         # e.g.: self.last_updated = {"robot-arm-1": 1632900000.0, "machine-a": 1632900000.0}
 
         self.attributes = {}
@@ -59,9 +55,8 @@ class BaseDataAdapter:
         self.cfg = config
         # cfg is a dictionary that contains the configuration of the data object.
         # Note on trial_id:
-        #   * The key `trial_id` is required. It will be the default trial_id for the data object.
-        #   * if the config file doesn't have a key `trial_id`,
-        #     use the data adapter class constructor to set it.
+        #   * cfg needs to have a key `trial_id` that will be the default trial_id for the data object.
+        #   * if the config file doesn't have a key `trial_id`, use the data adapter class constructor to set it.
         #   * default trial_id will be None if not set.
         # Note on adapter_name:
         #   * cfg needs to have a key `adapter_name` that will be the name of the adapter instance
@@ -117,8 +112,7 @@ class BaseDataAdapter:
 
     def update_data(self):
         """
-        Update data from the data source. If not defined in the child class,
-        it will call the get_data() method.
+        Update data from the data source. If not defined in the child class, it will call the get_data() method.
         """
         self.get_data()
 

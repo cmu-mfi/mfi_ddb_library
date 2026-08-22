@@ -17,10 +17,7 @@ class _SCHEMA(BaseModel):
         device_name: str = Field(..., description="Name of the device to be used in the data object")
         trial_id: str = Field(..., description="Trial ID for the MTConnect device. No spaces or special characters allowed.")
     class SCHEMA(BaseModel):
-        mtconnect: "_MTCONNECT" = Field(
-            ..., description="Configuration for the MTConnect agent connection"
-        )
-
+        mtconnect: "_MTCONNECT" = Field(..., description="Configuration for the MTConnect agent connection")
 
 class MTconnectDataAdapter(BaseDataAdapter):
 
@@ -31,7 +28,7 @@ class MTconnectDataAdapter(BaseDataAdapter):
             "agent_ip": "IP address of the MTConnect agent",
             "agent_url": "URL of the MTConnect agent",
             "device_name": "Name of the device to be used in the data object",
-            "trial_id": "Trial ID for the MTConnect device. No spaces/special characters allowed.",
+            "trial_id": "Trial ID for the MTConnect device. No spaces or special characters allowed.",
         }
     }
 
@@ -41,7 +38,7 @@ class MTconnectDataAdapter(BaseDataAdapter):
             "agent_ip": "192.168.1.1",
             "agent_url": "http://192.168.1.1:5000",
             "device_name": "MTConnectDevice",
-            "trial_id": "trial_001",
+            "trial_id": "trial_001"
         }
     }
 
@@ -53,7 +50,6 @@ class MTconnectDataAdapter(BaseDataAdapter):
         """
         Schema for the MTConnect data adapter configuration.
         """
-
         pass
 
     def __init__(self, config: dict):
@@ -66,15 +62,14 @@ class MTconnectDataAdapter(BaseDataAdapter):
 
         # POPULATE COMPONENT IDS AND ATTRIBUTES
         # Note: By default, only first device, from the list of MTConnect devices, is used.
-        #       If multiple devices exist,
-        #       specify config['mtconnect']['mtconnect_uuid'] to use a specific device.
-        probe_data_raw = self.__request_agent("probe")
+        #       If multiple devices exist, specify config['mtconnect']['mtconnect_uuid'] to use a specific device.
+        probe_data_raw = self.__request_agent('probe')
         device_data = probe_data_raw.MTConnectDevices.Devices.Device
         if isinstance(device_data, omegaconf.listconfig.ListConfig):
-            if "mtconnect_uuid" in self.cfg["mtconnect"]:
-                device_id = self.cfg["mtconnect"]["mtconnect_uuid"]
+            if 'mtconnect_uuid' in self.cfg['mtconnect'].keys():
+                device_id = self.cfg['mtconnect']['mtconnect_uuid']
                 for device in device_data:
-                    if device["@uuid"] == device_id:
+                    if device['@uuid'] == device_id:
                         device_data = device
                         break
             else:
@@ -84,12 +79,12 @@ class MTconnectDataAdapter(BaseDataAdapter):
 
         # Populate device attributes
         device_attributes = {}
-        device_attributes["trial_id"] = self.cfg["mtconnect"]["trial_id"]
-        for key in device_data:
+        device_attributes['trial_id'] = self.cfg['mtconnect']['trial_id']
+        for key in device_data.keys():
             if not isinstance(device_data[key], omegaconf.dictconfig.DictConfig):
                 device_attributes[key] = device_data[key]
-            elif key == "Description":
-                for sub_key in device_data[key]:
+            elif key == 'Description':
+                for sub_key in device_data[key].keys():
                     if not isinstance(device_data[key][sub_key], omegaconf.dictconfig.DictConfig):
                         device_attributes[sub_key] = device_data[key][sub_key]
 
@@ -97,7 +92,7 @@ class MTconnectDataAdapter(BaseDataAdapter):
         components_data = device_data
         component_data = self.__get_probe_components(components_data)
         for component in component_data:
-            component_id = f"{self.device_name}/{component['@id']}"
+            component_id = f'{self.device_name}/{component["@id"]}'
             self.last_updated[component_id] = current_time
             self.component_ids.append(component_id)
             self.attributes[component_id] = device_attributes.copy()
@@ -110,7 +105,7 @@ class MTconnectDataAdapter(BaseDataAdapter):
                     self._data[component_id][f'{data_item["@id"]}/{key}'] = str(data_item[key])
 
     def get_data(self):
-        raw_data = self.__request_agent("current")
+        raw_data = self.__request_agent('current')
         devices = raw_data.MTConnectStreams.Streams.DeviceStream
         device = devices[0] if isinstance(devices, omegaconf.listconfig.ListConfig) else devices
 
@@ -121,7 +116,7 @@ class MTconnectDataAdapter(BaseDataAdapter):
         self.__populate_data(component_stream)
 
     def update_data(self):
-        raw_data = self.__request_agent("sample")
+        raw_data = self.__request_agent('sample')
         devices = raw_data.MTConnectStreams.Streams.DeviceStream
         device = devices[0] if isinstance(devices, omegaconf.listconfig.ListConfig) else devices
 
@@ -154,7 +149,7 @@ class MTconnectDataAdapter(BaseDataAdapter):
         print(f"MTConnect agent at {ip} is active")
 
     def __request_agent(self, ext: str):
-        URL = self.cfg["mtconnect"]["agent_url"]
+        URL = self.cfg['mtconnect']['agent_url']
         response = requests.get(URL + ext)
         val = xmltodict.parse(response.text, encoding='utf-8')
         val = OmegaConf.create(val)
@@ -165,9 +160,9 @@ class MTconnectDataAdapter(BaseDataAdapter):
             component_data = []
 
         if isinstance(data, omegaconf.dictconfig.DictConfig):
-            if "DataItems" in data:
+            if 'DataItems' in data.keys():
                 component_data.append(data)
-            for key in data:
+            for key in data.keys():
                 self.__get_probe_components(data[key], component_data)
         elif isinstance(data, omegaconf.listconfig.ListConfig):
             for item in data:
@@ -184,26 +179,19 @@ class MTconnectDataAdapter(BaseDataAdapter):
 
             def extract_key_value(data_item, data_item_key):
                 if isinstance(data_item, omegaconf.dictconfig.DictConfig):
-                    for key in data_item:
+                    for key in data_item.keys():
                         substitute_key = key
-                        if key == "#text":
-                            substitute_key = "value"
-                        extract_key_value(
-                            data_item[key], f"{data_item_key}/{substitute_key}", component_id
-                        )
+                        if key == '#text':
+                            substitute_key = 'value'
+                        extract_key_value(data_item[key], f'{data_item_key}/{substitute_key}')
                 elif isinstance(data_item, omegaconf.listconfig.ListConfig):
-                    for i, item in enumerate(data_item):
-                        extract_key_value(item, f"{data_item_key}_{i}", component_id)
+                        for i, item in enumerate(data_item):
+                            extract_key_value(item, f'{data_item_key}_{i}')
                 else:
                     try:
                         self._data[component_id][data_item_key] = self.__autotype(data_item)
                     except KeyError:
-                        print(
-                            "WARNING: KeyError: ",
-                            data_item_key,
-                            " not found in data buffer for component ",
-                            component_id,
-                        )
+                        print("WARNING: KeyError: ", data_item_key, " not found in data buffer for component ", component_id)
                     self.last_updated[component_id] = current_time
 
             for key in component_data.keys():
@@ -218,8 +206,8 @@ class MTconnectDataAdapter(BaseDataAdapter):
     def __autotype(self, value):
         try:
             return int(value)
-        except Exception as _:
+        except:
             try:
                 return float(value)
-            except Exception as _:
+            except:
                 return value

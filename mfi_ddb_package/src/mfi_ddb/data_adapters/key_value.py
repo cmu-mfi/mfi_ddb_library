@@ -1,6 +1,5 @@
 from typing import List, Literal
-
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from mfi_ddb.data_adapters.base import BaseDataAdapter
 from mfi_ddb.topic_families.key_value import KeyValueTopicFamily
@@ -22,12 +21,8 @@ class KvDataAdapter(BaseDataAdapter):
     NAME = "KeyValue"
 
     CONFIG_HELP = {
-        "trial_id": "(optional) It is required if one of the payload is of type 'data'",
-        "payloads": (
-            "List of payload messages."
-            "Payloads of following types allowed: 'data', 'project', 'tp-tag', and 'user'."
-            "Each will be verified against the kv.json schema."
-        ),
+        'trial_id': "(optional) It is required if one of the payload is of type 'data'",
+        "payloads": "List of payload messages. Payloads of type 'data', 'project', 'tp-tag', and 'user' allowed. Each will be verified against the kv.json schema."
     }
 
     CONFIG_EXAMPLE = {
@@ -35,25 +30,31 @@ class KvDataAdapter(BaseDataAdapter):
         'trial_id': 'booster-a1',
         'payloads':[
             {
-                "schema_version": "mfi-v1.0",
-                "msg_type": "project",
-                "project_id": "p-550",
-                "project_name": "Apollo Mission",
-                "user_roles": [{"user_id": "john_smith", "domain": "Acme.Corp", "role": "admin"}],
-                "created_by_user_id": "user_01",
-                "created_by_domain": "internal",
-                "timestamp": "2026-03-31T23:34:00Z",
+            "schema_version": "mfi-v1.0",
+            "msg_type": "project",
+            "project_id": "p-550",
+            "project_name": "Apollo Mission",
+            "user_roles":[
+                {
+                "user_id": "john_smith",
+                "domain": "Acme.Corp",
+                "role": "admin"
+                }
+            ],
+            "created_by_user_id": "user_01",
+            "created_by_domain": "internal",
+            "timestamp": "2026-03-31T23:34:00Z"
             },
             {
-                "schema_version": "mfi-v1.0",
-                "msg_type": "user",
-                "user_id": "new-user-002",
-                "domain": "external",
-                "created_by_user_id": "admin_01",
-                "created_by_domain": "admin_domain",
-                "email": "user@example.com",
-                "name": "Jane Doe",
-                "timestamp": "2026-03-31T23:34:00Z",
+            "schema_version": "mfi-v1.0",
+            "msg_type": "user",
+            "user_id": "new-user-002",
+            "domain": "external",
+            "created_by_user_id": "admin_01",
+            "created_by_domain": "admin_domain",
+            "email": "user@example.com",
+            "name": "Jane Doe",
+            "timestamp": "2026-03-31T23:34:00Z"
             },
             {
             "schema_version": "mfi-v1.0",
@@ -95,12 +96,10 @@ class KvDataAdapter(BaseDataAdapter):
 
         self.pending_payloads = {}
         schema_validator = KeyValueTopicFamily.get_schema_validator()
-        for payload in self.cfg["payloads"]:
+        for payload in self.cfg['payloads']:
             payload = KeyValueTopicFamily.apply_defaults(payload, schema_validator)
             if not schema_validator.is_valid(payload):
-                self.logger.warning(
-                    f"Payload does not match schema: {schema_validator.iter_errors(payload)}"
-                )
+                self.logger.warning(f"Payload does not match schema: {schema_validator.iter_errors(payload)}")
                 self.logger.warning("Skippidng the payload...")
                 continue
 
@@ -117,9 +116,9 @@ class KvDataAdapter(BaseDataAdapter):
                 self._data[payload['msg_type']] = {}
 
     def get_data(self):
-        for key in self._data:
+        for key in self._data.keys():
             self.logger.info(f"sending {key} payload")
-            if len(self.pending_payloads[key]) > 0:
+            if len(self.pending_payloads[key])>0:
                 self._data[key] = self.pending_payloads[key].pop(0)
             else:
                 self._data[key] = {}
