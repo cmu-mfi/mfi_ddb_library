@@ -139,9 +139,6 @@ jobs:
           set -euo pipefail
           pre-commit run --all-files --config mfi_ddb_package/.pre-commit-config.yaml || true
           pre-commit run --all-files --config mfi_ddb_package/.pre-commit-config.yaml
-      
-      - name: Update build section
-        run: . mfi_ddb_package/update-build.sh
 
       - name: Commit and Push generated files
         # Ref: https://github.com/marketplace/actions/git-auto-commit
