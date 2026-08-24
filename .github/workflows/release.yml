@@ -41,10 +41,28 @@ jobs:
         run: uv build
 
       - name: Publish to PyPI
-        run: uv publish --token ${{ secrets.PYPI_TOKEN }}
+        shell: bash
+        run: |
+          set +e
+
+          output=$(uv publish --token "${{ secrets.PYPI_TOKEN }}" 2>&1)
+          status=$?
+
+          echo "$output"
+
+          if [ "$status" -eq 0 ]; then
+            exit 0
+          fi
+
+          if echo "$output" | grep -qiE 'already exists|File already exists'; then
+            echo "::notice::Package version already exists on PyPI; treating publish as successful."
+            exit 0
+          fi
+
+          echo "::error::PyPI publish failed."
+          exit "$status"
 
   docker-release:
-    needs: pypi-release
     runs-on: ubuntu-latest
 
     steps:
