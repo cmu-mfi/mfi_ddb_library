@@ -16,7 +16,7 @@ jobs:
         with:
           token: ${{ secrets.SHOBHITAGG_PAT }}
           ref: main
-          fetch-depth: 0
+          fetch-depth: 0       
 
       - name: Configure Git user
         run: |
@@ -27,7 +27,21 @@ jobs:
         run: |
           git fetch --all
 
+      - name: Check for version tag in dev branch
+        id: check_tag
+        run: |
+          # Check if dev branch has a tag matching version pattern (e.g., v1.0.0)
+          TAG=$(git log origin/dev --pretty=format:"%D" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
+          if [ -z "$TAG" ]; then
+            echo "No version tag found in dev branch. Skipping sync."
+            exit 1
+          else
+            echo "Found version tag: $TAG"
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+          fi
+
       - name: Sync dev to main
+        if: steps.check_tag.outcome == 'success'
         run: |
           # Update main with dev branch changes
           git merge origin/dev --no-edit

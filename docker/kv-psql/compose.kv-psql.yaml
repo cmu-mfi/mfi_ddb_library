@@ -28,8 +28,11 @@ services:
     build:
       context: ../../mfi_ddb_database_nodes/kv-psql/connector
       dockerfile: Dockerfile
+      tags:
+        - cmumfi/mfi-ddb-kv-psql-connector:${VERSION:-latest}
+        - cmumfi/mfi-ddb-kv-psql-connector:latest
     container_name: mfi-kv-psql-connector
-    image: cmumfi/mfi-ddb-kv-psql-connector:latest
+    image: cmumfi/mfi-ddb-kv-psql-connector:${VERSION:-latest}
     profiles:
       - "kv"
       - "dbn"
@@ -47,8 +50,11 @@ services:
     build:
       context: ../../mfi_ddb_database_nodes/kv-psql/dws
       dockerfile: Dockerfile
+      tags:
+        - cmumfi/mfi-ddb-kv-psql-dws:${VERSION:-latest}
+        - cmumfi/mfi-ddb-kv-psql-dws:latest 
     container_name: mfi-kv-psql-dws
-    image: cmumfi/mfi-ddb-kv-psql-dws:latest
+    image: cmumfi/mfi-ddb-kv-psql-dws:${VERSION:-latest}
     profiles:
       - "kv"
       - "dbn"

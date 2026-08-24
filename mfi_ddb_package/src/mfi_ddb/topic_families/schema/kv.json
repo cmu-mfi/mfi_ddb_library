@@ -67,7 +67,7 @@
                                 "user_id": {"type": "string"},
                                 "domain": {"type": "string"},
                                 "role": {
-                                    "type": "string", 
+                                    "type": "string",
                                     "options": ["admin", "operator", "maintainer", "researcher"],
                                     "default": "operator"
                                 }
@@ -99,12 +99,12 @@
                     "timestamp": {"type": "string", "format": "date-time"}
                 },
                 "required": [
-                    "time_start", "time_end", "trial_user_id", "trial_user_domain", "created_by_user_id", "created_by_domain", "timestamp" 
+                    "time_start", "time_end", "trial_user_id", "trial_user_domain", "created_by_user_id", "created_by_domain", "timestamp"
                 ],
                 "anyOf": [
                     {"required": ["project_id"]},
                     {"required": ["project_name"]}
-                ]                
+                ]
             }
         },
         {
@@ -151,7 +151,7 @@
                 },
                 "required": ["time", "user", "source", "adapter", "broker", "data_topics"]
             }
-        }              
+        }
 
     ],
     "additionalProperties": true

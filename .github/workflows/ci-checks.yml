@@ -2,14 +2,38 @@ name: MFI-DDB Package CI Checks
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ dev ]
   pull_request:
-    branches: [ main, dev ]
     paths:
       - 'mfi_ddb_package/src/**'
+      - 'mfi_ddb_package/tests/**'
+      - 'mfi_ddb_package/pyproject.toml'
+      - 'mfi_ddb_package/.pre-commit-config.yaml'
   workflow_dispatch:
 
 jobs:
+  # JOB 0: Lint and format check with ruff (mirrors the pre-commit hooks)
+  lint-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mfi_ddb_package
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras --dev
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
   # JOB 1: Installation across multiple OSes
   installation-check:
     strategy:
@@ -75,3 +99,51 @@ jobs:
   ros2-check:
     needs: installation-check
     uses: ./.github/workflows/ros2.yaml
+
+  # JOB 4: PR auto-fix via pre-commit hooks (commit any automatic fixes back to the PR branch)
+  pre-commit-check:
+    needs: lint-check
+    runs-on: ubuntu-latest
+    # NOTE: Run from repo root so that .pre-commit-config.yaml patterns (which reference
+    # "mfi_ddb_package/") resolve correctly. The config is invoked via explicit paths below.
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout with full history for push back to branch
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install pre-commit via uv tool
+        run: uv tool install pre-commit          
+
+      - name: Install hooks from project-local config
+        # Use the full path to the config file (located in mfi_ddb_package/)
+        run: pre-commit install --config mfi_ddb_package/.pre-commit-config.yaml
+
+      - name: Run full pre-commit suite (with automatic fixes)
+        env:
+          PY_COLORS: "1"
+          PRE_COMMIT_NO_INTERACTION: "1"
+          LC_ALL: C.UTF-8
+        run: |
+          set -euo pipefail
+          pre-commit run --all-files --config mfi_ddb_package/.pre-commit-config.yaml || true
+          pre-commit run --all-files --config mfi_ddb_package/.pre-commit-config.yaml
+
+      - name: Commit and Push generated files
+        # Ref: https://github.com/marketplace/actions/git-auto-commit
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: "CI: apply pre-commit auto-fixes"
+          file_pattern: "*"
+          branch: ${{ github.head_ref || github.ref_name }}

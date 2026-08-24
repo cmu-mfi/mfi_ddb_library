@@ -1,6 +1,6 @@
 # MFI DDB Library
 
-Library to stream data to Digital Data Backend (DDB) for the MFI project. It can be installed using pip. [https://pypi.org/project/mfi-ddb/](https://pypi.org/project/mfi-ddb/) 
+Library to stream data to Digital Data Backend (DDB) for the MFI project. It can be installed using pip. [https://pypi.org/project/mfi-ddb/](https://pypi.org/project/mfi-ddb/)
 
 ```
 pip install mfi_ddb
@@ -46,7 +46,7 @@ flowchart LR;
     D[Streamer] --> M[MQTT Client];
     B --> D;
     C[Topic Family] --> D;
-    M-->X[MQTT Broker];    
+    M-->X[MQTT Broker];
 
     classDef highlight fill:#094d57
     class B,C,D highlight
@@ -104,7 +104,7 @@ When streaming data to the broker, the following metadata is recorded through th
 | location context | The location context of the data being streamed, which includes the enterprise, site, area, and device. | [topic structure](./schema/README.md) |
 | attributes | Key-value pairs that provide additional information about the data being streamed. These are defined in the adapter yaml configuration file. | streamed on the same topic before data using the same topic family encoding |
 | streaming configuration | The configuration of the data stream, which includes broker information, enterprise and site details. | streamed on the `kv` and `blob` at birth and death of data streaming  |
-| adapter configuration | The configuration of the adapter that is streaming the data, which includes all the components and their attributes | streamed on the `kv` and `blob` at birth and death of data streaming |  
+| adapter configuration | The configuration of the adapter that is streaming the data, which includes all the components and their attributes | streamed on the `kv` and `blob` at birth and death of data streaming |
 
 ## Executable Modules
 
@@ -151,6 +151,36 @@ optional arguments:
                         Enable polling mode. Default is False.
   --poll_rate POLL_RATE, -r POLL_RATE
                         Polling rate in Hz. Default is 1 Hz, if --polling is set to True.
+```
+
+## Development
+
+### Pre-commit hooks
+
+Hooks run linting, formatting, and hygiene checks before each commit. They are scoped to `mfi_ddb_package/` and live in [`mfi_ddb_package/.pre-commit-config.yaml`](.pre-commit-config.yaml).
+
+1. Install `pre-commit` once (any Python environment on your machine):
+   ```
+   uv tool install pre-commit     # or: pipx install pre-commit
+   ```
+2. Install dependencies (provides `ruff`):
+   ```
+   uv sync --dev
+   ```
+3. Install the hook (run from the **repository root**, i.e. `ddb-workflows/`):
+   ```
+   pre-commit install --config mfi_ddb_package/.pre-commit-config.yaml
+   ```
+
+The ruff hooks auto-fix and reformat files in place and re-stage the changes. The first run after enabling hooks may rewrite a number of files (import sorting, etc.); to keep history clean, you can apply the bulk reformat manually once and commit it separately before relying on the hook:
+
+```
+uv run ruff check --fix . && uv run ruff format .
+```
+
+To run all hooks manually against the whole repo:
+```
+pre-commit run --config mfi_ddb_package/.pre-commit-config.yaml --all-files
 ```
 
 ## License

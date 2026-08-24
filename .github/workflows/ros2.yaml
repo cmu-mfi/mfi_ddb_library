@@ -1,13 +1,6 @@
 name: ROS2 Check
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-    paths:
-      - 'mfi_ddb_package/src/**'
-  workflow_dispatch:
   workflow_call:
 
 jobs:

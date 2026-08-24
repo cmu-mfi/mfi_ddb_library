@@ -1,4 +1,3 @@
-import threading
 import time
 from typing import List, Optional
 
@@ -9,21 +8,30 @@ from mfi_ddb.data_adapters.base import BaseDataAdapter
 
 MAX_ARRAY_SIZE = 16
 
+
 class _SCHEMA(BaseModel):
     class _DEVICES(BaseModel):
         namespace: str = Field(..., description="Namespace of the device in ROS")
-        rostopics: List[str] = Field(..., description="List of ROS topics to subscribe to for this device")
+        rostopics: List[str] = Field(
+            ..., description="List of ROS topics to subscribe to for this device"
+        )
         attributes: Optional[dict] = Field({}, description="Attributes of the device. Optional.")
+
     class SCHEMA(BaseModel):
-        trial_id: str = Field(..., description="Trial ID for the ROS device. No spaces or special characters allowed.")
+        trial_id: str = Field(
+            ..., description="Trial ID for the ROS device. No spaces or special characters allowed."
+        )
         devices: List["_DEVICES"] = Field(..., description="List of devices to subscribe to.")
 
-class RosDataAdapter(BaseDataAdapter):
 
+class RosDataAdapter(BaseDataAdapter):
     NAME = "ROS"
     CONFIG_HELP = {
         "trial_id": "Trial ID for the ROS device. No spaces or special characters allowed.",
-        "devices": "List of devices to subscribe to. Each device should have a 'namespace' and a list of 'rostopics' to subscribe to. 'attributes' are optional and can be used to set the attributes of the device.",   
+        "devices": (
+            "List of devices to subscribe. Required keys: ['namespace', 'rostopics']."
+            "'attributes' are optional. Use it to add attributes of the device."
+        ),
     }
     CONFIG_EXAMPLE = {
         "adapter_name": "my_ros_adapter",
@@ -35,8 +43,8 @@ class RosDataAdapter(BaseDataAdapter):
                 "attributes": {
                     "manufacturer": "RobotCorp",
                     "model": "RobotArmX",
-                    "description": "A robotic arm for testing purposes."
-                }
+                    "description": "A robotic arm for testing purposes.",
+                },
             },
             "device2": {
                 "namespace": "machine_a",
@@ -44,18 +52,18 @@ class RosDataAdapter(BaseDataAdapter):
                 "attributes": {
                     "manufacturer": "MachineCorp",
                     "version": 0.1,
-                    "description": "A machine for testing purposes."
-                }
-            }
-        }
-    }    
+                    "description": "A machine for testing purposes.",
+                },
+            },
+        },
+    }
     RECOMMENDED_TOPIC_FAMILY = "historian"
 
     SELF_UPDATE = True
 
     class SCHEMA(BaseDataAdapter.SCHEMA, _SCHEMA.SCHEMA):
         pass
-    
+
     def __init__(self, config: dict) -> None:
         super().__init__()
 
@@ -73,13 +81,13 @@ class RosDataAdapter(BaseDataAdapter):
             self.rospy = rospy
             self.rosgraph = rosgraph
 
-        except ImportError as e:
+        except ImportError:
             raise Exception(
                 "ROS1 libraries not found. Please install ROS1 libraries to use RosDataAdapter."
-            )
+            ) from None
 
         # CHECK CONFIG FOR REQUIRED KEYS
-        if "devices" not in config.keys():
+        if "devices" not in config:
             raise Exception("No devices found in the config file.")
 
         # INIT DATA MEMBERS FROM CONFIG
@@ -93,19 +101,15 @@ class RosDataAdapter(BaseDataAdapter):
             self.component_ids.append(namespace)
 
             self.attributes[namespace] = cfg["attributes"]
-            if "trial_id" not in cfg["attributes"].keys():
-                if "trial_id" in self.cfg.keys():
-                    self.attributes[namespace]["trial_id"] = self.cfg["trial_id"]
+            if "trial_id" not in cfg["attributes"] and "trial_id" in self.cfg:
+                self.attributes[namespace]["trial_id"] = self.cfg["trial_id"]
 
             self._data[namespace] = {}
             self.last_updated[namespace] = 0
             self.raw_data[namespace] = {}
             self.byte_data_filter[namespace] = {}
             for topic in cfg["rostopics"]:
-                if namespace != "/":
-                    topic = f"/{namespace}/{topic}"
-                else:
-                    topic = f"/{topic}"
+                topic = f"/{namespace}/{topic}" if namespace != "/" else f"/{topic}"
                 self.raw_data[namespace][topic] = None
 
                 # Data filter for each topic to avoid uint8[] array data
@@ -117,10 +121,8 @@ class RosDataAdapter(BaseDataAdapter):
         # REF: https://github.com/ros/ros_comm/blob/8250c7d434ea34d0589eb8b6eaab5df1b11fd325/tools/rostopic/src/rostopic/__init__.py#L84
         try:
             rosgraph.Master("/rostopic").getPid()
-        except Exception as e:
-            raise Exception(
-                "ROS master is not running. Can't initialize RosDataAdapter."
-            )
+        except Exception:
+            raise Exception("ROS master is not running. Can't initialize RosDataAdapter.") from None
 
         # INIT ROS NODE IF NOT ALREADY INITIALIZED
         print("Initializing ROS node...")
@@ -133,14 +135,10 @@ class RosDataAdapter(BaseDataAdapter):
         for device in self.component_ids:
             for topic in self.raw_data[device]:
                 try:
-                    topic_type = self.rostopic.get_topic_type(topic)[0]
-                except:
-                    rospy.logerr(
-                        f"Topic {topic} not found. Removing from the RosDataAdapter."
-                    )
-                    print(
-                        f"Error: Topic {topic} not found. Removing from the RosDataAdapter."
-                    )
+                    topic_type = self.rostopic.get_topic_type(topic)[0]  # noqa: F841
+                except Exception as _:
+                    rospy.logerr(f"Topic {topic} not found. Removing from the RosDataAdapter.")
+                    print(f"Error: Topic {topic} not found. Removing from the RosDataAdapter.")
 
                     del self.raw_data[device][topic]
                     continue
@@ -153,7 +151,7 @@ class RosDataAdapter(BaseDataAdapter):
         if len(self.component_ids) == 0:
             print("ERROR: No components found in the data object.")
             exit(1)
-            
+
         self.rospy.sleep(0.1)  # allow some time for callback to get data
 
     def __process_rawdata(self, device, topic):
@@ -172,7 +170,7 @@ class RosDataAdapter(BaseDataAdapter):
                     msg.__slots__.remove(key)
 
         topic_name = topic.replace(f"/{device}/", "")
-        msg_dict = yaml.safe_load(str(msg))            
+        msg_dict = yaml.safe_load(str(msg))
         # print(f"Msg: {msg_dict}")
         new_data = self.__get_keyvalue_from_dict(msg_dict, f"{topic_name}/")
 
@@ -189,11 +187,7 @@ class RosDataAdapter(BaseDataAdapter):
             return data
         for key in data_dict:
             if isinstance(data_dict[key], dict):
-                data.update(
-                    self.__get_keyvalue_from_dict(
-                        data_dict[key], key_prefix + key + "."
-                    )
-                )
+                data.update(self.__get_keyvalue_from_dict(data_dict[key], key_prefix + key + "."))
             else:
                 if not isinstance(data_dict[key], list):
                     data[key_prefix + key] = data_dict[key]
@@ -201,9 +195,7 @@ class RosDataAdapter(BaseDataAdapter):
                     for i, val in enumerate(data_dict[key]):
                         data[key_prefix + key + f"/{key}.{i}"] = val
                 else:
-                    data[key_prefix + key] = "Array too big. Size: " + str(
-                        len(data_dict[key])
-                    )
+                    data[key_prefix + key] = "Array too big. Size: " + str(len(data_dict[key]))
 
         return data
 

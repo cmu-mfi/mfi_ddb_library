@@ -6,26 +6,32 @@ from pydantic import BaseModel, Field
 
 class BaseDataAdapter:
     """
-    Base class for data adapters. Use as a super class for the data adapters that will be used in the PullStreamToMqtt(Spb) and PushStreamToMqtt(Spb) classes.
+    Base class for data adapters.
     """
 
     NAME = "Base"
     CONFIG_EXAMPLE = {}
     CONFIG_HELP = {}
     RECOMMENDED_TOPIC_FAMILY = ""
-    SELF_UPDATE = False  # If True, the data adapter will update the data by itself in a separate thread.
+    SELF_UPDATE = False  # If True, the data adapter will use event triggers.
 
     class SCHEMA(BaseModel):
         """
-        Schema for the data adapter configuration.
-        Override this class in the child class to define the schema for the data adapter configuration.
+        Schema for the data adapter configuration.Override this class in the child class to
+        define the schema for the data adapter configuration.
         """
-        trial_id: str = Field(..., description="Trial ID for the system. No spaces or special characters allowed.")
-        adapter_name: str = Field("my_adapter", description="(optional) Name of the adapter instance.")
 
-    def __init__(self, config: dict = {}) -> None:
+        trial_id: str = Field(
+            ..., description="Trial ID for the system. No spaces or special characters allowed."
+        )
+        adapter_name: str = Field(
+            "my_adapter", description="(optional) Name of the adapter instance."
+        )
+
+    def __init__(self, config: dict = {}) -> None:  # noqa: B006
         self.component_ids = []
-        # component_ids is a list of identifiers for the components that are part of the data object.
+        # component_ids is a list of identifiers for the components
+        # that are part of the data object.
         # e.g.: self.component_ids = ["robot-arm-1", "machine-a"]
 
         self._data = {}
@@ -44,25 +50,41 @@ class BaseDataAdapter:
         # Invalid update: self.cb_data["robot-arm-1"] = {"estop": 1, "joint-1": 0.52}
 
         self.last_updated = {}
-        # last_updated is a dictionary that contains the Unix timestamp in seconds of the last update of the components.
+        # last_updated is a dictionary that contains the Unix timestamp in seconds of the
+        # last update of the components.
         # e.g.: self.last_updated = {"robot-arm-1": 1632900000.0, "machine-a": 1632900000.0}
 
         self.attributes = {}
         # attributes is a dictionary that contains the attributes of the components.
-        # e.g.: self.attributes = {"robot-arm-1": {"manufacturer": "ABB", "model": "IRB 120", "experiment_class": "orange-test-1"},
-        #                          "machine-a": {"manufacturer": "Siemens", "model": "S7-1500", "experiment_class": "orange-test-1"}},
+        # e.g.: self.attributes =
+        # (
+        #     {
+        #         "robot-arm-1": {
+        #             "manufacturer": "ABB",
+        #             "model": "IRB 120",
+        #             "experiment_class": "orange-test-1",
+        #         },
+        #         "machine-a": {
+        #             "manufacturer": "Siemens",
+        #             "model": "S7-1500",
+        #             "experiment_class": "orange-test-1",
+        #         },
+        #     },
+        # )
 
         self.cfg = config
         # cfg is a dictionary that contains the configuration of the data object.
         # Note on trial_id:
-        #   * cfg needs to have a key `trial_id` that will be the default trial_id for the data object.
-        #   * if the config file doesn't have a key `trial_id`, use the data adapter class constructor to set it.
+        #   * cfg needs to have a key `trial_id` that will be the
+        #     default trial_id for the data object.
+        #   * if the config file doesn't have a key `trial_id`,
+        #     use the data adapter class constructor to set it.
         #   * default trial_id will be None if not set.
         # Note on adapter_name:
         #   * cfg needs to have a key `adapter_name` that will be the name of the adapter instance
         #   * if the key doesn't exist, name will be blank.
-        self._trial_id = self.cfg['trial_id']
-        self._adapter_name = self.cfg.get('adapter_name','my_adapter')
+        self._trial_id = self.cfg["trial_id"]
+        self._adapter_name = self.cfg.get("adapter_name", "my_adapter")
 
         self._observers = []  # List of observers (listeners)
 
@@ -112,7 +134,8 @@ class BaseDataAdapter:
 
     def update_data(self):
         """
-        Update data from the data source. If not defined in the child class, it will call the get_data() method.
+        Update data from the data source.
+        If not defined in the child class, it will call the get_data() method.
         """
         self.get_data()
 
@@ -143,10 +166,12 @@ class BaseDataAdapter:
             # Run observer callback in a separate thread
             threading.Thread(target=observer.on_data_update, args=(new_value,), daemon=True).start()
 
-    def clear_data_buffer(self, component_ids:list=[]):
+    def clear_data_buffer(self, component_ids: list = None):
         """
         Clear the data buffer of each component_id. Used by streamers to clear already streamed data
         """
+        if component_ids is None:
+            component_ids = []
         component_ids = component_ids if component_ids else self.component_ids
 
         for component_id in component_ids:
