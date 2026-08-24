@@ -25,10 +25,7 @@ jobs:
         uses: astral-sh/setup-uv@v6
 
       - name: 3. Check lock file
-        run: |
-          if ! uv lock --check; then
-            uv lock
-          fi
+        run: uv lock
       
       - name: 4. Commit and push changes
         # Ref: https://github.com/marketplace/actions/git-auto-commit
