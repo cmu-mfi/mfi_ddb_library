@@ -101,10 +101,20 @@ jobs:
         with:
           token: ${{secrets.SHOBHITAGG_PAT}}
 
+      - name: Set version
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
       - name: Archive docker directory
         run: |
-          tar czf docker.tar.gz docker
-          zip -r docker.zip docker
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          tar czf "docker-${VERSION}.tar.gz" docker
+          zip -r "docker-${VERSION}.zip" docker
+
+      - name: Archive schema directory
+        run: |
+          tar czf payload-schema.tar.gz mfi_ddb_package/src/mfi_ddb/topic_families/schema
+          zip -r payload-schema.zip mfi_ddb_package/src/mfi_ddb/topic_families/schema
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -112,5 +122,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           generate_release_notes: true
           files: |
-            docker.tar.gz
-            docker.zip
+            docker-${{ steps.version.outputs.VERSION }}.tar.gz
+            docker-${{ steps.version.outputs.VERSION }}.zip
+            payload-schema.tar.gz
+            payload-schema.zip
