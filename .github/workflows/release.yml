@@ -67,6 +67,13 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Verify tag ref
+        run: |
+          if ! [[ "${{ github.ref_name }}" =~ ^v ]]; then
+            echo "::error::Release workflow must run from a tag ref (got '${{ github.ref_name }}'). Use workflow_dispatch from a tag."
+            exit 1
+          fi        
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
