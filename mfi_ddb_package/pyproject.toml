@@ -1,6 +1,6 @@
 [project]
 name = "mfi_ddb"
-version = "1.2.0"
+version = "1.2.1"
 description = "MFI DDB: Python library for streaming data"
 readme = "README.md"
 requires-python = ">=3.8,<3.13"
