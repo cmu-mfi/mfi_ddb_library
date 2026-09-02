@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Discussions / Questions
+    url: https://github.com/cmu-mfi/mfi_ddb_library/discussions
+    about: For open-ended questions, how-to, and usage help — please use Discussions instead.
