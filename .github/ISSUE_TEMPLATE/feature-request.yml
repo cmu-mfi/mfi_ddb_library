@@ -1,0 +1,40 @@
+name: 🚀 Feature Request
+description: Suggest a new feature or enhancement for the MFI DDB Library
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please describe the use case and what you'd like.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of the MFI DDB Library does this feature relate to?
+      options:
+        - mfi_ddb_package (Core Library)
+        - mfi_ddb_data_adapter (Data Adapter App)
+        - mfi_ddb_database_nodes (Database Nodes)
+        - mfi_ddb_retrieval_api (Retrieval API)
+        - Multiple / Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case / motivation
+      description: What problem are you trying to solve? Why do you need this?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe what you'd like to happen. Any alternatives considered?
+    validations:
+      required: true
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Screenshots, links, related issues, or anything else relevant.

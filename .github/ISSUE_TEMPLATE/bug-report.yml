@@ -1,0 +1,83 @@
+name: 🐞 Bug Report
+description: Report a bug or unexpected behavior in the MFI DDB Library
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report! Please fill in the fields below.
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of the MFI DDB Library does this issue relate to?
+      options:
+        - mfi_ddb_package (Core Library)
+        - mfi_ddb_data_adapter (Data Adapter App)
+        - mfi_ddb_database_nodes (Database Nodes)
+        - mfi_ddb_retrieval_api (Retrieval API)
+        - Multiple / Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: A short description of the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Step-by-step instructions to trigger the issue.
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected-actual
+    attributes:
+      label: Expected vs actual behavior
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - Linux
+        - Windows
+        - macOS
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment type
+      description: Is the MFI DDB stack running on a single node or spread across multiple nodes?
+      options:
+        - Single node
+        - Multi-node
+    validations:
+      required: true
+  - type: textarea
+    id: topology
+    attributes:
+      label: Deployment topology details
+      description: If multi-node, briefly describe the setup (which services run on which nodes, broker location, etc.). If single node, you may leave this blank.
+      placeholder: "e.g. Data Adapter App on edge PC #1, broker + TimescaleDB node on server #2, Retrieval API on server #3."
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Paste relevant logs or stack traces. Please redact any secrets.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: DDB version (optional)
+      description: "Package version or docker release tag, if known (e.g. mfi-ddb==1.1.0, release v1.2.0)."
