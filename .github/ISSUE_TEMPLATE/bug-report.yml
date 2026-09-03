@@ -81,10 +81,3 @@ body:
     attributes:
       label: DDB version (optional)
       description: "Package version or docker release tag, if known (e.g. mfi-ddb==1.1.0, release v1.2.0)."
-  - type: checkboxes
-    id: checklist
-    attributes:
-      label: Checklist
-      options:
-        - label: I have redacted any secrets, tokens, or sensitive hostnames from the logs above.
-          required: true

@@ -33,24 +33,6 @@ body:
       description: Describe what you'd like to happen. Any alternatives considered?
     validations:
       required: true
-  - type: dropdown
-    id: os
-    attributes:
-      label: Operating System (optional)
-      options:
-        - Linux
-        - Windows
-        - macOS
-        - Other
-  - type: dropdown
-    id: deployment
-    attributes:
-      label: Deployment type (optional)
-      description: Is this feature relevant to a single-node or multi-node setup?
-      options:
-        - Single node
-        - Multi-node
-        - Both / Not sure
   - type: textarea
     id: additional
     attributes:
