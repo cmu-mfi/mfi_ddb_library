@@ -1,0 +1,22 @@
+adapter_name: "my_aconity_adapter"
+aconity:
+  rest_url: "http://192.168.1.50:9000"
+  ws_url: "ws://192.168.1.50:9000"
+  email: "admin@aconity3d.com"
+  password: "passwd"
+  studio_version: 3
+trial_id: "trial_001"
+queue_size: 10
+topics:
+  - component_id: "aconity_state"
+    topic: "State"
+    type: "data"
+  - component_id: "aconity_positioning"
+    topic: "Positioning"
+    type: "data"
+  - component_id: "aconity_tasks"
+    topic: "task"
+    type: "event"
+  - component_id: "aconity_cmds"
+    topic: "cmds"
+    type: "event"

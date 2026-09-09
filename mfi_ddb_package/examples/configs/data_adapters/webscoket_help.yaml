@@ -1,0 +1,7 @@
+ws:
+  ws_url: "WebSocket URL (e.g., ws://localhost:9000)"
+  headers: "(optional) Dictionary of headers for WebSocket handshake"
+  timeout: "(optional) Timeout in sec for connecting to the WebSocket server (default: 5.0s)"
+trial_id: "Trial ID for the system. No spaces or special characters allowed."
+queue_size: "(optional) Max number of messages to buffer before processing. (default: 10)"
+topics: "List of topics to subscribe to. Required keys: ['component_id', 'topic']. Optional: ['trial_id']"
