@@ -12,14 +12,14 @@ import yaml
 from pydantic import ValidationError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from schemas import CONFIG_FILES, DOCKER_DIR, MasterConfigPayload
+from schemas import CONFIG_FILES, TEMPLATE_DIR, MasterConfigPayload
 from generators import generate_master_compose, write_runtime_configs, validate_existing_databases
 from main import containers_ready
 
 
 def payload_for(modules):
     return MasterConfigPayload(selectedServices=modules, configs={
-        name: yaml.safe_load((DOCKER_DIR / name).read_text())
+        name: yaml.safe_load((TEMPLATE_DIR / name).read_text())
         for name, module in CONFIG_FILES.items() if module in modules
     })
 

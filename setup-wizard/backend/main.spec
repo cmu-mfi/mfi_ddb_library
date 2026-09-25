@@ -1,11 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from pathlib import Path
+
+backend_dir = Path(SPECPATH)
 
 a = Analysis(
-    ['main.py'],
-    pathex=['.'],
+    [str(backend_dir / 'main.py')],
+    pathex=[str(backend_dir)],
     binaries=[],
-    datas=[('../../docker', 'docker'), ('../../mfi_ddb_database_nodes/timescaledb/init_schema.sql', 'mfi_ddb_database_nodes/timescaledb')],
+    datas=[(str(backend_dir / 'templates'), 'templates')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

@@ -3,7 +3,7 @@ from pathlib import Path
 import shutil
 
 import yaml
-from schemas import ASSET_ROOT, DOCKER_DIR, MODULE_DIRS, LOCAL_DATABASES, local_database_settings
+from schemas import TEMPLATE_DIR, MODULE_DIRS, LOCAL_DATABASES, local_database_settings
 
 
 def write_runtime_configs(config_dir: Path, payload) -> None:
@@ -12,23 +12,27 @@ def write_runtime_configs(config_dir: Path, payload) -> None:
         target = config_dir / filename
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(yaml.safe_dump(document, sort_keys=False, allow_unicode=True))
-    # These files have no wizard inputs; retain their checked-in defaults.
+    # These files have no wizard inputs; use the wizard's bundled defaults.
+    if 'ts' in payload.selectedServices:
+        target = config_dir / 'timescale' / 'init_schema.sql'
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(TEMPLATE_DIR / 'timescale' / 'init_schema.sql', target)
     if 'rws' in payload.selectedServices:
-        for source in (DOCKER_DIR / 'metadata-rws').glob('*.ini'):
+        for source in (TEMPLATE_DIR / 'metadata-rws').glob('*.ini'):
             shutil.copyfile(source, config_dir / 'metadata-rws' / source.name)
 
 
 def generate_master_compose(runtime_dir: Path, payload) -> None:
-    """Use the existing Docker service definitions and mount the submitted configs."""
-    base = yaml.safe_load((DOCKER_DIR / 'docker-compose.yaml').read_text())
+    """Use the wizard-owned container definitions and mount the submitted configs."""
+    base = yaml.safe_load((TEMPLATE_DIR / 'docker-compose.yaml').read_text())
     result = {'name': base['name'], 'networks': base['networks'], 'services': {}}
     sources = []
     if 'infra' in payload.selectedServices:
-        sources.append(('infra', DOCKER_DIR, base['services']))
+        sources.append(('infra', TEMPLATE_DIR, base['services']))
     for module in payload.selectedServices:
         if module == 'infra':
             continue
-        directory = DOCKER_DIR / MODULE_DIRS[module]
+        directory = TEMPLATE_DIR / MODULE_DIRS[module]
         compose = next(directory.glob('compose.*.yaml'))
         sources.append((module, directory, yaml.safe_load(compose.read_text())['services']))
 
@@ -41,15 +45,14 @@ def generate_master_compose(runtime_dir: Path, payload) -> None:
             for mount in service.get('volumes', []):
                 source, target, *mode = mount.split(':')
                 resolved = (directory / source).resolve()
-                if resolved.is_relative_to(DOCKER_DIR.resolve() / '.data'):
-                    relative = resolved.relative_to(DOCKER_DIR.resolve() / '.data')
+                if resolved.is_relative_to(TEMPLATE_DIR.resolve() / '.data'):
+                    relative = resolved.relative_to(TEMPLATE_DIR.resolve() / '.data')
                     host = runtime_dir / '.data' / relative
                     host.mkdir(parents=True, exist_ok=True)
-                elif resolved.is_relative_to(DOCKER_DIR.resolve()):
-                    host = runtime_dir / 'runtime_configs' / resolved.relative_to(DOCKER_DIR.resolve())
+                elif resolved.is_relative_to(TEMPLATE_DIR.resolve()):
+                    host = runtime_dir / 'runtime_configs' / resolved.relative_to(TEMPLATE_DIR.resolve())
                 else:
-                    # Timescale's initialization SQL is packaged alongside the templates.
-                    host = ASSET_ROOT / resolved.relative_to(ASSET_ROOT.resolve())
+                    raise ValueError(f'Container asset must be inside wizard templates: {source}')
                 if module == 'blob' and target == '/data/blob_storage':
                     file = 'connector' if name == 'blob-connector' else 'dws'
                     field = 'save_directory' if file == 'connector' else 'blob_dir'

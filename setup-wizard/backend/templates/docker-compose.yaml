@@ -1,0 +1,20 @@
+name: mfi-ddb-pipeline
+networks:
+  mfi_network:
+    driver: bridge
+services:
+  mqtt-broker:
+    image: emqx/emqx:5.8.0
+    container_name: mfi-mqtt-broker
+    ports:
+    - 1883:1883
+    - 8083:8083
+    - 18083:18083
+    volumes:
+    - ./.data/emqx/data:/opt/emqx/data
+    - ./.data/emqx/log:/opt/emqx/log
+    environment:
+    - EMQX_NAME=mfi_broker
+    networks:
+    - mfi_network
+    restart: always

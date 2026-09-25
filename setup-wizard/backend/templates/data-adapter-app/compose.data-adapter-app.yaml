@@ -1,0 +1,24 @@
+services:
+  data-adapter-backend:
+    platform: linux/amd64
+    container_name: mfi-data-adapter-backend
+    image: cmumfi/mfi-ddb-data-adapter-backend:latest
+    ports:
+    - 8001:8000
+    depends_on:
+      mqtt-broker:
+        condition: service_started
+    networks:
+    - mfi_network
+    restart: always
+  data-adapter-frontend:
+    platform: linux/amd64
+    container_name: mfi-data-adapter-frontend
+    image: cmumfi/mfi-ddb-data-adapter-frontend:latest
+    ports:
+    - 3001:80
+    depends_on:
+    - data-adapter-backend
+    networks:
+    - mfi_network
+    restart: always

@@ -1,7 +1,7 @@
 // UI fields mirror the module configuration YAML files; file-qualified keys keep values independent.
 export const YAML_CONFIG_BLUEPRINT = {
   "aveva/config.yaml": {
-    title: "docker/aveva/config.yaml",
+    title: "aveva/config.yaml",
     module: "aveva",
     fields: [
       {"label": "url", "type": "text", "default": "<redacted>", "nullable": false, "key": "aveva/config.yaml::url"},
@@ -13,7 +13,7 @@ export const YAML_CONFIG_BLUEPRINT = {
     ],
   },
   "blob/connector-config.yaml": {
-    title: "docker/blob/connector-config.yaml",
+    title: "blob/connector-config.yaml",
     module: "blob",
     fields: [
       {"label": "mqtt.broker_address", "type": "text", "default": "mfi-mqtt-broker", "nullable": false, "key": "blob/connector-config.yaml::mqtt.broker_address"},
@@ -32,7 +32,7 @@ export const YAML_CONFIG_BLUEPRINT = {
     ],
   },
   "blob/dws-config.yaml": {
-    title: "docker/blob/dws-config.yaml",
+    title: "blob/dws-config.yaml",
     module: "blob",
     fields: [
       {"label": "config.blob_dir", "type": "text", "default": "/data/blob_storage", "nullable": false, "key": "blob/dws-config.yaml::config.blob_dir"},
@@ -40,7 +40,7 @@ export const YAML_CONFIG_BLUEPRINT = {
     ],
   },
   "kv-psql/connector-config.yaml": {
-    title: "docker/kv-psql/connector-config.yaml",
+    title: "kv-psql/connector-config.yaml",
     module: "kv",
     fields: [
       {"label": "mqtt.broker", "type": "text", "default": "mqtt-broker", "nullable": false, "key": "kv-psql/connector-config.yaml::mqtt.broker"},
@@ -55,7 +55,7 @@ export const YAML_CONFIG_BLUEPRINT = {
     ],
   },
   "kv-psql/dws-config.yaml": {
-    title: "docker/kv-psql/dws-config.yaml",
+    title: "kv-psql/dws-config.yaml",
     module: "kv",
     fields: [
       {"label": "postgres.host", "type": "text", "default": "kv-psql-db", "nullable": false, "key": "kv-psql/dws-config.yaml::postgres.host"},
@@ -67,7 +67,7 @@ export const YAML_CONFIG_BLUEPRINT = {
     ],
   },
   "metadata-rws/rws-dws-endpoints.yaml": {
-    title: "docker/metadata-rws/rws-dws-endpoints.yaml",
+    title: "metadata-rws/rws-dws-endpoints.yaml",
     module: "rws",
     fields: [
       {"label": "services.metadata_service.url", "type": "text", "default": "http://mfi-metadata-store-db:5432", "nullable": false, "key": "metadata-rws/rws-dws-endpoints.yaml::services.metadata_service.url"},
@@ -81,7 +81,7 @@ export const YAML_CONFIG_BLUEPRINT = {
     ],
   },
   "timescale/connector-config.yaml": {
-    title: "docker/timescale/connector-config.yaml",
+    title: "timescale/connector-config.yaml",
     module: "ts",
     fields: [
       {"label": "mqtt.broker_address", "type": "text", "default": "mqtt-broker", "nullable": false, "key": "timescale/connector-config.yaml::mqtt.broker_address"},
@@ -98,7 +98,7 @@ export const YAML_CONFIG_BLUEPRINT = {
     ],
   },
   "timescale/dws-config.yaml": {
-    title: "docker/timescale/dws-config.yaml",
+    title: "timescale/dws-config.yaml",
     module: "ts",
     fields: [
       {"label": "timescaledb.host", "type": "text", "default": "timescaledb-db", "nullable": false, "key": "timescale/dws-config.yaml::timescaledb.host"},

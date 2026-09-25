@@ -1,4 +1,36 @@
+# Standalone desktop setup wizard
 
+The wizard pulls published container images and starts them with Docker Compose.
+It owns its configuration defaults, service definitions, and initialization SQL in
+`backend/templates/`. It does not read or package the repository's separate
+`docker/` or database-node directories. The `setup-wizard/` directory can be copied
+and built on its own.
+
+Users need Docker with Docker Compose installed and running, plus access to the
+configured container image registry. The packaged app includes its Python backend;
+users do not need Python, Node.js, or this repository.
+
+## Build the desktop app
+
+Build on the target operating system with Python and Node.js installed.
+From `setup-wizard/backend/`:
+
+```sh
+python -m pip install -r requirements.txt pyinstaller
+python -m PyInstaller --noconfirm main.spec
+```
+
+Then from `setup-wizard/ui/`:
+
+```sh
+npm install
+npm run electron:build
+```
+
+PyInstaller bundles `backend/templates/` with the backend executable.
+Electron Builder includes `backend/dist/main/` in the desktop installer.
+Templates are read from that bundle at runtime; writable configuration files and
+initialization SQL are copied into `~/.mfi_ddb_runtime/` before container startup.
 
 ### Generated deployment configuration
 

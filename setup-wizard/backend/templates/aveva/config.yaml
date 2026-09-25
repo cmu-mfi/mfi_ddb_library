@@ -1,0 +1,11 @@
+url: <redacted>
+
+username: <redacted>
+password: <redacted>
+
+dataserver:
+  name: <redacted>
+  webid: <redacted>
+
+mqtt_connector:
+  path: <redacted>

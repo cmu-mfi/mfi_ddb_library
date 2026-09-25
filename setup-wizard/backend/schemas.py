@@ -6,14 +6,14 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, model_validator
 
-ASSET_ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[2]))
-DOCKER_DIR = ASSET_ROOT / 'docker'
+# PyInstaller bundles the wizard-owned templates beside its extracted Python modules.
+TEMPLATE_DIR = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent)) / 'templates'
 MODULE_DIRS = {'kv': 'kv-psql', 'ts': 'timescale', 'blob': 'blob',
                'rws': 'metadata-rws', 'aveva': 'aveva', 'daa': 'data-adapter-app'}
 CONFIG_FILES = {
-    str(path.relative_to(DOCKER_DIR)): module
+    str(path.relative_to(TEMPLATE_DIR)): module
     for module, directory in MODULE_DIRS.items()
-    for path in (DOCKER_DIR / directory).glob('*.yaml')
+    for path in (TEMPLATE_DIR / directory).glob('*.yaml')
     if not path.name.startswith('compose.')
 }
 
@@ -109,7 +109,7 @@ class MasterConfigPayload(BaseModel):
         if self.configs.keys() != expected:
             raise ValueError('Configuration files must match the selected services')
         for name, document in self.configs.items():
-            template = yaml.safe_load((DOCKER_DIR / name).read_text())
+            template = yaml.safe_load((TEMPLATE_DIR / name).read_text())
             validate_document(document, template, name)
         validate_runtime_settings(self)
         return self
