@@ -1,60 +1,11 @@
-// const API_BASE_URL = 'http://localhost:8000';
-// Make the URL dynamic so that the frontend can be served from any host machine to reach either local for app or remote for web server
-const API_BASE_URL = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-  ? `http://${window.location.hostname}:8000`
-  : 'http://localhost:8000';
+import { buildConfigPayload } from './configPayload.js';
 
-export const deployPipeline = async (formValues) => {
-  // Transform flat frontend form state into the structured JSON payload our Pydantic schema demands
-  const payload = {
-    infra: {
-      MQTT_BROKER_HOST: formValues.MQTT_BROKER_HOST,
-      MQTT_BROKER_PORT: parseInt(formValues.MQTT_BROKER_PORT, 10),
-      MQTT_DASHBOARD_PORT: parseInt(formValues.MQTT_DASHBOARD_PORT, 10),
-      MQTT_WEBSOCKET_PORT: parseInt(formValues.MQTT_WEBSOCKET_PORT, 10),
-      MQTT_USERNAME: formValues.MQTT_USERNAME || "",
-      MQTT_PASSWORD: formValues.MQTT_PASSWORD || ""
-    },
-    kv: {
-      KV_DEPLOYMENT: formValues.KV_DEPLOYMENT,
-      KV_DB_HOST: formValues.KV_DB_HOST,
-      KV_DB_HOST_PORT: parseInt(formValues.KV_DB_HOST_PORT, 10),
-      KV_DB_USER: formValues.KV_DB_USER,
-      KV_DB_PASSWORD: formValues.KV_DB_PASSWORD,
-      KV_DB_NAME: formValues.KV_DB_NAME,
-      KV_CONNECTOR_CLIENT_ID: formValues.KV_CONNECTOR_CLIENT_ID,
-      KV_TOPIC_SUBSCRIPTION: formValues.KV_TOPIC_SUBSCRIPTION,
-      KV_DWS_PORT: parseInt(formValues.KV_DWS_PORT, 10)
-    },
-    ts: {
-      TS_DEPLOYMENT: formValues.TS_DEPLOYMENT,
-      TS_DB_HOST: formValues.TS_DB_HOST,
-      TS_DB_HOST_PORT: parseInt(formValues.TS_DB_HOST_PORT, 10),
-      TS_DB_USER: formValues.TS_DB_USER,
-      TS_DB_PASSWORD: formValues.TS_DB_PASSWORD,
-      TS_DB_NAME: formValues.TS_DB_NAME,
-      TS_TOPIC_SUBSCRIPTION: formValues.TS_TOPIC_SUBSCRIPTION,
-      TS_COMPONENT_ID: formValues.TS_COMPONENT_ID,
-      TS_DWS_PORT: parseInt(formValues.TS_DWS_PORT, 10)
-    },
-    blob: {
-      MFI_BLOB_HOST_PATH: formValues.MFI_BLOB_HOST_PATH,
-      BLOB_DWS_PORT: parseInt(formValues.BLOB_DWS_PORT, 10),
-      BLOB_TOPIC_SUBSCRIPTION: formValues.BLOB_TOPIC_SUBSCRIPTION
-    },
-    rws: {
-      RWS_DEPLOYMENT: formValues.RWS_DEPLOYMENT,
-      MDS_DB_HOST: formValues.MDS_DB_HOST,
-      RWS_API_PORT: parseInt(formValues.RWS_API_PORT, 10),
-      MDS_DB_HOST_PORT: parseInt(formValues.MDS_DB_HOST_PORT, 10),
-      MDS_DB_USER: formValues.MDS_DB_USER,
-      MDS_DB_PASSWORD: formValues.MDS_DB_PASSWORD,
-      MDS_DB_NAME: formValues.MDS_DB_NAME,
-      MDS_TOPIC_FAMILY: formValues.MDS_TOPIC_FAMILY,
-      MDS_TOPIC_VERSION: formValues.MDS_TOPIC_VERSION,
-      MDS_ENTERPRISE: formValues.MDS_ENTERPRISE
-    }
-  };
+// Electron's file:// pages use the local Python backend too.
+const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+const API_BASE_URL = `http://${hostname || 'localhost'}:8000`;
+
+export const deployPipeline = async (formValues, selectedServices) => {
+  const payload = buildConfigPayload(formValues, selectedServices);
 
   const response = await fetch(`${API_BASE_URL}/api/deploy`, {
     method: 'POST',
@@ -66,7 +17,10 @@ export const deployPipeline = async (formValues) => {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || 'Failed to deploy data backbone pipeline.');
+    const detail = Array.isArray(errorData.detail)
+      ? errorData.detail.map(error => `${error.loc.join('.')}: ${error.msg}`).join('; ')
+      : errorData.detail;
+    throw new Error(detail || 'Failed to deploy data backbone pipeline.');
   }
 
   return await response.json();
@@ -191,7 +145,10 @@ export const hostPlatform = {
       const eventSource = new EventSource(url);
 
       eventSource.onmessage = (event) => {
-        if (event.data === '[DEPLOYMENT_COMPLETE]') {
+        if (event.data.startsWith('[ERROR]')) {
+          eventSource.close();
+          onError(event.data.slice('[ERROR]'.length).trim());
+        } else if (event.data === '[DEPLOYMENT_COMPLETE]') {
           eventSource.close();
           onComplete();
         } else {

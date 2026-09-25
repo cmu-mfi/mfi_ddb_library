@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=['.'],
     binaries=[],
-    datas=[],
+    datas=[('../../docker', 'docker'), ('../../mfi_ddb_database_nodes/timescaledb/init_schema.sql', 'mfi_ddb_database_nodes/timescaledb')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

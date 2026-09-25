@@ -1,436 +1,127 @@
-import os
+from copy import deepcopy
 from pathlib import Path
+import shutil
+
+import yaml
+from schemas import ASSET_ROOT, DOCKER_DIR, MODULE_DIRS, LOCAL_DATABASES, local_database_settings
+
 
 def write_runtime_configs(config_dir: Path, payload) -> None:
-    """
-    Accepts an initialized file system directory path and a validated 
-    Pydantic MasterConfigPayload instance, writing out cleanly formatted strings.
-    """
-    infra = payload.infra
-    kv = payload.kv
-    ts = payload.ts
-    blob = payload.blob
-    rws = payload.rws
+    """Serialize submitted documents without merging or replacing their values."""
+    for filename, document in payload.configs.items():
+        target = config_dir / filename
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(yaml.safe_dump(document, sort_keys=False, allow_unicode=True))
+    # These files have no wizard inputs; retain their checked-in defaults.
+    if 'rws' in payload.selectedServices:
+        for source in (DOCKER_DIR / 'metadata-rws').glob('*.ini'):
+            shutil.copyfile(source, config_dir / 'metadata-rws' / source.name)
 
-    # ==========================================
-    # 1. KEY-VALUE CONNECTOR CONFIGURATION (.yaml)
-    # ==========================================
-    kv_yaml_content = (
-        f"mqtt:\n"
-        f"  broker: {infra.MQTT_BROKER_HOST}\n"
-        f"  port: {infra.MQTT_BROKER_PORT}\n"
-        f"  client_id: {kv.KV_CONNECTOR_CLIENT_ID}\n"
-        f"  topics:\n"
-        f"    - {kv.KV_TOPIC_SUBSCRIPTION}\n\n"
-        f"postgres:\n"
-        f"  host: {kv.KV_DB_HOST}\n"
-        f"  port: 5432\n"
-        f"  database: {kv.KV_DB_NAME}\n"
-        f"  user: {kv.KV_DB_USER}\n"
-        f"  password: {kv.KV_DB_PASSWORD}\n"
-    )
-    (config_dir / "kv_psql_connector.yaml").write_text(kv_yaml_content)
-
-    # ==========================================
-    # 2. TIMESCALEDB CONNECTOR CONFIGURATION (.yaml)
-    # ==========================================
-    ts_yaml_content = (
-        f"mqtt:\n"
-        f"  broker_address: {infra.MQTT_BROKER_HOST}\n"
-        f"  broker_port: {infra.MQTT_BROKER_PORT}\n"
-        f"  topic: {ts.TS_TOPIC_SUBSCRIPTION}\n"
-        f"  username: {infra.MQTT_USERNAME}\n"
-        f"  password: {infra.MQTT_PASSWORD}\n\n"
-        f"timescaledb:\n"
-        f"  host: {ts.TS_DB_HOST}\n"
-        f"  port: 5432\n"
-        f"  user: {ts.TS_DB_USER}\n"
-        f"  password: {ts.TS_DB_PASSWORD}\n"
-        f"  dbname: {ts.TS_DB_NAME}\n\n"
-        f"component_id: {ts.TS_COMPONENT_ID}\n"
-    )
-    (config_dir / "timescale_connector.yaml").write_text(ts_yaml_content)
-
-    # ==========================================
-    # 3. RETRIEVAL API ROUTING RULES (.yaml)
-    # ==========================================
-    kv_family_base = kv.KV_TOPIC_SUBSCRIPTION.replace("/#", "")
-    ts_family_base = ts.TS_TOPIC_SUBSCRIPTION.replace("/#", "")
-    blob_family_base = blob.BLOB_TOPIC_SUBSCRIPTION.replace("/#", "")
-
-    if kv.KV_DEPLOYMENT == "external":
-        kv_routing_url = f"http://{kv.KV_DB_HOST}:{kv.KV_DWS_PORT}"
-    else:
-        kv_routing_url = f"http://mfi-kv-psql-dws:{kv.KV_DWS_PORT}"
-
-    if ts.TS_DEPLOYMENT == "external":
-        ts_routing_url = f"http://{ts.TS_DB_HOST}:{ts.TS_DWS_PORT}"
-    else:
-        ts_routing_url = f"http://mfi-timescaledb-dws:{ts.TS_DWS_PORT}"
-
-    rws_endpoints_content = (
-        f"services:\n"
-        f"  kv_service:\n"
-        f"    url: {kv_routing_url}\n"
-        f"    topic_families:\n"
-        f"    - {kv_family_base}\n"
-        f"  historian_service:\n"
-        f"    url: {ts_routing_url}\n"
-        f"    topic_families:\n"
-        f"    - {ts_family_base}\n"
-        f"  cfs_service:\n"
-        f"    url: http://mfi-blob-dws:{blob.BLOB_DWS_PORT}\n"
-        f"    topic_families:\n"
-        f"    - {blob_family_base}\n"
-    )
-    (config_dir / "rws_endpoints.yaml").write_text(rws_endpoints_content)
-
-    # ==========================================
-    # 4. METADATA BROKER SUBSCRIPTIONS (.ini)
-    # ==========================================
-    metadata_broker_content = (
-        f"[mqtt]\n"
-        f"broker_address={infra.MQTT_BROKER_HOST}\n"
-        f"broker_port={infra.MQTT_BROKER_PORT}\n"
-        f"username={infra.MQTT_USERNAME}\n"
-        f"password={infra.MQTT_PASSWORD}\n"
-        f"tls_enabled=false\n\n"
-        f"[topic]\n"
-        f"topic_family={rws.MDS_TOPIC_FAMILY}\n"
-        f"version={rws.MDS_TOPIC_VERSION}\n"
-        f"enterprise={rws.MDS_ENTERPRISE}\n"
-    )
-    (config_dir / "metadata_broker.ini").write_text(metadata_broker_content)
-
-    # ==========================================
-    # 5. POSTGRES INGESTION INI CONFIGURATIONS (.ini)
-    # ==========================================
-    metadata_db_content = (
-        f"[postgresql]\n"
-        f"host={rws.MDS_DB_HOST}\n"
-        f"port=5432\n"
-        f"database={rws.MDS_DB_NAME}\n"
-        f"user={rws.MDS_DB_USER}\n"
-        f"password={rws.MDS_DB_PASSWORD}\n"
-    )
-    (config_dir / "metadata_pg.ini").write_text(metadata_db_content)
-    (config_dir / "rws_pg.ini").write_text(metadata_db_content)
-
-    # ==========================================
-    # 6. BLOB CONNECTOR UNIFIED CONFIGURATION (.yaml)
-    # ==========================================
-    blob_connector_content = (
-        f"mqtt:\n"
-        f"  broker_address: \"{infra.MQTT_BROKER_HOST}\"\n"
-        f"  broker_port: {infra.MQTT_BROKER_PORT}\n"
-        f"  username: \"{infra.MQTT_USERNAME}\"\n"
-        f"  password: \"{infra.MQTT_PASSWORD}\"\n"
-        f"  tls_enabled: false\n"
-        f"  debug: false\n\n"
-        f"config:\n"
-        f"  save_directory: \"/data/blob_storage\"\n"
-        f"  topic:\n"
-        f"    version: \"{rws.MDS_TOPIC_VERSION}\"\n"
-        f"    topic_family: \"{blob.BLOB_TOPIC_SUBSCRIPTION.replace('/#', '')}\"\n"
-        f"    enterprise: \"{rws.MDS_ENTERPRISE}\"\n"
-        f"    site: null\n"
-        f"    area: null\n"
-        f"    device: null\n"
-    )
-    (config_dir / "blob_connector.yaml").write_text(blob_connector_content)
-
-    # ==========================================
-    # 7. BLOB DWS CONFIGURATION (.yaml)
-    # ==========================================
-    blob_dws_content = (
-        f"config:\n"
-        f"  blob_dir: \"/data/blob_storage\"\n"
-        f"  index_path: \"/data/blob_storage/index.jsonl\"\n"
-    )
-    (config_dir / "blob_dws.yaml").write_text(blob_dws_content)
 
 def generate_master_compose(runtime_dir: Path, payload) -> None:
-    """
-    Generates a decoupled, robust docker-compose.yaml architecture
-    where services can run in pure isolation without hard dependency failures.
-    """
-    infra = payload.infra
-    kv = payload.kv
-    ts = payload.ts
-    blob = payload.blob
-    rws = payload.rws
+    """Use the existing Docker service definitions and mount the submitted configs."""
+    base = yaml.safe_load((DOCKER_DIR / 'docker-compose.yaml').read_text())
+    result = {'name': base['name'], 'networks': base['networks'], 'services': {}}
+    sources = []
+    if 'infra' in payload.selectedServices:
+        sources.append(('infra', DOCKER_DIR, base['services']))
+    for module in payload.selectedServices:
+        if module == 'infra':
+            continue
+        directory = DOCKER_DIR / MODULE_DIRS[module]
+        compose = next(directory.glob('compose.*.yaml'))
+        sources.append((module, directory, yaml.safe_load(compose.read_text())['services']))
 
-    resolved_blob_path = os.path.abspath(os.path.expanduser(blob.MFI_BLOB_HOST_PATH))
+    for module, directory, services in sources:
+        for name, original in services.items():
+            service = deepcopy(original)
+            service.pop('build', None)  # Published images are used by the installer.
+            service['profiles'] = [module]
+            mounts = []
+            for mount in service.get('volumes', []):
+                source, target, *mode = mount.split(':')
+                resolved = (directory / source).resolve()
+                if resolved.is_relative_to(DOCKER_DIR.resolve() / '.data'):
+                    relative = resolved.relative_to(DOCKER_DIR.resolve() / '.data')
+                    host = runtime_dir / '.data' / relative
+                    host.mkdir(parents=True, exist_ok=True)
+                elif resolved.is_relative_to(DOCKER_DIR.resolve()):
+                    host = runtime_dir / 'runtime_configs' / resolved.relative_to(DOCKER_DIR.resolve())
+                else:
+                    # Timescale's initialization SQL is packaged alongside the templates.
+                    host = ASSET_ROOT / resolved.relative_to(ASSET_ROOT.resolve())
+                if module == 'blob' and target == '/data/blob_storage':
+                    file = 'connector' if name == 'blob-connector' else 'dws'
+                    field = 'save_directory' if file == 'connector' else 'blob_dir'
+                    target = payload.configs[f'blob/{file}-config.yaml']['config'][field]
+                mounts.append({'type': 'bind', 'source': str(host), 'target': target,
+                               'read_only': 'ro' in mode})
+            if mounts:
+                service['volumes'] = mounts
+            result['services'][name] = service
 
-# Dynamic loopback string generation logic
-    extra_hosts_block = ""
-    if getattr(kv, 'KV_DB_HOST', '') == "host.docker.internal" or getattr(ts, 'TS_DB_HOST', '') == "host.docker.internal":
-        extra_hosts_block = (
-            "\n    extra_hosts:"
-            "\n      - \"host.docker.internal:host-gateway\""
-        )
+    for module, (_, _, service_name, database_key) in LOCAL_DATABASES.items():
+        if module not in payload.selectedServices:
+            continue
+        settings = local_database_settings(payload.configs, module)
+        if settings is None:
+            continue
+        database = result['services'][service_name]
+        database['environment'] = {
+            'POSTGRES_USER': settings['user'], 'POSTGRES_PASSWORD': settings['password'],
+            'POSTGRES_DB': settings[database_key],
+        }
+        database['command'] = ['postgres', '-p', str(settings['port'])]
+        host_port = database['ports'][0].split(':')[0]
+        database['ports'] = [f"{host_port}:{settings['port']}"]
+        database['healthcheck']['test'] = [
+            'CMD-SHELL', f'pg_isready -h 127.0.0.1 -p {settings["port"]} -U "$POSTGRES_USER" -d "$POSTGRES_DB"',
+        ]
+    if 'kv' in payload.selectedServices:
+        port = payload.configs['kv-psql/dws-config.yaml']['dws']['port']
+        result['services']['kv-psql-dws']['ports'] = [f'{port}:{port}']
+    if 'rws' in payload.selectedServices:
+        # The setup backend occupies host port 8000 throughout deployment.
+        result['services']['rws-app']['ports'] = ['8002:8000']
 
-    # Note the explicit prepended newline and consistent block indentations
-    kv_depends_on = ""
-    if kv.KV_DB_HOST in ["kv-psql-db", "mfi-kv-psql-db"]:
-        kv_depends_on = (
-            "\n    depends_on:"
-            "\n      kv-psql-db:"
-            "\n        condition: service_healthy"
-        )
+    # An unselected module can be provided externally, so do not retain its dependency.
+    for service in result['services'].values():
+        dependencies = service.get('depends_on')
+        if dependencies is not None:
+            service['depends_on'] = ({key: value for key, value in dependencies.items() if key in result['services']}
+                                     if isinstance(dependencies, dict)
+                                     else [key for key in dependencies if key in result['services']])
+            if not service['depends_on']:
+                del service['depends_on']
+    # Compose interpolates dollar signs even inside YAML-quoted strings.
+    def escape(value):
+        if isinstance(value, str):
+            return value.replace('$', '$$')
+        if isinstance(value, list):
+            return [escape(item) for item in value]
+        if isinstance(value, dict):
+            return {key: escape(item) for key, item in value.items()}
+        return value
+    (runtime_dir / 'docker-compose.yaml').write_text(yaml.safe_dump(escape(result), sort_keys=False))
 
-    ts_depends_on = ""
-    if ts.TS_DB_HOST in ["timescaledb-db", "mfi-timescaledb-db"]:
-        ts_depends_on = (
-            "\n    depends_on:"
-            "\n      timescaledb-db:"
-            "\n        condition: service_healthy"
-        )
 
-    rws_depends_on = ""
-    if rws.MDS_DB_HOST in ["metadata-store-db", "mfi-metadata-store-db"]:
-        rws_depends_on = (
-            "\n    depends_on:"
-            "\n      metadata-store-db:"
-            "\n        condition: service_healthy"
-        )
-
-    compose_content = f"""networks:
-  mfi_network:
-    driver: bridge
-
-volumes:
-  timescale_storage:
-  kv_psql_storage:
-  blob_storage:
-  mds_storage:
-  emqx_data:
-  emqx_log:
-
-services:
-  # ==========================================
-  # SHARED INFRASTRUCTURE (Profile: broker)
-  # ==========================================
-  mqtt-broker:
-    image: emqx/emqx:5.8.0
-    container_name: mfi-mqtt-broker
-    ports:
-      - "{infra.MQTT_BROKER_PORT}:1883"
-      - "{infra.MQTT_WEBSOCKET_PORT}:8083"
-      - "{infra.MQTT_DASHBOARD_PORT}:18083"
-    environment:
-      - EMQX_NAME=mfi_broker
-    profiles:
-      - "infra"
-    volumes:
-      - emqx_data:/opt/emqx/data
-      - emqx_log:/opt/emqx/log
-    healthcheck:
-      test: ["CMD", "emqx", "ctl", "status"]
-      interval: 5s
-      timeout: 5s
-      retries: 3
-    networks:
-      mfi_network:
-        aliases:
-          - "{infra.MQTT_BROKER_HOST}"
-    restart: always
-
-# ==========================================
-  # BLOB DATABASE LAYER (Profile: blob)
-  # ==========================================
-  blob-connector:
-    image: cmumfi/mfi-ddb-blob-connector:latest
-    container_name: mfi-blob-connector
-    command: >
-      python src/mfi_ddb/databases/blob/connector/connector.py /app/src/mfi_ddb/databases/blob/connector/config.yaml
-    profiles:
-      - "blob"
-    volumes:
-      - "{resolved_blob_path}:/data/blob_storage"
-      - ./runtime_configs/blob_connector.yaml:/app/src/mfi_ddb/databases/blob/connector/config.yaml:ro
-    networks:
-      - mfi_network
-    restart: on-failure
-
-  blob-dws:
-    image: cmumfi/mfi-ddb-blob-dws:latest
-    container_name: mfi-blob-dws
-    ports:
-      - "{blob.BLOB_DWS_PORT}:50053"
-    command: >
-      python -m mfi_ddb.databases.blob.dws.server --config /app/src/mfi_ddb/databases/blob/dws/config.yaml
-    profiles:
-      - "blob"
-    volumes:
-      - "{resolved_blob_path}:/data/blob_storage:ro"
-      - ./runtime_configs/blob_dws.yaml:/app/src/mfi_ddb/databases/blob/dws/config.yaml:ro
-    networks:
-      - mfi_network
-    restart: always
-
-  # ==========================================
-  # KEY-VALUE POSTGRESQL LAYER (Profile: kv)
-  # ==========================================
-  kv-psql-db:
-    image: postgres:15-alpine
-    container_name: mfi-kv-psql-db
-    environment:
-      - POSTGRES_USER={kv.KV_DB_USER}
-      - POSTGRES_PASSWORD={kv.KV_DB_PASSWORD}
-      - POSTGRES_DB={kv.KV_DB_NAME}
-    ports:
-      - "{kv.KV_DB_HOST_PORT}:5432"
-    volumes:
-      - kv_psql_storage:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U {kv.KV_DB_USER} -d {kv.KV_DB_NAME}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    profiles:
-      - "kv"
-    networks:
-      mfi_network:
-        aliases:
-          - "{kv.KV_DB_HOST}"
-    restart: always
-
-  kv-psql-connector:
-    image: cmumfi/mfi-ddb-kv-psql-connector:latest
-    container_name: mfi-kv-psql-connector{extra_hosts_block}{kv_depends_on}
-    environment:
-      - DB_HOST={kv.KV_DB_HOST}
-    networks:
-      - mfi_network
-    profiles:
-      - "kv"
-    volumes:
-      - ./runtime_configs/kv_psql_connector.yaml:/app/src/mfi_ddb/databases/kv-psql/connector/config.yaml:ro
-    restart: always
-
-  kv-psql-dws:
-    image: cmumfi/mfi-ddb-kv-psql-dws:latest
-    container_name: mfi-kv-psql-dws
-    ports:
-      - "{kv.KV_DWS_PORT}:50051"{kv_depends_on}
-    command: >
-      sh -c "python -m mfi_ddb.databases.kv-psql.dws.init_db --host {kv.KV_DB_HOST} && 
-             python -m mfi_ddb.databases.kv-psql.dws.server"
-    profiles:
-      - "kv"
-    networks:
-      - mfi_network
-    restart: always
-
-  # ==========================================
-  # RETRIEVAL API & METADATA LAYER (Profile: rws)
-  # ==========================================
-  metadata-store-db:
-    image: postgres:15-alpine
-    container_name: mfi-metadata-store-db
-    environment:
-      - POSTGRES_USER={rws.MDS_DB_USER}
-      - POSTGRES_PASSWORD={rws.MDS_DB_PASSWORD}
-      - POSTGRES_DB={rws.MDS_DB_NAME}
-    ports:
-      - "{rws.MDS_DB_HOST_PORT}:5432"
-    volumes:
-      - mds_storage:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U {rws.MDS_DB_USER} -d {rws.MDS_DB_NAME}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    networks:
-      mfi_network:
-        aliases:
-          - "{rws.MDS_DB_HOST}"
-    profiles:
-      - "rws"
-    restart: always
-
-  metadata-store-connector:
-    image: cmumfi/mfi-ddb-metadata-store-connector:latest
-    container_name: mfi-metadata-store-connector
-    command: >
-      python src/mfi_ddb/retrieval_api/metadata_store_pg/connector.py
-      --broker_config src/mfi_ddb/retrieval_api/metadata_store_pg/broker.ini
-      --pg_config src/mfi_ddb/retrieval_api/metadata_store_pg/pg_database.ini{rws_depends_on}
-    networks:
-      - mfi_network
-    profiles:
-      - "rws"
-    volumes:
-      - ./runtime_configs/metadata_broker.ini:/app/src/mfi_ddb/retrieval_api/metadata_store_pg/broker.ini:ro
-      - ./runtime_configs/metadata_pg.ini:/app/src/mfi_ddb/retrieval_api/metadata_store_pg/pg_database.ini:ro
-    restart: always
-
-  rws-app:
-    image: cmumfi/mfi-ddb-rws-app:latest
-    container_name: mfi-rws-app
-    ports:
-      - "{rws.RWS_API_PORT}:8000"{rws_depends_on}
-    networks:
-      - mfi_network
-    volumes:
-      - ./runtime_configs/rws_endpoints.yaml:/app/src/mfi_ddb/retrieval_api/rws/app/config/dws.endpoints.yaml:ro
-      - ./runtime_configs/rws_pg.ini:/app/src/mfi_ddb/retrieval_api/rws/app/config/pg_database.ini:ro
-    profiles:
-      - "rws"
-    restart: always
-
-  # ==========================================
-  # TIMESCALEDB METRICS LAYER (Profile: ts)
-  # ==========================================
-  timescaledb-db:
-    image: timescale/timescaledb:latest-pg16
-    container_name: mfi-timescaledb-db
-    environment:
-      - POSTGRES_USER={ts.TS_DB_USER}
-      - POSTGRES_PASSWORD={ts.TS_DB_PASSWORD}
-      - POSTGRES_DB={ts.TS_DB_NAME}
-    ports:
-      - "{ts.TS_DB_HOST_PORT}:5432"
-    volumes:
-      - timescale_storage:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U {ts.TS_DB_USER} -d {ts.TS_DB_NAME}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    profiles:
-      - "ts"
-    networks:
-      mfi_network:
-        aliases:
-          - "{ts.TS_DB_HOST}"
-    restart: always
-
-  timescaledb-connector:
-    image: cmumfi/mfi-ddb-timescaledb-connector:latest
-    container_name: mfi-timescaledb-connector{extra_hosts_block}{ts_depends_on}
-    environment:
-      - DB_HOST={ts.TS_DB_HOST}
-    volumes:
-      - ./runtime_configs/timescale_connector.yaml:/app/src/mfi_ddb/databases/timescaledb/connector/config.yaml:ro
-    profiles:
-      - "ts"
-    networks:
-      - mfi_network
-    restart: on-failure
-
-  timescaledb-dws:
-    image: cmumfi/mfi-ddb-timescaledb-dws:latest
-    container_name: mfi-timescaledb-dws
-    ports:
-      - "{ts.TS_DWS_PORT}:50052"{ts_depends_on}
-    command: >
-      sh -c "python -m mfi_ddb.databases.timescaledb.dws.server --host {ts.TS_DB_HOST}"
-    profiles:
-      - "ts"
-    networks:
-      - mfi_network
-    restart: always
-"""
-    (runtime_dir / "docker-compose.yaml").write_text(compose_content)
+def validate_existing_databases(runtime_dir: Path, payload) -> None:
+    """Postgres initialization variables cannot change credentials on an existing volume."""
+    compose_path = runtime_dir / 'docker-compose.yaml'
+    if not compose_path.exists():
+        return
+    old_services = yaml.safe_load(compose_path.read_text()).get('services', {})
+    for module, (_, _, service, database_key) in LOCAL_DATABASES.items():
+        storage = 'kv_psql_storage' if module == 'kv' else 'timescale_storage'
+        if module not in payload.selectedServices or not (runtime_dir / '.data' / storage / 'PG_VERSION').exists():
+            continue
+        settings = local_database_settings(payload.configs, module)
+        if settings is None:
+            continue
+        previous = old_services.get(service, {}).get('environment', {})
+        if isinstance(previous, list):
+            previous = dict(entry.split('=', 1) for entry in previous)
+        desired = {'POSTGRES_USER': settings['user'], 'POSTGRES_PASSWORD': settings['password'],
+                   'POSTGRES_DB': settings[database_key]}
+        if any(previous.get(key, '').replace('$$', '$') != value for key, value in desired.items()):
+            raise ValueError(f'{service} already has initialized data. Keep its existing credentials and database name, or migrate the database before changing them. No data has been deleted.')

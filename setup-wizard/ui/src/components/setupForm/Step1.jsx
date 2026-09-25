@@ -1,7 +1,11 @@
-import React from 'react';
 import ServiceCard from './ServiceCard';
 
 const SERVICES_REGISTRY = [
+  {
+    id: "aveva",
+    title: "AVEVA PI DB Node",
+    description: "Configure the AVEVA PI web service, credentials, data server, and MQTT connector path."
+  },
   {
     id: "infra",
     title: "MQTT Broker Node",

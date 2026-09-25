@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { CONFIG_BLUEPRINT } from './config/config';
+import { useState } from 'react';
+import { YAML_CONFIG_BLUEPRINT } from './config/yamlConfig';
 import Step0Welcome from './components/setupForm/Step0';
 import Step1Selection from './components/setupForm/Step1';
 import Step2Configuration from './components/setupForm/Step2';
@@ -8,12 +8,12 @@ import Step3Monitor from './components/setupForm/Step3';
 export default function App() {
   const [step, setStep] = useState(0); 
   const [selectedServices, setSelectedServices] = useState({
-    infra: false, kv: false, ts: false, blob: false, rws: false
+    infra: false, kv: false, ts: false, blob: false, rws: false, daa: false, aveva: false
   });
   
   const [formValues, setFormValues] = useState(() => {
     const initial = {};
-    Object.values(CONFIG_BLUEPRINT).forEach(sec => {
+    Object.values(YAML_CONFIG_BLUEPRINT).forEach(sec => {
       sec.fields.forEach(f => { initial[f.key] = f.default; });
     });
     return initial;
