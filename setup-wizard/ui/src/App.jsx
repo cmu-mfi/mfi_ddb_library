@@ -34,7 +34,7 @@ export default function App() {
       {/* VIBRANT CMU BRAND TOP BANNER */}
       <header className="flex-none px-8 py-2 bg-cmu-red flex justify-between items-center shadow-md z-10">
         <div className="flex items-center gap-3">
-          <img src="/ddb_logo.png" alt="CMU Logo" className="h-20 md:h-28 lg:h-32 w-auto bg-black p-3 rounded-2xl" />
+          <img src={`${import.meta.env.BASE_URL}ddb_logo.png`} alt="CMU DDB Logo" className="h-20 md:h-28 lg:h-32 w-auto bg-black p-3 rounded-2xl" />
           <div>
             <h1 className="text-xl md:text-2xl lg:text-3xl font-bold tracking-tight text-white leading-none">CMU MFI Digital Data Backbone</h1>
             <p className="text-xs md:text-sm lg:text-base text-red-100 font-medium uppercase tracking-wider mt-2">System Setup Wizard</p>

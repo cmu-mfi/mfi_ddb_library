@@ -36,6 +36,7 @@
   "build": {
     "appId": "com.mfi.setupwizard",
     "productName": "MFI DDB Setup Wizard",
+    "icon": "public/ddb_logo.png",
     "files": [
       "dist/**/*",
       "electron/**/*"
@@ -51,6 +52,7 @@
       "target": "dmg"
     },
     "win": {
+      "icon": "public/favicon.ico",
       "target": "nsis"
     },
     "linux": {

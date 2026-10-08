@@ -49,9 +49,13 @@ function startBackend() {
 }
 
 function createWindow() {
+  const iconPath = path.join(app.getAppPath(), app.isPackaged ? 'dist' : 'public', 'ddb_logo.png');
+  if (process.platform === 'darwin') app.dock.setIcon(iconPath);
+
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    icon: iconPath,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
