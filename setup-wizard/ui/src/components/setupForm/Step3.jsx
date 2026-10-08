@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { hostPlatform } from '../../services/api';
 
-export default function Step3Monitor({ selectedServices, formValues, prevStep, onFinished }) {
+export default function Step3Monitor({ selectedServices, formValues, prevStep, dashboardUrl }) {
   const [logs, setLogs] = useState([]);
   const [isDeploying, setIsDeploying] = useState(false);
   const [deploySuccess, setDeploySuccess] = useState(null);
@@ -192,13 +192,15 @@ export default function Step3Monitor({ selectedServices, formValues, prevStep, o
           ← Adjust Configurations
         </button>
 
-        {deploySuccess === true && (
-          <button
-            onClick={onFinished}
+        {deploySuccess === true && dashboardUrl && (
+          <a
+            href={dashboardUrl}
+            target="_blank"
+            rel="noopener noreferrer"
             className="px-6 py-2.5 cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-lg shadow-sm transition transform active:scale-95 animate-fade"
           >
             Continue to Dashboard →
-          </button>
+          </a>
         )}
         
         {deploySuccess === false && (

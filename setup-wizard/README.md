@@ -46,6 +46,12 @@ port 50051 and publish host ports 50052, 50053, and 50054. RWS routes between
 containers must use internal ports. The wizard publishes RWS at
 `http://localhost:8002` to avoid the setup backend on port 8000.
 
+After the selected stack is ready, **Continue to Dashboard** opens the Data Adapter
+App frontend in your browser when that module was selected. The link uses its
+generated Compose port mapping (3001 by default) and the setup backend's hostname
+or IP, or a specific host IP configured in the frontend port binding. Desktop
+deployments default to `http://localhost:3001/`.
+
 Blob connector and DWS paths mount the same host directory. The DWS index path
 must be `<blob_dir>/index.jsonl`, matching the connector's fixed index filename.
 

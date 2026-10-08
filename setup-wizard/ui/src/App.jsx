@@ -7,6 +7,7 @@ import Step3Monitor from './components/setupForm/Step3';
 
 export default function App() {
   const [step, setStep] = useState(0); 
+  const [dashboardUrl, setDashboardUrl] = useState(null);
   const [selectedServices, setSelectedServices] = useState({
     infra: false, kv: false, ts: false, blob: false, rws: false, daa: false, aveva: false
   });
@@ -67,7 +68,10 @@ export default function App() {
               formValues={formValues} 
               updateValue={updateValue} 
               prevStep={() => setStep(1)} 
-              nextStep={() => setStep(3)} 
+              nextStep={url => {
+                setDashboardUrl(url);
+                setStep(3);
+              }}
             />
           )}
 
@@ -76,6 +80,7 @@ export default function App() {
               selectedServices={selectedServices} 
               formValues={formValues} 
               prevStep={() => setStep(2)} 
+              dashboardUrl={dashboardUrl}
             />
           )}
           

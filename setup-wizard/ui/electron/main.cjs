@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, shell } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process'); // To run background processes
 
@@ -57,6 +57,13 @@ function createWindow() {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.cjs')
     },
+  });
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
   });
 
   if (!app.isPackaged) {

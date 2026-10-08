@@ -4,7 +4,7 @@ import os
 import json
 
 import yaml
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pathlib import Path
@@ -29,7 +29,7 @@ CONFIG_DIR = RUNTIME_DIR / "runtime_configs"
 COMPOSE_FILE_PATH = RUNTIME_DIR / "docker-compose.yaml"
 
 @app.post("/api/deploy", status_code=status.HTTP_201_CREATED)
-async def deploy_pipeline(payload: MasterConfigPayload):
+async def deploy_pipeline(payload: MasterConfigPayload, request: Request):
     """
     Step 1: Staging Configurations.
     Assembles configuration files and writes out the docker-compose file.
@@ -46,6 +46,19 @@ async def deploy_pipeline(payload: MasterConfigPayload):
         
         # 3. Generate the master docker-compose configuration
         generate_master_compose(RUNTIME_DIR, payload)
+
+        dashboard_url = None
+        compose = yaml.safe_load((RUNTIME_DIR / 'docker-compose.yaml').read_text())
+        frontend = compose['services'].get('data-adapter-frontend')
+        if frontend:
+            # Use the published frontend port and the browser-accessible deployment host.
+            binding = frontend['ports'][0].rsplit(':', 2)
+            host = request.url.hostname
+            if len(binding) == 3 and binding[0] not in ('0.0.0.0', '[::]', '::'):
+                host = binding[0].strip('[]')
+            if ':' in host:
+                host = f'[{host}]'
+            dashboard_url = f'http://{host}:{binding[-2]}/'
         
         # --- BLOCKING STEP 4 REMOVED ---
         # The actual container pull/spin-up execution is handed off entirely 
@@ -54,7 +67,8 @@ async def deploy_pipeline(payload: MasterConfigPayload):
         return {
             "status": "success",
             "message": "DDB custom configurations staged successfully. Handing off execution loop to stream.",
-            "workspace": str(RUNTIME_DIR)
+            "workspace": str(RUNTIME_DIR),
+            "dashboard_url": dashboard_url,
         }
         
     except Exception as e:

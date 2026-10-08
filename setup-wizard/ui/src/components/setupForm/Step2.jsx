@@ -36,7 +36,7 @@ export default function Step2Configuration({ selectedServices, formValues, updat
       console.log('Configurations written successfully:', result);
       
       // 2. Advance directly to Step 3 (The Streaming Terminal Monitor)
-      nextStep();
+      nextStep(result.dashboard_url);
     } catch (err) {
       console.error('Configuration assembly execution error:', err);
       setErrorMsg(err.message || 'An unexpected server error occurred while writing configurations.');
