@@ -17,7 +17,6 @@ From `setup-wizard/backend/`:
 
 ```sh
 python -m pip install -r requirements.txt pyinstaller
-python -m PyInstaller --noconfirm main.spec
 ```
 
 Then from `setup-wizard/ui/`:
@@ -26,6 +25,10 @@ Then from `setup-wizard/ui/`:
 npm install
 npm run electron:build
 ```
+
+`electron:build` rebuilds the Python backend before packaging the UI, so the
+installer always includes current backend changes. It uses `python3` on macOS
+and Linux, and `python` on Windows; install the dependencies in that interpreter.
 
 PyInstaller bundles `backend/templates/` with the backend executable.
 Electron Builder includes `backend/dist/main/` in the desktop installer.
