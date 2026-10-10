@@ -4,6 +4,32 @@ import psycopg2
 from psycopg2.extras import execute_batch
 from typing import Optional, Any
 
+# Define the schema initialization script as a constant
+INIT_SCHEMA_SQL = """
+CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+
+CREATE TABLE IF NOT EXISTS timeseries_data (
+  time        TIMESTAMPTZ NOT NULL,
+  topic       TEXT NOT NULL,
+  component   TEXT NOT NULL,
+  metric      TEXT NOT NULL,
+  value_num   DOUBLE PRECISION,
+  value_text  TEXT,
+  value_json  JSONB
+);
+
+-- Note: create_hypertable fails if called on an existing hypertable.
+-- Using an anonymous DO block wraps it safely for repeated runs.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM _timescaledb_catalog.hypertable WHERE table_name = 'timeseries_data'
+    ) THEN
+        PERFORM create_hypertable('timeseries_data', 'time');
+    END IF;
+END $$;
+"""
+
 
 class TimeScaleWriter:
     def __init__(self, db_config: dict):
@@ -28,6 +54,21 @@ class TimeScaleWriter:
         conn.autocommit = True
         self.conn = conn
 
+        # Execute schema migration safely right after connection established
+        self._initialize_schema()
+    
+    def _initialize_schema(self):
+        """Ensures extension, tables, and hypertables exist on startup."""
+        if self.conn is None:
+            return
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(INIT_SCHEMA_SQL)
+                print("TimescaleDB schema successfully verified/initialized.")
+        except Exception as e:
+            print(f"CRITICAL: Failed to initialize schema on startup: {e}")
+            raise e
+        
     def reconnect(self):
         """Safely tear down and reconstruct the connection state."""
         try:

@@ -1,12 +1,11 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Modal from "./Modal";
-import { ConnectionManager } from "./ConnectionManager";
-import { makeDefaultStreamerConfig } from "../data/defaults";
-import { getConnCtr, setConnCtr } from "../state/conn_ctr";
 import {
-  connectConnection,
-  disconnectConnection,
+  createConnection,
+  stopConnection,
   fetchAdapters,
+  fetchStreamerConfig,
+  updateConnectionConfig,
   validateAdapterConfig,
   validateStreamerConfig,
 } from "../api";
@@ -63,7 +62,8 @@ const generateHelpNodes = (helpData) => {
 export default function ConnectionModal({ isOpen, onClose, onSave, initialData = {} }) {
   const [connectionType, setConnectionType] = useState("");
   const [configuration, setConfiguration] = useState("");
-  const [streamerConfig, setStreamerConfig] = useState(makeDefaultStreamerConfig());
+  const [streamerExample, setStreamerExample] = useState("");
+  const [streamerConfig, setStreamerConfig] = useState("");
   const [adapters, setAdapters] = useState([]);
   const [step, setStep] = useState("");
   const [validationError, setValidationError] = useState("");
@@ -77,6 +77,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
   const [pollingRateHz, setPollingRateHz] = useState("1");
   const fileInputRef = useRef(null);
   const lastValidatedRef = useRef("");
+  const streamerExampleRef = useRef("");
 
   const connectionTypes = adapters.map((a) => a.name);
 
@@ -108,12 +109,12 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
     const t = e.target.value;
     setConnectionType(t);
     setConfiguration(exampleConfigMap[t] || "");
-    setStreamerConfig(makeDefaultStreamerConfig());
+    setStreamerConfig(streamerExample);
     setIsPolling(true);
     setPollingRateHz("1");
     setValidationError("");
     lastValidatedRef.current = "";
-  }, [exampleConfigMap]);
+  }, [exampleConfigMap, streamerExample]);
 
   const handleFileUpload = useCallback((e) => {
     const f = e.target.files?.[0];
@@ -127,7 +128,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
   const handleClose = useCallback(async () => {
     if (isSubmitting) return;
     if (activeConnectionId) {
-      await disconnectConnection(activeConnectionId).catch(console.error);
+      await stopConnection(activeConnectionId).catch(console.error);
       setActiveConnectionId(null);
     }
     onClose();
@@ -161,33 +162,52 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
     setValidationError("");
     try {
       const validation = await validateConfiguration();
-      if (!validation?.valid) { setIsSubmitting(false); return; }
+      if (!validation?.valid) return;
 
       const effectiveIsPolling = supportsCallback ? isPolling : true;
       const hzInt = Math.max(1, parseInt((pollingRateHz || "1").trim(), 10) || 1);
 
       if (initialData.id) {
-        const updated = {
+        // Backend builds and connects the new config before touching the
+        // existing connection - on failure here the old connection is
+        // untouched and still running, so we just show why and leave the
+        // modal open for another attempt.
+        setStep("Applying updated configuration...");
+        const response = await updateConnectionConfig(
+          initialData.id, configuration, streamerConfig, effectiveIsPolling, hzInt
+        );
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => ({}));
+          setValidationError(errBody.detail || `Failed to apply updated configuration (HTTP ${response.status}).`);
+          return;
+        }
+        onSave({
           ...initialData,
           adapter: connectionType,
           adapterConfig: configuration,
           streamerConfig,
+          isPolling: effectiveIsPolling,
+          pollingRateHz: hzInt,
           updatedAt: new Date().toISOString(),
-        };
-        ConnectionManager.saveConnection(initialData.id, updated);
-        onSave(updated);
+        });
         onClose();
         return;
       }
 
-      const id = getConnCtr() + 1;
-      setConnCtr(id);
-      setActiveConnectionId(id);
       setStep("Connecting to adapter...");
 
-      await connectConnection(id, connectionType, configuration, streamerConfig, effectiveIsPolling, hzInt);
+      // The backend generates the id - it's the only thing that actually
+      // knows which ids are already taken (active_connections + SQLite).
+      const response = await createConnection(connectionType, configuration, streamerConfig, effectiveIsPolling, hzInt);
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({}));
+        setValidationError(errBody.detail || `Failed to connect (HTTP ${response.status}).`);
+        return;
+      }
+      const { id } = await response.json();
+      setActiveConnectionId(id);
 
-      const saved = {
+      onSave({
         id,
         adapter: connectionType,
         adapterConfig: configuration,
@@ -195,12 +215,11 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
         isPolling: effectiveIsPolling,
         pollingRateHz: hzInt,
         savedAt: new Date().toISOString(),
-      };
-      ConnectionManager.saveConnection(id, saved);
-      onSave(saved);
+      });
       onClose();
     } catch (e) {
       console.error(e);
+      setValidationError(e.message || "An unexpected error occurred.");
     } finally {
       setStep("");
       setIsSubmitting(false);
@@ -217,13 +236,24 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
 
   useEffect(() => {
     fetchAdapters().then(setAdapters).catch(console.error);
+    fetchStreamerConfig()
+      .then((data) => setStreamerExample(data?.configExample?.configuration || ""))
+      .catch(console.error);
   }, []);
+
+  // Kept in sync so the reset effect below can read the latest fetched
+  // default without depending on streamerExample directly - depending on it
+  // there would re-run the reset (and wipe in-progress user input) every
+  // time the async fetch resolves while the modal is already open.
+  useEffect(() => {
+    streamerExampleRef.current = streamerExample;
+  }, [streamerExample]);
 
   useEffect(() => {
     if (!isOpen) return;
     setConnectionType(initialData.adapter || "");
     setConfiguration(initialData.adapterConfig || "");
-    setStreamerConfig(initialData.streamerConfig || makeDefaultStreamerConfig());
+    setStreamerConfig(initialData.streamerConfig || streamerExampleRef.current);
     setIsPolling(typeof initialData.isPolling === "boolean" ? initialData.isPolling : true);
     setPollingRateHz(initialData.pollingRateHz != null ? String(initialData.pollingRateHz) : "1");
     setStep("");
@@ -262,7 +292,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
           <label className="block mb-1.5 text-sm font-medium text-gray-800" htmlFor="connection-type">
             Data Adapter:
           </label>
-          <select id="connection-type" value={connectionType} onChange={handleTypeChange} className={inputCls} disabled={isSubmitting}>
+          <select id="connection-type" value={connectionType} onChange={handleTypeChange} className={inputCls} disabled={isSubmitting || isEditMode} title={isEditMode ? "Adapter type can't be changed after creation" : undefined}>
             <option value="">Select a type</option>
             {connectionTypes.map((type) => <option key={type} value={type}>{type}</option>)}
           </select>

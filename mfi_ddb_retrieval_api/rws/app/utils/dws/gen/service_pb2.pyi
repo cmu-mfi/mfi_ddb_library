@@ -11,12 +11,14 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 DESCRIPTOR: _descriptor.FileDescriptor
 
 class GetDataPointRequest(_message.Message):
-    __slots__ = ("topic", "timestamp")
+    __slots__ = ("topic", "timestamp", "do_closest_past")
     TOPIC_FIELD_NUMBER: _ClassVar[int]
     TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
+    DO_CLOSEST_PAST_FIELD_NUMBER: _ClassVar[int]
     topic: str
     timestamp: _timestamp_pb2.Timestamp
-    def __init__(self, topic: _Optional[str] = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    do_closest_past: bool
+    def __init__(self, topic: _Optional[str] = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., do_closest_past: _Optional[bool] = ...) -> None: ...
 
 class GetDataPointResponse(_message.Message):
     __slots__ = ("datapoint",)

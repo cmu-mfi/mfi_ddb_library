@@ -5,12 +5,13 @@ import time
 import queue
 import threading
 from pathlib import Path
+from unicodedata import name
 import yaml
 from typing import Any, List, Tuple, Optional
 import paho.mqtt.client as mqtt
 from paho.mqtt.enums import CallbackAPIVersion
 from datetime import datetime, timezone
-from mqtt_spb_wrapper.spb_base import SpbPayloadParser
+from mqtt_spb_wrapper.spb_base import SpbPayloadParser, SpbTopic
 
 from db import TimeScaleWriter
 
@@ -100,14 +101,49 @@ def on_connect(client, userdata, flags, rc, properties=None):
 def on_message(client, userdata, msg):
     """MQTT callback: decode payload and batch insert into TimeScaleDB."""
     try:
+        # initialize topic parser
+        # spb_topic = SpbTopic(msg.topic)
+        
+        # not using the sbptopic parser since it is harcoded to expect a namespace
+        # instead I can drop the namespace directly from the array
+        topic_fields = msg.topic.split("/")
+
+        if len(topic_fields) < 3:
+            raise ValueError(f"Malformed MQTT topic structure: {msg.topic}")
+
+        # extract the message type string
+        msg_type = topic_fields[2]
+
+        # delete the message type from the array
+        del topic_fields[2]
+
+        # assembling the topic path, leaving out message type folder
+        # clean_fields = [spb_topic.namespace, spb_topic.domain_name]
+
+        # if spb_topic.eon_name:
+        #     clean_fields.append(spb_topic.eon_name)
+        # if spb_topic.eon_device_name:
+        #     clean_fields.append(spb_topic.eon_device_name)
+        
+        clean_topic = "/".join(topic_fields)
+        
         metrics = decode_sparkplug(msg.payload)
         rows = []
         for name, value, ts_ms in metrics:
             t = to_ts(ts_ms)
+            
             value_num, value_text, value_json = classify_value(value)
+
+            # prepend the message type context into the existing metric string
+            tracked_metric_name = f"{msg_type}/{name}"
+            
+            clean_name = name.lstrip("DATA/") if name.startswith("DATA/") else name
+
+            full_topic_path = f"{clean_topic}/{clean_name}"
+
             # Persist each metric as a separate row keyed by topic + component + metric.
             rows.append(
-                (t, msg.topic, cfg["component_id"], name, value_num, value_text, value_json)
+                (t, full_topic_path, cfg["component_id"], tracked_metric_name, value_num, value_text, value_json)
             )
         if rows:
             # writer.insert_rows(rows) --> would overwhelm the DB if we do it directly in the MQTT thread; instead, push to the queue for the background worker to consume
@@ -178,7 +214,26 @@ def db_batch_writer_worker(
 def main():
     """Start the background batch worker, connect to broker, and process events."""
     # 1. Create DB writer instance and spin up the background consumer thread
-    db_writer = TimeScaleWriter(cfg["timescaledb"])
+    
+    # db_writer = TimeScaleWriter(cfg["timescaledb"])
+
+    # adding retries to ensure that the db is up and the schema is initialized before we start the MQTT client and worker thread
+    # max of a 45 second wait before application gives up and exits.
+    db_writer = None
+    retry_count = 0
+    max_retries = 15
+    
+    print("Connecting to TimescaleDB and validating/initializing schema...")
+    while db_writer is None:
+        try:
+            db_writer = TimeScaleWriter(cfg["timescaledb"])
+        except Exception as e:
+            retry_count += 1
+            if retry_count > max_retries:
+                print("CRITICAL: Could not connect to TimescaleDB or verify schema. Exiting application.")
+                raise e
+            print(f"Database/Schema not ready yet ({e}). Retrying in 3 seconds... ({retry_count}/{max_retries})")
+            time.sleep(3)
 
     worker_thread = threading.Thread(
         target=db_batch_writer_worker,

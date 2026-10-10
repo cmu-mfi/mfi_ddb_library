@@ -1,0 +1,660 @@
+{
+  "apiVersion": "dashboard.grafana.app/v2",
+  "kind": "Dashboard",
+  "metadata": {
+    "name": "afsaya0lnt9fkc",
+    "namespace": "default",
+    "uid": "5e5c6acd-7ac0-4c1c-9ca1-566b06fb5636",
+    "resourceVersion": "1786059932246992",
+    "generation": 5,
+    "creationTimestamp": "2026-08-06T23:26:24Z",
+    "labels": {
+      "grafana.app/deprecatedInternalID": "341189090594816"
+    },
+    "annotations": {
+      "grafana.app/createdBy": "access-policy:service",
+      "grafana.app/managedBy": "classic-file-provisioning",
+      "grafana.app/managerAllowsEdits": "true",
+      "grafana.app/managerId": "Default Dashboards",
+      "grafana.app/saved-from-ui": "Grafana v13.1.2 (7f247b37a4)",
+      "grafana.app/sourceChecksum": "0d10eda3dff05f013164fd60c7b02f1a",
+      "grafana.app/sourcePath": "/var/lib/grafana/dashboards/rws.json",
+      "grafana.app/sourceTimestamp": "1786058993000",
+      "grafana.app/updatedBy": "user:dfueqt3uzwv0gf",
+      "grafana.app/updatedTimestamp": "2026-08-06T23:45:32Z"
+    }
+  },
+  "spec": {
+    "annotations": [
+      {
+        "kind": "AnnotationQuery",
+        "spec": {
+          "query": {
+            "kind": "DataQuery",
+            "group": "grafana",
+            "version": "v0",
+            "datasource": {
+              "name": "-- Grafana --"
+            },
+            "spec": {}
+          },
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "builtIn": true
+        }
+      }
+    ],
+    "cursorSync": "Off",
+    "editable": true,
+    "elements": {
+      "panel-3": {
+        "kind": "Panel",
+        "spec": {
+          "id": 3,
+          "title": "trial uuids",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "yesoreyeram-infinity-datasource",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "PD0067CAD9A63E081"
+                      },
+                      "spec": {
+                        "columns": [],
+                        "computed_columns": [],
+                        "filterExpression": "",
+                        "filters": [],
+                        "format": "table",
+                        "global_query_id": "",
+                        "parser": "backend",
+                        "root_selector": "trials",
+                        "source": "url",
+                        "type": "json",
+                        "url": "http://localhost:8000/mfi-ddb/type1",
+                        "url_options": {
+                          "body_content_type": "application/json",
+                          "body_type": "raw",
+                          "data": "{\n  \"time_start\": \"${__from:date:iso}\",\n  \"time_end\": \"${__to:date:iso}\",\n  \"user_id\": \"test_user\",\n  \"user_domain\": \"default\",\n  \"data_format\": \"json\",\n  \"enterprise_id\": \"CMU\",\n  \"site\": null,\n  \"device\": null,\n  \"trial_id\": null,\n  \"project_id\": null,\n  \"project_name\": null,\n  \"search_terms\": []\n}",
+                          "headers": [
+                            {
+                              "key": "accept",
+                              "value": "application/json"
+                            },
+                            {
+                              "key": "Content-Type",
+                              "value": "application/json"
+                            }
+                          ],
+                          "method": "POST"
+                        }
+                      }
+                    },
+                    "refId": "Type 1",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "kind": "Transformation",
+                  "group": "convertFieldType",
+                  "spec": {
+                    "options": {
+                      "conversions": [],
+                      "fields": {}
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "table",
+            "version": "13.1.2",
+            "spec": {
+              "options": {
+                "cellHeight": "sm",
+                "showHeader": true,
+                "sortBy": [
+                  {
+                    "desc": false,
+                    "displayName": "uuid"
+                  }
+                ]
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "none",
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "thresholds"
+                  },
+                  "custom": {
+                    "align": "auto",
+                    "cellOptions": {
+                      "type": "json-view"
+                    },
+                    "footer": {
+                      "reducers": []
+                    },
+                    "inspect": false
+                  }
+                },
+                "overrides": [
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "mfi-v1.0-historian/CMU/Server-Room/telemetry/V WiFi RSSI (dBm)"
+                    },
+                    "properties": []
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "mfi-v1.0-historian/CMU/Server-Room/telemetry/humidity"
+                    },
+                    "properties": []
+                  },
+                  {
+                    "matcher": {
+                      "id": "byName",
+                      "options": "mfi-v1.0-historian/CMU/Server-Room/telemetry/temperature"
+                    },
+                    "properties": []
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "panel-5": {
+        "kind": "Panel",
+        "spec": {
+          "id": 5,
+          "title": "Humidity",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "yesoreyeram-infinity-datasource",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "PD0067CAD9A63E081"
+                      },
+                      "spec": {
+                        "columns": [],
+                        "filters": [],
+                        "format": "table",
+                        "global_query_id": "",
+                        "parser": "backend",
+                        "root_selector": "(\n  /* 1. Get all unique timestamps from the dataset */\n  $timestamps := $distinct(data.data.*.timestamp);\n\n  /* 2. Get all metrics (the dynamic keys inside \"data\") */\n  $metrics := $keys(data.data);\n\n  /* 3. Rebuild the structure: map each timestamp to its aligned values */\n  $timestamps . (\n    $t := $;\n    $merge([\n      $metrics . (\n        $m := $;\n        { $m: $lookup($$.data.data, $m)[timestamp = $t].value }\n      ),\n      {\"timestamp\": $t}\n    ])\n  )\n)",
+                        "source": "url",
+                        "type": "json",
+                        "url": "http://localhost:8000/mfi-ddb/type2",
+                        "url_options": {
+                          "body_content_type": "application/json",
+                          "body_type": "raw",
+                          "data": "{\r\n  \"trial_uuid\": \"$uuid\",\r\n  \"data_format\": \"json\",\r\n  \"time_start\": \"${__from:date:iso}\",\r\n  \"time_end\": \"${__to:date:iso}\",\r\n  \"user_id\": \"test_user\",\r\n  \"user_domain\": \"default\",\r\n  \"frequency\": -1\r\n}",
+                          "headers": [
+                            {
+                              "key": "accept",
+                              "value": "application/json"
+                            },
+                            {
+                              "key": "Content-Type",
+                              "value": "application/json"
+                            }
+                          ],
+                          "method": "POST"
+                        }
+                      }
+                    },
+                    "refId": "Type 2",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "kind": "Transformation",
+                  "group": "convertFieldType",
+                  "spec": {
+                    "options": {
+                      "conversions": [
+                        {
+                          "destinationType": "time",
+                          "targetField": "timestamp"
+                        }
+                      ],
+                      "fields": {}
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "xychart",
+            "version": "13.1.2",
+            "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "overflow": "ellipsis",
+                  "placement": "bottom",
+                  "showLegend": false
+                },
+                "mapping": "auto",
+                "series": [
+                  {
+                    "frame": {
+                      "matcher": {
+                        "id": "byIndex",
+                        "options": 0
+                      }
+                    },
+                    "x": {
+                      "matcher": {
+                        "id": "byName",
+                        "options": "timestamp"
+                      }
+                    },
+                    "y": {
+                      "matcher": {
+                        "id": "byName",
+                        "options": "mfi-v1.0-historian/CMU/Test-Site/telemetry/humidity"
+                      }
+                    }
+                  }
+                ],
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "Humidity",
+                    "axisPlacement": "auto",
+                    "fillOpacity": 50,
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "pointShape": "circle",
+                    "pointSize": {
+                      "fixed": 5
+                    },
+                    "pointStrokeWidth": 1,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "show": "points"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      },
+      "panel-6": {
+        "kind": "Panel",
+        "spec": {
+          "id": 6,
+          "title": "Temperature",
+          "description": "",
+          "links": [],
+          "data": {
+            "kind": "QueryGroup",
+            "spec": {
+              "queries": [
+                {
+                  "kind": "PanelQuery",
+                  "spec": {
+                    "query": {
+                      "kind": "DataQuery",
+                      "group": "yesoreyeram-infinity-datasource",
+                      "version": "v0",
+                      "datasource": {
+                        "name": "PD0067CAD9A63E081"
+                      },
+                      "spec": {
+                        "columns": [],
+                        "filters": [],
+                        "format": "table",
+                        "global_query_id": "",
+                        "parser": "backend",
+                        "root_selector": "(\n  /* 1. Get all unique timestamps from the dataset */\n  $timestamps := $distinct(data.data.*.timestamp);\n\n  /* 2. Get all metrics (the dynamic keys inside \"data\") */\n  $metrics := $keys(data.data);\n\n  /* 3. Rebuild the structure: map each timestamp to its aligned values */\n  $timestamps . (\n    $t := $;\n    $merge([\n      $metrics . (\n        $m := $;\n        { $m: $lookup($$.data.data, $m)[timestamp = $t].value }\n      ),\n      {\"timestamp\": $t}\n    ])\n  )\n)",
+                        "source": "url",
+                        "type": "json",
+                        "url": "http://localhost:8000/mfi-ddb/type2",
+                        "url_options": {
+                          "body_content_type": "application/json",
+                          "body_type": "raw",
+                          "data": "{\r\n  \"trial_uuid\": \"$uuid\",\r\n  \"data_format\": \"json\",\r\n  \"time_start\": \"${__from:date:iso}\",\r\n  \"time_end\": \"${__to:date:iso}\",\r\n  \"user_id\": \"test_user\",\r\n  \"user_domain\": \"default\",\r\n  \"frequency\": -1\r\n}",
+                          "headers": [
+                            {
+                              "key": "accept",
+                              "value": "application/json"
+                            },
+                            {
+                              "key": "Content-Type",
+                              "value": "application/json"
+                            }
+                          ],
+                          "method": "POST"
+                        }
+                      }
+                    },
+                    "refId": "Type 2",
+                    "hidden": false
+                  }
+                }
+              ],
+              "transformations": [
+                {
+                  "kind": "Transformation",
+                  "group": "convertFieldType",
+                  "spec": {
+                    "options": {
+                      "conversions": [
+                        {
+                          "destinationType": "time",
+                          "targetField": "timestamp"
+                        }
+                      ],
+                      "fields": {}
+                    }
+                  }
+                }
+              ],
+              "queryOptions": {}
+            }
+          },
+          "vizConfig": {
+            "kind": "VizConfig",
+            "group": "xychart",
+            "version": "13.1.2",
+            "spec": {
+              "options": {
+                "legend": {
+                  "calcs": [],
+                  "displayMode": "list",
+                  "overflow": "ellipsis",
+                  "placement": "bottom",
+                  "showLegend": false
+                },
+                "mapping": "auto",
+                "series": [
+                  {
+                    "frame": {
+                      "matcher": {
+                        "id": "byIndex",
+                        "options": 0
+                      }
+                    },
+                    "x": {
+                      "matcher": {
+                        "id": "byName",
+                        "options": "timestamp"
+                      }
+                    },
+                    "y": {
+                      "matcher": {
+                        "id": "byName",
+                        "options": "mfi-v1.0-historian/CMU/Test-Site/telemetry/temperature"
+                      }
+                    }
+                  }
+                ],
+                "tooltip": {
+                  "hideZeros": false,
+                  "mode": "single",
+                  "sort": "none"
+                }
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "thresholds": {
+                    "mode": "absolute",
+                    "steps": [
+                      {
+                        "value": 0,
+                        "color": "green"
+                      },
+                      {
+                        "value": 80,
+                        "color": "red"
+                      }
+                    ]
+                  },
+                  "color": {
+                    "mode": "palette-classic"
+                  },
+                  "custom": {
+                    "axisBorderShow": false,
+                    "axisCenteredZero": false,
+                    "axisColorMode": "text",
+                    "axisLabel": "Temperature",
+                    "axisPlacement": "auto",
+                    "fillOpacity": 50,
+                    "hideFrom": {
+                      "legend": false,
+                      "tooltip": false,
+                      "viz": false
+                    },
+                    "pointShape": "circle",
+                    "pointSize": {
+                      "fixed": 5
+                    },
+                    "pointStrokeWidth": 1,
+                    "scaleDistribution": {
+                      "type": "linear"
+                    },
+                    "show": "points"
+                  }
+                },
+                "overrides": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "layout": {
+      "kind": "GridLayout",
+      "spec": {
+        "items": [
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 22,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-6"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 22,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-5"
+              }
+            }
+          },
+          {
+            "kind": "GridLayoutItem",
+            "spec": {
+              "x": 0,
+              "y": 22,
+              "width": 24,
+              "height": 5,
+              "element": {
+                "kind": "ElementReference",
+                "name": "panel-3"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "links": [],
+    "liveNow": false,
+    "preload": false,
+    "tags": [],
+    "timeSettings": {
+      "timezone": "utc",
+      "from": "now-30d",
+      "to": "now",
+      "autoRefresh": "",
+      "autoRefreshIntervals": [
+        "5s",
+        "10s",
+        "30s",
+        "1m",
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "2h",
+        "1d"
+      ],
+      "hideTimepicker": false,
+      "fiscalYearStartMonth": 0
+    },
+    "title": "RWS Infinity",
+    "variables": [
+      {
+        "kind": "QueryVariable",
+        "spec": {
+          "name": "uuid",
+          "current": {
+            "text": "7831ba86-339a-4a42-ae10-a86769915c48",
+            "value": "7831ba86-339a-4a42-ae10-a86769915c48"
+          },
+          "label": "trial_uuid",
+          "hide": "dontHide",
+          "refresh": "onDashboardLoad",
+          "skipUrlSync": false,
+          "query": {
+            "kind": "DataQuery",
+            "group": "yesoreyeram-infinity-datasource",
+            "version": "v0",
+            "datasource": {
+              "name": "PD0067CAD9A63E081"
+            },
+            "spec": {
+              "infinityQuery": {
+                "columns": [],
+                "data": "values\nfoo\nbar\nbaz",
+                "filters": [],
+                "format": "table",
+                "parser": "backend",
+                "refId": "",
+                "root_selector": "trials.uuid",
+                "source": "url",
+                "type": "json",
+                "url": "http://localhost:8000/mfi-ddb/type1",
+                "url_options": {
+                  "body_content_type": "application/json",
+                  "body_type": "raw",
+                  "data": "{\r\n  \"time_start\": \"${__from:date:iso}\",\r\n  \"time_end\": \"${__to:date:iso}\",\r\n  \"user_id\": \"test_user\",\r\n  \"user_domain\": \"default\",\r\n  \"data_format\": \"json\",\r\n  \"enterprise_id\": \"CMU\",\r\n  \"site\": null,\r\n  \"device\": null,\r\n  \"trial_id\": null,\r\n  \"project_id\": null,\r\n  \"project_name\": null,\r\n  \"search_terms\": []\r\n}",
+                  "headers": [
+                    {
+                      "key": "accept",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    }
+                  ],
+                  "method": "POST"
+                }
+              },
+              "queryType": "infinity",
+              "refId": "variable"
+            }
+          },
+          "regex": "",
+          "regexApplyTo": "value",
+          "sort": "disabled",
+          "definition": "",
+          "options": [],
+          "multi": false,
+          "includeAll": false,
+          "allowCustomValue": true
+        }
+      }
+    ]
+  }
+} 
+// # Getting Started With MFI DDB 

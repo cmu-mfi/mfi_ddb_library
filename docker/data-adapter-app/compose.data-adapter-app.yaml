@@ -4,13 +4,15 @@ services:
     build:
       context: ../../mfi_ddb_data_adapter/data_adapter_app/backend
       dockerfile: Dockerfile
+      tags:
+        - cmumfi/mfi-ddb-data-adapter-backend:${VERSION:-latest}
+        - cmumfi/mfi-ddb-data-adapter-backend:latest
     container_name: mfi-data-adapter-backend
-    image: cmumfi/mfi-ddb-data-adapter-backend:latest
+    image: cmumfi/mfi-ddb-data-adapter-backend:${VERSION:-latest}
+    profiles:
+      - "daa"
     ports:
       - "8001:8000"  # Exposes the FastAPI backend to your host machine on port 8001
-    depends_on:
-      mqtt-broker:
-        condition: service_started
     networks:
       - mfi_network
     restart: always
@@ -20,8 +22,13 @@ services:
     build:
       context: ../../mfi_ddb_data_adapter/data_adapter_app/frontend
       dockerfile: Dockerfile
+      tags:
+        - cmumfi/mfi-ddb-data-adapter-frontend:${VERSION:-latest}
+        - cmumfi/mfi-ddb-data-adapter-frontend:latest
     container_name: mfi-data-adapter-frontend
-    image: cmumfi/mfi-ddb-data-adapter-frontend:latest
+    image: cmumfi/mfi-ddb-data-adapter-frontend:${VERSION:-latest}
+    profiles:
+      - "daa"
     ports:
       - "3001:80"    # Maps Nginx's internal port 80 to your host machine on port 3001
     depends_on:

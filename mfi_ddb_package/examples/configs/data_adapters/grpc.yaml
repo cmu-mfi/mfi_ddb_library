@@ -1,3 +1,4 @@
+adapter_name: my_grpc_adapter
 server_address: localhost
 server_port: 50051
 certificate_path: /full/path/to/cert.pem

@@ -30,7 +30,7 @@ flowchart LR;
 ```
 > \*  `site`, `area`, and `device` are optional placeholders for the actual values of the enterprise, site, area, and device.
 
-Examples: 
+Examples:
 * `mfi-v1.0-kv/CMU/Mill19/Mezzanine-Lab/yk-destroyer/#`
 * `mfi-v1.0-historian/CMU/Mill19/HAAS-UMC750/#`
 
@@ -44,7 +44,7 @@ Key points to note:
 
 * Sparkplug requires following topic structure: `namespace/group_id/message_type/node_id/[device_id]`
 * Sparkplug messages are serialized using Google Protocol Buffers ([protobuf](https://protobuf.dev/)).
-* In reference to the above structure, 
+* In reference to the above structure,
     * `namespace` = `mfi-v1.0-historian`
     * `group_id` = `enterprise`
     * `message_type` = Sparkplug B message type, like DDATA, DBIRTH, etc.
@@ -57,7 +57,7 @@ Key points to note:
 
 ### blob [binary data]
 
-blob topic tree expects large binary files. 
+blob topic tree expects large binary files.
 
 * The file data is sent as a binary payload of a json message.
 * The json message is serialized using [protobuf](https://protobuf.dev/) protocol.
@@ -66,8 +66,8 @@ blob topic tree expects large binary files.
 
 ### kv [non-time-series]
 
-* The messages in k-v topic tree can be used to send non-time series data. 
-* The schema is designed to be flexible and extensible to accommodate different types of data. 
+* The messages in k-v topic tree can be used to send non-time series data.
+* The schema is designed to be flexible and extensible to accommodate different types of data.
 * The schema is defined in [kv.json](./kv.json).
 * While [blob](#blob-binary-data) and [historian](#historian-time-series) are protobuf serialized, k-v messages are sent as json for ease of readability.
 
@@ -80,4 +80,4 @@ When streaming data to the broker, the following metadata is recorded through th
 | location context | The location context of the data being streamed, which includes the enterprise, site, area, and device. | [topic structure](#topic-structure) |
 | attributes | Key-value pairs that provide additional information about the data being streamed. These are defined in the adapter yaml configuration file. | streamed on the same topic before data using the same topic family encoding |
 | streaming configuration | The configuration of the data stream, which includes broker information, enterprise and site details. | streamed on the `kv` and `blob` at birth and death of data streaming  |
-| adapter configuration | The configuration of the adapter that is streaming the data, which includes all the components and their attributes | streamed on the `kv` and `blob` at birth and death of data streaming |  
+| adapter configuration | The configuration of the adapter that is streaming the data, which includes all the components and their attributes | streamed on the `kv` and `blob` at birth and death of data streaming |

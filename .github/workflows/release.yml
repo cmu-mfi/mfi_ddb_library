@@ -1,0 +1,134 @@
+name: Publish Releases
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  pypi-release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mfi_ddb_package
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive          
+
+      - name: Verify tag ref
+        run: |
+          if ! [[ "${{ github.ref_name }}" =~ ^v ]]; then
+            echo "::error::Release workflow must run from a tag ref (got '${{ github.ref_name }}'). Use workflow_dispatch from a tag."
+            exit 1
+          fi
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Add build metadata
+        run: . update-build.sh
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      - name: Publish to PyPI
+        shell: bash
+        run: |
+          set +e
+
+          output=$(uv publish --token "${{ secrets.PYPI_TOKEN }}" 2>&1)
+          status=$?
+
+          echo "$output"
+
+          if [ "$status" -eq 0 ]; then
+            exit 0
+          fi
+
+          if echo "$output" | grep -qiE 'already exists|File already exists'; then
+            echo "::notice::Package version already exists on PyPI; treating publish as successful."
+            exit 0
+          fi
+
+          echo "::error::PyPI publish failed."
+          exit "$status"
+
+  docker-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Verify tag ref
+        run: |
+          if ! [[ "${{ github.ref_name }}" =~ ^v ]]; then
+            echo "::error::Release workflow must run from a tag ref (got '${{ github.ref_name }}'). Use workflow_dispatch from a tag."
+            exit 1
+          fi        
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Push Docker Compose Images
+        env:
+          GITHUB_VERSION: ${{ github.ref_name }}
+        run: |
+          VERSION="${GITHUB_VERSION#v}"
+          export VERSION
+
+          echo "Building version: $VERSION"
+
+          cd docker
+          docker compose --profile '*' build --no-cache
+          docker compose --profile '*' push
+          
+  github-release:
+    needs: [docker-release, pypi-release]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+        with:
+          token: ${{secrets.SHOBHITAGG_PAT}}
+
+      - name: Set version
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Archive docker directory
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          tar czf "docker-${VERSION}.tar.gz" docker
+          zip -r "docker-${VERSION}.zip" docker
+
+      - name: Archive schema directory
+        run: |
+          tar czf payload-schema.tar.gz mfi_ddb_package/src/mfi_ddb/topic_families/schema
+          zip -r payload-schema.zip mfi_ddb_package/src/mfi_ddb/topic_families/schema
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            docker-${{ steps.version.outputs.VERSION }}.tar.gz
+            docker-${{ steps.version.outputs.VERSION }}.zip
+            payload-schema.tar.gz
+            payload-schema.zip

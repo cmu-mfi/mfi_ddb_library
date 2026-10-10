@@ -6,7 +6,7 @@ flowchart LR;
     D[Streamer] --> M[MQTT Client];
     B --> D;
     C[Topic Family] --> D;
-    M-->X[MQTT Broker];    
+    M-->X[MQTT Broker];
 
     classDef highlight fill:#094d57
     class B highlight
@@ -39,12 +39,13 @@ When writing a new data adapter, please make sure to follow the checklist below:
 
 - [ ] Update `NAME`, `CONFIG_HELP`, `CONFIG_EXAMPLE`, `RECOMMENDED_TOPIC_FAMILY`, `SELF_UPDATE` class variables.
 
+- [ ] Include `adapter_name` and `trial_id` keys in the config.
+
 - [ ] Constructor checklist:
     - [ ] Use only one dict parameter `config` to initialize the data adapter.
     - [ ] Call `super().__init__(config)` to initialize the base class.
     - [ ] Populate `self.component_ids` with the component ids that this data adapter will be streaming data for.
-    - [ ] Initialize `self.attributes` with metadata about the data being streamed. 
+    - [ ] Initialize `self.attributes` with metadata about the data being streamed.
     - [ ] Initialize `self._data` with component ids as keys.
 
 - [ ] Write unit tests for the new data adapter and add them to [`tests/data_adapters`](../tests/data_adapters)
-

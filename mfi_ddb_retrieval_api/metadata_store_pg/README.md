@@ -28,7 +28,7 @@ erDiagram
         VARCHAR(50) user_id FK
         VARCHAR(50) domain FK
         UUID project_id FK
-        user_role role (admin, operator, maintainer, researcher)
+        user_role role "(admin, operator, <br>maintainer, researcher)"
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
     }

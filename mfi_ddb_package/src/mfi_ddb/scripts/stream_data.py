@@ -5,9 +5,8 @@ import time
 import yaml
 
 import mfi_ddb
- 
+
 if __name__ == "__main__":
-    
     # LOAD AVAILABLE DATA ADAPTERS
     # =======================================================
     data_adapters = {}
@@ -19,28 +18,31 @@ if __name__ == "__main__":
         except AttributeError:
             continue
     # supported_adapters = ", ".join(f"'{adapter}'" for adapter in data_adapters.values())
-    supported_adapters = ", ".join(f"'{adapter}'" for adapter in data_adapters.keys())
-    
+    supported_adapters = ", ".join(f"'{adapter}'" for adapter in data_adapters)
+
     # INPUT ARGUMENTS
     # =======================================================
-    
+
     example_usage = """
     Example usage:
-    
+
     Use a configuration directory:
     $ python -m mfi_ddb.scripts.stream_data --data_adapter 'MQTT' --config_dir ./configs
-    
+
     Use specific configuration files:
-    $ python -m mfi_ddb.scripts.stream_data -d 'Local Files' --adapter_cfg ./configs/local_files.yaml --streamer_cfg ./configs/streamer.yaml
+    $ python -m mfi_ddb.scripts.stream_data -d 'Local Files' --adapter_cfg ./configs/local_files.yml
+    --streamer_cfg ./configs/streamer.yaml
 
     Enable polling mode with a specific rate (in Hz):
-    $ python -m mfi_ddb.scripts.stream_data -d 'MTConnect' -a ./configs/mtconnect.yaml -s ./configs/streamer.yaml -p True -r 2
+    $ python -m mfi_ddb.scripts.stream_data -d 'MTConnect' -a ./configs/mtconnect.yaml
+    -s ./configs/streamer.yaml -p True -r 2
     """
     parser = argparse.ArgumentParser(
         description="Stream data using MFI-DDB library.",
         epilog=example_usage,
-        formatter_class=argparse.RawDescriptionHelpFormatter)
-    
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
     parser.add_argument(
         "--data_adapter",
         "-d",
@@ -80,9 +82,9 @@ if __name__ == "__main__":
         type=int,
         default=1,
         help="Polling rate in Hz. Default is 1 Hz, if --polling is set to True.",
-    )    
+    )
     args = parser.parse_args()
-    
+
     if args.streamer_cfg and args.adapter_cfg:
         streamer_config_file = args.streamer_cfg
         adapter_config_file = args.adapter_cfg
@@ -94,8 +96,8 @@ if __name__ == "__main__":
         exception_msg = (
             "Either --config_dir or both --streamer_cfg and --adapter_cfg must be provided."
         )
-        raise Exception(exception_msg)  
-    
+        raise Exception(exception_msg)
+
     # LOAD CONFIG FILES
     # =======================================================
 
@@ -103,31 +105,36 @@ if __name__ == "__main__":
         adapter_class = data_adapters[args.data_adapter]
     except KeyError:
         exception_msg = (
-            f"Data adapter '{args.data_adapter}' not found. Supported adapters: {supported_adapters}"
+            f"Data adapter '{args.data_adapter}' not found.Supported adapters: {supported_adapters}"
         )
-        raise Exception(exception_msg)
+        raise Exception(exception_msg) from None
 
     try:
-        with open(adapter_config_file, "r") as file:
+        with open(adapter_config_file) as file:
             adapter_config = yaml.load(file, Loader=yaml.FullLoader)
     except FileNotFoundError:
-        exception_msg = f"ADAPTER CONFIG NOT FOUND. ENSURE THE FILE EXISTS: {os.path.abspath(adapter_config_file)}"
-        raise Exception(exception_msg)
+        exception_msg = (
+            "ADAPTER CONFIG NOT FOUND."
+            f"ENSURE THE FILE EXISTS: {os.path.abspath(adapter_config_file)}"
+        )
+        raise Exception(exception_msg) from None
 
     try:
-        with open(streamer_config_file, "r") as file:
+        with open(streamer_config_file) as file:
             streamer_config = yaml.load(file, Loader=yaml.FullLoader)
     except FileNotFoundError:
-        exception_msg = f"STREAMER CONFIG NOT FOUND. ENSURE THE FILE EXISTS: {os.path.abspath(streamer_config_file)}"
-        raise Exception(exception_msg)
+        exception_msg = (
+            "STREAMER CONFIG NOT FOUND."
+            f"ENSURE THE FILE EXISTS: {os.path.abspath(streamer_config_file)}"
+        )
+        raise Exception(exception_msg) from None
 
-    
     # INITIALIZE ADAPTER AND STREAMER
     # =======================================================
     adapter = adapter_class(adapter_config)
-    
+
     streamer = mfi_ddb.Streamer(streamer_config, adapter, stream_on_update=not args.polling)
-    
+
     if args.polling:
         print("\nPolling method selected.")
         while True:

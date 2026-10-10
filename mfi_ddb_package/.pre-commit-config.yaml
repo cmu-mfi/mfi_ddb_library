@@ -1,0 +1,72 @@
+# Pre-commit hooks for the mfi_ddb package.
+# Install (run from the repository root, i.e. ddb-workflows/):
+#   pre-commit install --config mfi_ddb_package/.pre-commit-config.yaml
+#
+# Requires `pre-commit` to be available on PATH. Install it once with:
+#   uv tool install pre-commit      # or: pipx install pre-commit
+#
+# The ruff hooks below are "local" hooks that run via `uv run` so they use the
+# ruff version pinned by this project's dev dependencies (kept in sync with CI)
+# rather than a separately managed pre-commit cache version.
+
+repos:
+  # Generic hygiene hooks, scoped to the mfi_ddb_package directory.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        files: ^mfi_ddb_package/
+        exclude: \.git/
+      - id: end-of-file-fixer
+        files: ^mfi_ddb_package/
+        exclude: \.git/
+      - id: check-yaml
+        files: ^mfi_ddb_package/
+      - id: check-toml
+        files: ^mfi_ddb_package/
+      - id: check-json
+        files: ^mfi_ddb_package/
+        exclude: \.ipynb$
+      - id: check-merge-conflict
+        files: ^mfi_ddb_package/
+      - id: check-added-large-files
+        files: ^mfi_ddb_package/
+        args: ["--maxkb=1024"]
+      - id: debug-statements
+        files: ^mfi_ddb_package/
+
+  # Lint + format with ruff (version pinned via the project's uv dev deps).
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check (mfi_ddb)
+        entry: uv run --project mfi_ddb_package ruff check --fix
+        language: system
+        files: ^mfi_ddb_package/.*\.py$
+        exclude: _pb2\.py$|\.ipynb$
+        pass_filenames: true
+        types: [python]
+      - id: ruff-format
+        name: ruff format (mfi_ddb)
+        entry: uv run --project mfi_ddb_package ruff format
+        language: system
+        files: ^mfi_ddb_package/.*\.py$
+        exclude: _pb2\.py$|\.ipynb$
+        pass_filenames: true
+        types: [python]
+
+  # Secret detection. Uses the `gitleaks` binary from PATH (a single Go binary,
+  # no Go toolchain required). Install via:
+  #   brew install gitleaks
+  #   # or download from https://github.com/gitleaks/gitleaks/releases
+  # The hook no-ops (exit 0) if gitleaks is not installed, so it never blocks
+  # contributors who haven't installed it; it activates automatically once the
+  # binary is on PATH.
+  - repo: local
+    hooks:
+      - id: gitleaks
+        name: gitleaks (mfi_ddb)
+        entry: bash -c 'command -v gitleaks >/dev/null 2>&1 || exit 0; exec gitleaks protect --staged --redact --verbose'
+        language: system
+        files: ^mfi_ddb_package/
+        pass_filenames: false

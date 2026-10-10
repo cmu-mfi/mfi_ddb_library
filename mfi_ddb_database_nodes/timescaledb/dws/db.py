@@ -26,6 +26,23 @@ class TimeScaleReader:
         Any literal characters are escaped so topic text is not interpreted as
         regex syntax.
         """
+        # If the pattern ends with '/#', make the trailing slash optional
+        # so it matches paths both with and without sub-elements cleanly.
+        if topic_pattern.endswith("/#"):
+            base_pattern = topic_pattern[:-2] # Strip off the '/#'
+            # Build regex for the base topic OR any child sub-topic paths
+            # e.g., ^base_pattern(|/.*)$
+            regex_meta = set('.^$*?{}[]\\|()')
+            regex_parts = []
+            for ch in base_pattern:
+                if ch == "+":
+                    regex_parts.append(r"[^/]+")
+                elif ch in regex_meta:
+                    regex_parts.append("\\" + ch)
+                else:
+                    regex_parts.append(ch)
+            return "^" + "".join(regex_parts) + "(|/.*)$"
+        
         regex_parts = []
         # Characters that must be escaped when inserted into a regex outside
         # of a character class. Note: hyphen (`-`) is safe outside of classes

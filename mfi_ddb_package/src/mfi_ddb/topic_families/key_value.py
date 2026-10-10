@@ -1,11 +1,14 @@
-from .base import BaseTopicFamily
 import json
-import jsonschema
 import logging
 import os
 
+import jsonschema
+
+from .base import BaseTopicFamily
+
 SCHEMA_FILE = "schema/kv.json"
 LOGGER = logging.getLogger(__name__)
+
 
 class KeyValueTopicFamily(BaseTopicFamily):
     def __init__(self):
@@ -18,24 +21,24 @@ class KeyValueTopicFamily(BaseTopicFamily):
         if not self.schema_validator.is_valid(data):
             LOGGER.error(f"Data does not match schema: {self.schema_validator.iter_errors(data)}")
             raise ValueError("Data does not match the MFI DDB key-value schema")
-        
-        if set(data.keys()) == set(['schema_version','msg_type']):
+
+        if set(data.keys()) == set(["schema_version", "msg_type"]):
             return {}
-            
-        return {"data":data}
-    
+
+        return {"data": data}
+
     # Removing this method for now. It might be unnecessary for key_value topic family
     # def __autotype(self, data):
     #     if not isinstance(data, dict):
     #         for cast in (int, float, str):
     #             try:
     #                 return cast(data)
-    #             except:
-    #                 continue    
-    #     return data        
-    
+    #             except Exception as _:
+    #                 continue
+    #     return data
+
     @staticmethod
-    def apply_defaults(data, validator = None):
+    def apply_defaults(data, validator=None):
         if validator:
             schema = validator.schema
         else:
@@ -43,16 +46,16 @@ class KeyValueTopicFamily(BaseTopicFamily):
         for key, value in schema.get("properties", {}).items():
             if "default" in value:
                 data.setdefault(key, value["default"])
-        return data        
-    
+        return data
+
     @staticmethod
     def get_schema_validator():
         current_dir = os.path.dirname(__file__)
         schema_path = os.path.join(current_dir, SCHEMA_FILE)
-        with open(schema_path, "r") as f:
+        with open(schema_path) as f:
             schema = json.load(f)
         return jsonschema.Draft7Validator(schema)
-        
+
     @staticmethod
     def process_message(message):
         try:
@@ -66,4 +69,4 @@ class KeyValueTopicFamily(BaseTopicFamily):
             return data
         except json.JSONDecodeError as e:
             LOGGER.error(f"Failed to decode message: {e}")
-            raise ValueError("Message is not valid JSON")
+            raise ValueError("Message is not valid JSON") from e

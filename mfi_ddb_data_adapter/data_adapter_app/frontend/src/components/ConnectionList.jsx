@@ -5,10 +5,8 @@ const ConnectionList = ({
   onNewConnection,
   onEditConnection,
   onTerminateConnection,
-  onRestoreConnections,
   onPauseConnection,
   onResumeConnection,
-  isRestoring,
 }) => {
   const hasItems = connections.length > 0;
 

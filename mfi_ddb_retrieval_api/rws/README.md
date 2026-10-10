@@ -1,10 +1,6 @@
 # Retrieval Web Service (RWS)
 
-...
-
-## Authentication
-
-...
+The RWS is implemented as a RESTful web service that handles incoming requests from users, processes them using the metadata, and retrieves the relevant data from the database nodes. It provides endpoints for querying the data based on various parameters and returns the results in a structured format (e.g., JSON).
 
 ## API Endpoints
 

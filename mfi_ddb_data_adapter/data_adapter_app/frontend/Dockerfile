@@ -16,6 +16,9 @@ RUN npm run build
 # Stage 2: Serve the static files using Nginx
 FROM nginx:stable-alpine
 
+# Copy our custom Nginx routing rules over the default ones
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 # Copy the compiled production assets from the builder stage to Nginx's web root
 COPY --from=builder /app/dist /usr/share/nginx/html
 

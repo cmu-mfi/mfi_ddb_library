@@ -42,6 +42,8 @@
 
 - [ ] Update `NAME`, `CONFIG_HELP`, `CONFIG_EXAMPLE`, `RECOMMENDED_TOPIC_FAMILY`, `SELF_UPDATE` class variables.
 
+- [ ] Include `adapter_name` and `trial_id` keys in the config.
+
 - [ ] Constructor checklist:
     - [ ] Use only one dict parameter `config` to initialize the data adapter.
     - [ ] Call `super().__init__(config)` to initialize the base class.
