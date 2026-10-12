@@ -11,7 +11,6 @@ import importlib
 import inspect
 import logging
 import pkgutil
-import time
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional, Tuple, Iterable
 
@@ -62,12 +61,6 @@ meter.create_observable_gauge(
     description="Number of active adapters currently streaming live data"
 )
 
-# to log the time of the connect request at that moment
-adapter_last_connect_time = meter.create_gauge(
-    "mfi_adapter_last_connect_timestamp_seconds",
-    description="Timestamp of the last connect request in Unix seconds",
-    unit="s"
-)
 # ==========================================
 
 logger = logging.getLogger(__name__)
@@ -180,12 +173,6 @@ async def connect_endpoint(
     is_polling: bool = Form(True),
     polling_rate_hz: int = Form(1),
 ) -> dict:
-
-    # log the time when the connect request is received, for Prometheus metrics
-    adapter_last_connect_time.set(
-        time.time(), 
-        {"adapter_name": adapter_name, "conn_id": conn_id}
-    )
 
     formatted_time = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] + "+00"
     logger.info("Connect hit at %s for conn_id=%s, adapter=%s", formatted_time, conn_id, adapter_name)

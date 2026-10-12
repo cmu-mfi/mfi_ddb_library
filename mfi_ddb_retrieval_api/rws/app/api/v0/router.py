@@ -4,7 +4,6 @@ Configuration Router for MFI DDB Retrieval API
 
 import datetime
 import logging
-import time  # <-- 1. Added time for measuring retrieval duration
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -22,16 +21,6 @@ from opentelemetry.metrics import get_meter
 
 # Grabs the registered meter from main.py of rws-app
 meter = get_meter("mfi.rws.app")
-
-dws_retrieval_duration = meter.create_histogram(
-    "mfi_rws_dws_retrieval_duration_seconds",
-    description="Duration of timeseries data retrieval operations from DWS Agent"
-)
-
-dws_retrieval_counter = meter.create_counter(
-    "mfi_rws_dws_retrievals_total",
-    description="Total requests handled by the DWS agent categorized by status"
-)
 
 trial_search_counter = meter.create_counter(
     "mfi_rws_trial_searches_total",
@@ -95,26 +84,12 @@ def _build_trial_payload(trial_row: Dict[str, Any], request: schema.Type2Request
     }
     
     data_topics = trial_row.get("data_topics", [])
-    trial_name = trial_row.get("trial_name", "unknown")
     
-    # Track DWS Agent read execution speed
-    start_retrieval = time.perf_counter()
+    # DwsAgent records retrieval duration and status for this call.
     try:
         data = DwsAgent.get_data(data_topics, start_value, end_value)
-        duration = time.perf_counter() - start_retrieval
-        
-        # Record metrics on success
-        dws_retrieval_duration.record(duration, {"trial_name": trial_name, "status": "SUCCESS"})
-        dws_retrieval_counter.add(1, {"trial_name": trial_name, "status": "SUCCESS"})
-        
         logger.info(f"Retrieved data for trial {trial_row.get('uuid')}: {data}")    
     except Exception as e:
-        duration = time.perf_counter() - start_retrieval
-        
-        # Record metrics on failure
-        dws_retrieval_duration.record(duration, {"trial_name": trial_name, "status": "ERROR"})
-        dws_retrieval_counter.add(1, {"trial_name": trial_name, "status": "ERROR"})
-        
         logger.error(f"Error retrieving data for trial {trial_row.get('trial_name')}: {e}")
         data = {}
     
