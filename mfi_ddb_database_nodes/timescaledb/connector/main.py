@@ -52,7 +52,23 @@ queue_drops_counter = meter.create_counter(
 
 batch_write_duration = meter.create_histogram(
     "mfi_timescale_batch_write_duration_seconds",
+    unit="s",
     description="Time taken to execute multi-row batch inserts on TimescaleDB"
+)
+
+receive_to_write_duration = meter.create_histogram(
+    "mfi_timescale_receive_to_write_duration_seconds", unit="s",
+    description="MQTT callback arrival to successful batch write, including decoding, queueing and retries",
+)
+
+ingestion_duration = meter.create_histogram(
+    "mfi_timescale_ingestion_duration_seconds", unit="s",
+    description="Sparkplug message creation to successful DB write; requires synchronized publisher and connector clocks",
+)
+
+queue_wait_duration = meter.create_histogram(
+    "mfi_timescale_queue_wait_duration_seconds", unit="s",
+    description="Time a decoded MQTT message waits in the connector queue before dequeue",
 )
 
 # Limit the queue to 50,000 message chunks to prevent memory bloat if the DB drops
@@ -86,14 +102,14 @@ writer = None
 
 
 # parsing and classification logic
-def decode_sparkplug(payload_bytes: bytes) -> List[Tuple[str, Any, Optional[int]]]:
+def decode_sparkplug(payload_bytes: bytes, payload=None) -> List[Tuple[str, Any, Optional[int]]]:
     """Decode Sparkplug B bytes into (metric_name, value, timestamp_ms) tuples.
 
     The wrapper parses the protobuf payload into a dict. We only keep metrics
     that have a name, and return the timestamp in epoch milliseconds if present.
     """
-    parser = SpbPayloadParser()
-    payload = parser.parse_payload(payload_bytes)
+    if payload is None:
+        payload = SpbPayloadParser().parse_payload(payload_bytes)
 
     if not isinstance(payload, dict):
         return []
@@ -151,6 +167,7 @@ def on_connect(client, userdata, flags, rc, properties=None):
 
 def on_message(client, userdata, msg):
     """MQTT callback: decode payload and batch insert into TimeScaleDB."""
+    received_at = time.perf_counter()
     # --- 2. Increment MQTT message count ---
     mqtt_messages_counter.add(1, {"topic": msg.topic})
     
@@ -168,7 +185,20 @@ def on_message(client, userdata, msg):
         
         clean_topic = "/".join(topic_fields)
         
-        metrics = decode_sparkplug(msg.payload)
+        payload = SpbPayloadParser().parse_payload(msg.payload)
+        metrics = decode_sparkplug(msg.payload, payload)
+        sent_at = None
+        # Use the message timestamp, not acquisition timestamps on individual metrics.
+        # Retained replay and pre-created death/will payloads are not live ingestion.
+        if isinstance(payload, dict) and not msg.retain and msg_type in {"DBIRTH", "NBIRTH", "DDATA", "NDATA"}:
+            try:
+                timestamp_ms = int(payload.get("timestamp", 0))
+                if 0 < timestamp_ms < 2**63:
+                    sent_at = timestamp_ms / 1000.0
+                    if sent_at > time.time():
+                        sent_at = None  # Clock skew: do not report negative latency.
+            except (TypeError, ValueError, OverflowError):
+                pass
         
         # --- 3. Track number of decoded individual datapoints ---
         if metrics:
@@ -193,7 +223,7 @@ def on_message(client, userdata, msg):
             )
         if rows:
             try:
-                data_queue.put(rows, block=False)
+                data_queue.put((rows, received_at, time.perf_counter(), sent_at), block=False)
             except queue.Full:
                 # --- 4. Queue backpressure telemetry ---
                 queue_drops_counter.add(1)
@@ -214,6 +244,8 @@ def db_batch_writer_worker(
     print("Background DB Batch Worker Thread started.")
     while True:
         batch = []
+        received_times = []
+        sent_times = []
         start_time = time.time()
 
         # Gather rows until max_batch_size or flush_interval is met
@@ -226,8 +258,12 @@ def db_batch_writer_worker(
 
             try:
                 # Wait for rows to arrive up to the remaining time boundary
-                message_rows = q.get(timeout=max(remaining_time, 0.001))
+                message_rows, received_at, enqueued_at, sent_at = q.get(timeout=max(remaining_time, 0.001))
                 batch.extend(message_rows)
+                received_times.append(received_at)
+                if sent_at is not None:
+                    sent_times.append(sent_at)
+                queue_wait_duration.record(time.perf_counter() - enqueued_at)
                 q.task_done()
             except queue.Empty:
                 break
@@ -258,6 +294,14 @@ def db_batch_writer_worker(
                     except Exception:
                         pass
                     time.sleep(5)
+
+            finished_at = time.perf_counter()
+            finished_wall_time = time.time()
+            for received_at in received_times:
+                receive_to_write_duration.record(finished_at - received_at)
+            for sent_at in sent_times:
+                if finished_wall_time >= sent_at:
+                    ingestion_duration.record(finished_wall_time - sent_at)
 
 
 def main():

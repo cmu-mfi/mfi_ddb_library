@@ -44,7 +44,13 @@ blob_messages_counter = meter.create_counter(
 
 blob_write_duration = meter.create_histogram(
     "mfi_blob_write_duration_seconds",
+    unit="s",
     description="Time taken to save blob and metadata to local disk"
+)
+
+processing_duration = meter.create_histogram(
+    "mfi_blob_connector_processing_duration_seconds", unit="s",
+    description="Subscriber callback duration including payload parsing and storage attempt",
 )
 
 blob_save_errors = meter.create_counter(
@@ -190,6 +196,7 @@ class CFSSubscriberService:
 
     # ---------- CALLBACK ----------
     def _callback(self, topic, payload):
+        started_at = time.perf_counter()
         def parse():
             return BlobTopicFamily.process_message(payload)
 
@@ -203,6 +210,7 @@ class CFSSubscriberService:
             data_type, data = parse()
         except Exception as e:
             logger.exception(f"Failed to parse message: {e}")
+            processing_duration.record(time.perf_counter() - started_at)
             return
 
         logger.info(f"Received {data_type} message on topic: {topic}")
@@ -210,6 +218,7 @@ class CFSSubscriberService:
         handler = get_handler(data_type)
         if not handler:
             logger.warning(f"Unknown data type received: {data_type}")
+            processing_duration.record(time.perf_counter() - started_at)
             return
 
         try:
@@ -219,6 +228,8 @@ class CFSSubscriberService:
             handler(topic, data)
         except Exception as e:
             logger.exception(f"Error handling {data_type} message: {e}")
+        finally:
+            processing_duration.record(time.perf_counter() - started_at)
 
     # ---------- HANDLERS ----------
     def _handle_attributes(self, topic, data):

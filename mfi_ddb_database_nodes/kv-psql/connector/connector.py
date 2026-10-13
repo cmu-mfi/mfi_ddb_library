@@ -53,7 +53,13 @@ db_writes = meter.create_counter(
 
 db_write_duration = meter.create_histogram(
     "mfi_kv_connector_db_write_duration_seconds",
+    unit="s",
     description="Time taken to execute INSERT statements on PostgreSQL"
+)
+
+processing_duration = meter.create_histogram(
+    "mfi_kv_connector_processing_duration_seconds", unit="s",
+    description="MQTT callback duration including payload parsing and database write attempt",
 )
 # ==========================================
 
@@ -185,6 +191,7 @@ class MQTTConnector:
     
     def on_message(self, client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         """Callback for when a message is received from the broker."""
+        started_at = time.perf_counter()
         # --- 7. Count incoming message from broker ---
         mqtt_messages_received.add(1, {"topic": msg.topic})
         
@@ -199,6 +206,8 @@ class MQTTConnector:
             self.store_data_point(msg.topic, payload)
         except Exception as e:
             self.logger.error(f"Error processing message: {e}")
+        finally:
+            processing_duration.record(time.perf_counter() - started_at)
     
     def start(self):
         """Start the MQTT connector."""

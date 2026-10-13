@@ -53,7 +53,13 @@ db_operations_counter = meter.create_counter(
 
 db_op_duration = meter.create_histogram(
     "mfi_mds_connector_db_duration_seconds",
+    unit="s",
     description="Database transaction durations executed by MDS Connector"
+)
+
+processing_duration = meter.create_histogram(
+    "mfi_mds_connector_processing_duration_seconds", unit="s",
+    description="Subscriber callback duration including validation, lookups and database write attempts",
 )
 # ==========================================
 
@@ -372,8 +378,16 @@ def main(broker_config_path, pg_config_path):
     # SUBSCRIBE TO TOPIC AND SET A CALLBACK
     topic_config = load_config(config_file, section="topic")
     topic = get_topic_from_config(topic_config)
+
+    def timed_callback(full_topic, message):
+        started_at = time.perf_counter()
+        try:
+            callback(mqtt_config, full_topic, message)
+        finally:
+            processing_duration.record(time.perf_counter() - started_at)
+
     mqtt_sub.create_message_callback(
-        topic, lambda full_topic, message: callback(mqtt_config, full_topic, message)
+        topic, timed_callback
     )
 
     mqtt_sub.client.loop_start()

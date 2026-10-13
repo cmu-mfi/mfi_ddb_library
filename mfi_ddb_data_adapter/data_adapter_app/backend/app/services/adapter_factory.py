@@ -17,7 +17,18 @@ meter = get_meter("mfi.data_adapter.app")
 
 poll_duration_histogram = meter.create_histogram(
     "mfi_adapter_poll_duration_seconds",
+    unit="s",
     description="Time taken to pull and stream data in a single polling cycle"
+)
+
+adapter_startup_duration = meter.create_histogram(
+    "mfi_adapter_startup_duration_seconds", unit="s",
+    description="Adapter and streamer initialization duration before starting the polling thread",
+)
+
+adapter_instantiation_duration = meter.create_histogram(
+    "mfi_adapter_instantiation_duration_seconds", unit="s",
+    description="Data adapter constructor duration",
 )
 
 poll_executions_counter = meter.create_counter(
@@ -114,10 +125,17 @@ class AdapterFactory:
             self.logger.error("Configuration validation failed. Aborting connection.")
             raise ValueError("Invalid configuration for adapter or streamer.")
 
+        startup_start = time.perf_counter()
         self.data_adapter = self.adp_class(self.adp_cfg)
+        adapter_instantiation_duration.record(
+            time.perf_counter() - startup_start, {"adapter_name": self.adp_name}
+        )
         
         self.streamer = self.streamer_class(
             self.streamer_cfg, self.data_adapter, stream_on_update=not self.is_polling
+        )
+        adapter_startup_duration.record(
+            time.perf_counter() - startup_start, {"adapter_name": self.adp_name}
         )
         
         self.is_connected = True
