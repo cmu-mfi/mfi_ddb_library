@@ -1,0 +1,15 @@
+mqtt:
+  broker_address: "mqtt-broker"
+  broker_port: 1883
+  topic: "mfi-v1.0-historian/#"
+  username: ""
+  password: ""
+
+timescaledb:
+  host: "timescaledb-db"
+  port: 5432
+  user: "tsdb"
+  password: "timescale"
+  dbname: "ddb_ts"
+
+component_id: "default_component"
