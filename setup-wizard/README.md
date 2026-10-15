@@ -1,63 +1,106 @@
-# Standalone desktop setup wizard
+# MFI DDB Setup Wizard
 
-The wizard pulls published container images and starts them with Docker Compose.
-It owns its configuration defaults, service definitions, and initialization SQL in
-`backend/templates/`. It does not read or package the repository's separate
-`docker/` or database-node directories. The `setup-wizard/` directory can be copied
-and built on its own.
+The Setup Wizard helps you choose Digital Data Backbone (DDB) services, enter
+their settings, and start them using Docker. You can also download a copy of your
+settings from the app.
 
-Users need Docker with Docker Compose installed and running, plus access to the
-configured container image registry. The packaged app includes its Python backend;
-users do not need Python, Node.js, or this repository.
+## Before you start
 
-## Build the desktop app
+- Install [Docker with Docker Compose](https://docs.docker.com/get-started/get-docker/)
+  and make sure it is running. If you use Docker Desktop on Windows, select Linux
+  containers.
+- Have an internet connection so Docker can download the required service images.
+- Have the addresses, ports, usernames, and passwords for the services you want
+  to connect to.
 
-Build on the target operating system with Python and Node.js installed.
-From `setup-wizard/backend/`:
+The packaged app includes what it needs to run. You do not need to install Python
+or Node.js, or download this project's source code.
+
+## Download and open the app
+
+Download the MFI DDB Setup Wizard package shared with you for your operating system.
+
+| Operating system | Package | How to open it |
+| --- | --- | --- |
+| macOS | `.dmg` | Open the file, drag the app into Applications, and launch it. |
+| Windows | `.exe` | Run the installer, follow the prompts, and launch the installed app. |
+| Linux | `.AppImage` | Allow the file to run as a program in its file permissions, then open it. |
+
+If you receive a `.zip` package, extract it first, then open the installer or app
+inside it.
+
+## Choose services and enter settings
+
+1. Open the app and click **Get Started**.
+2. Select the services you want to run. Include **Data Adapter App** if you want
+   to open its dashboard after setup.
+3. Click **Configure Parameters**.
+4. Review each configuration page and enter your settings. Use **Next
+   Configuration** to continue or **Previous Configuration** to go back. Your
+   entries are kept as you move between pages.
+
+## Download your configurations
+
+On the final configuration page, you can save a copy of your settings before
+starting the services. Choose either option:
+
+| Button | What you download |
+| --- | --- |
+| **Download JSON** | One `mfi-ddb-configurations.json` file containing your selected services and their settings. |
+| **Download YAML + JSON (ZIP)** | One `mfi-ddb-configurations.zip` archive containing individual YAML configuration files and the same JSON file. |
+
+The save dialog starts in your **Downloads** folder. You can choose a different
+location. Extract the ZIP to read the individual YAML files.
+
+Saving a copy is optional. You can download either format without starting Docker
+services, and your entries stay in the wizard so you can continue with setup.
+
+## Start the services with Docker
+
+1. Make sure Docker is running, then click **Launch DDB Pipeline** on the final
+   configuration page.
+2. The wizard applies your settings and uses Docker Compose to download any
+   missing service images and start the selected containers.
+3. Watch the **Orchestration Progress Monitor** for download and startup updates.
+   The first launch can take longer while images are being downloaded.
+4. Wait for the progress bar to reach **100%** and the success message to appear.
+
+The wizard runs the Docker commands for you. You can also see the running
+containers in Docker Desktop or your usual Docker management tool.
+
+## Open the Data Adapter App
+
+After a successful deployment, click **Continue to Dashboard** to open the
+Data Adapter App in your browser. This button appears when you selected
+**Data Adapter App** during setup. The default desktop address is
+`http://localhost:3001/`.
+
+Closing the wizard leaves the Docker services running. Use Docker Desktop or
+your usual Docker management tool to stop them when you are finished.
+
+## If setup fails
+
+Read the error shown in the progress monitor. Check that Docker is running, your
+settings are correct, and the required ports are available. Use **Adjust
+Configurations** to change your entries, or **Retry Deployment** to try again.
+
+## Build the app locally
+
+Install Python and Node.js, then build on the operating system you want to run
+the app on. From the repository root:
 
 ```sh
-python -m pip install -r requirements.txt pyinstaller
-```
-
-Then from `setup-wizard/ui/`:
-
-```sh
-npm install
+cd setup-wizard
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r backend/requirements.txt pyinstaller
+cd ui
+npm ci
 npm run electron:build
 ```
 
-`electron:build` rebuilds the Python backend before packaging the UI, so the
-installer always includes current backend changes. It uses `python3` on macOS
-and Linux, and `python` on Windows; install the dependencies in that interpreter.
+On Windows, use `python` instead of `python3`, and activate the environment with
+`.\.venv\Scripts\Activate.ps1` in PowerShell instead of `source .venv/bin/activate`.
 
-PyInstaller bundles `backend/templates/` with the backend executable.
-Electron Builder includes `backend/dist/main/` in the desktop installer.
-Templates are read from that bundle at runtime; writable configuration files and
-initialization SQL are copied into `~/.mfi_ddb_runtime/` before container startup.
-
-### Generated deployment configuration
-
-The backend writes submitted YAML documents under
-`~/.mfi_ddb_runtime/runtime_configs/` and generates a Compose file mounting them.
-Local KV/Timescale database initialization follows the submitted connection settings.
-Connector and DWS settings must agree when they use the same local database;
-external database settings remain independent. Existing data is never reset to
-apply changed initialization credentials: migrate the database first.
-
-KV DWS uses its configured port. Timescale, Blob, and AVEVA listen on internal
-port 50051 and publish host ports 50052, 50053, and 50054. RWS routes between
-containers must use internal ports. The wizard publishes RWS at
-`http://localhost:8002` to avoid the setup backend on port 8000.
-
-After the selected stack is ready, **Continue to Dashboard** opens the Data Adapter
-App frontend in your browser when that module was selected. The link uses its
-generated Compose port mapping (3001 by default) and the setup backend's hostname
-or IP, or a specific host IP configured in the frontend port binding. Desktop
-deployments default to `http://localhost:3001/`.
-
-Blob connector and DWS paths mount the same host directory. The DWS index path
-must be `<blob_dir>/index.jsonl`, matching the connector's fixed index filename.
-
-Backend regression checks (install backend requirements and `httpx` first):
-`python -m unittest discover -s setup-wizard/backend/tests -v`.
-The Compose matrix test requires the Docker CLI but does not start containers.
+The build command packages both the backend and the app. Find the finished
+installer in `setup-wizard/ui/dist/`.
