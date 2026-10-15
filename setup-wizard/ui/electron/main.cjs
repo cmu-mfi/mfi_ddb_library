@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, session, shell } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process'); // To run background processes
 
@@ -80,6 +80,11 @@ function createWindow() {
 
 // App Lifecycle Management
 app.whenReady().then(() => {
+  session.defaultSession.on('will-download', (_event, item) => {
+    item.setSaveDialogOptions({
+      defaultPath: path.join(app.getPath('downloads'), item.getFilename()),
+    });
+  });
   startBackend(); // 👈 1. Start Python engine
   createWindow(); // 👈 2. Open UI window
 

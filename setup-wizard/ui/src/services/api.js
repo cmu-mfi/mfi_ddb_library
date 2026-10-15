@@ -1,4 +1,6 @@
 import { buildConfigPayload } from './configPayload.js';
+import { dump } from 'js-yaml';
+import { strToU8, zipSync } from 'fflate';
 
 // Electron's file:// pages use the local Python backend too.
 const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
@@ -24,6 +26,34 @@ export const deployPipeline = async (formValues, selectedServices) => {
   }
 
   return await response.json();
+};
+
+export const downloadConfiguration = (formValues, selectedServices, format = 'json') => {
+  const payload = buildConfigPayload(formValues, selectedServices);
+  const contents = JSON.stringify(payload, null, 2) + '\n';
+  let filename = 'mfi-ddb-configurations.json';
+  let blob;
+  if (format === 'json') {
+    blob = new Blob([contents], { type: 'application/json' });
+  } else if (format === 'yaml') {
+    const files = Object.fromEntries(Object.entries(payload.configs).map(([name, config]) =>
+      [name, strToU8(dump(config, { noRefs: true, lineWidth: 100 }))]));
+    files[filename] = strToU8(contents);
+    filename = 'mfi-ddb-configurations.zip';
+    blob = new Blob([zipSync(files)], { type: 'application/zip' });
+  } else {
+    throw new Error('Unsupported configuration download format.');
+  }
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Give the browser/Electron time to start reading the download before releasing it.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 };
 
 
