@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
+from threading import Lock
 from typing import List, Optional, Union, Dict
 
 import grpc
@@ -78,6 +79,7 @@ class __DwsAgent:
         # Persistent channel & stub storage for connection reuse
         self._channels: Dict[str, grpc.Channel] = {}
         self._stubs: Dict[str, DataServiceStub] = {}
+        self._stub_lock = Lock()
         
     def _load_config(self, config_file):
         with open(config_file, 'r') as f:
@@ -98,18 +100,19 @@ class __DwsAgent:
 
     def _get_stub(self, server_url: str) -> DataServiceStub:
         """Reuse gRPC channels and stubs across worker threads."""
-        if server_url not in self._stubs:
-            # Configure gRPC channel with keepalive options to maintain persistent connection
-            options = [
-                ('grpc.keepalive_time_ms', 30000),
-                ('grpc.keepalive_timeout_ms', 10000),
-                ('grpc.keepalive_permit_without_calls', 1),
-                ('grpc.http2.max_pings_without_data', 0),
-            ]
-            channel = grpc.insecure_channel(server_url, options=options)
-            self._channels[server_url] = channel
-            self._stubs[server_url] = DataServiceStub(channel)
-        return self._stubs[server_url]
+        with self._stub_lock:
+            if server_url not in self._stubs:
+                # Configure gRPC channel with keepalive options to maintain persistent connection
+                options = [
+                    ('grpc.keepalive_time_ms', 30000),
+                    ('grpc.keepalive_timeout_ms', 10000),
+                    ('grpc.keepalive_permit_without_calls', 1),
+                    ('grpc.http2.max_pings_without_data', 0),
+                ]
+                channel = grpc.insecure_channel(server_url, options=options)
+                self._channels[server_url] = channel
+                self._stubs[server_url] = DataServiceStub(channel)
+            return self._stubs[server_url]
 
     def _fetch_time_chunk(self, stub: DataServiceStub, topics_str: str, start_dt: datetime, end_dt: datetime) -> List[Datapoint]:
         """Worker thread function using a SHARED gRPC stub."""
