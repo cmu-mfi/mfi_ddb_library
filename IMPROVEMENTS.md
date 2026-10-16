@@ -9,10 +9,12 @@
 | Sequential PI requests — implemented | `mfi_ddb_database_nodes/aveva-pi/dws/piwebapi.py` | Fetch independent streams in parallel using the default bounded worker pool and separate HTTP sessions; merge in stream order to preserve sorting and page-token behavior. Keep single-stream requests on the existing path. |
 | Duplicate parsing/validation — implemented | `mfi_ddb_retrieval_api/metadata_store_pg/connector.py` | Load the validator once per process, parse each message once, apply the package defaults, and validate once before database handling. Package code is unchanged. |
 | Blocking retrieval API — implemented | `mfi_ddb_retrieval_api/rws/app/api/v0/router.py`, `mfi_ddb_retrieval_api/rws/app/services/dws_agent.py` | Run Type 1/2/3 handlers in FastAPI’s worker pool; protect shared DWS channel/stub initialization with a lock. API routes and response models are unchanged. |
-| Permission-query N+1 | `mfi_ddb_retrieval_api/rws/app/services/pg_mds.py` | Batch role lookups while preserving existing authorization rules. |
+| Permission-query N+1 — implemented | `mfi_ddb_retrieval_api/rws/app/services/pg_mds.py` | Fetch roles once for the distinct projects requiring permission checks, preserving owner/superadmin access and admin/maintainer permissions. Release the search connection before the role lookup. |
 | Fixed retrieval fan-out | `mfi_ddb_retrieval_api/rws/app/services/dws_agent.py` | Adapt chunk count for small requests. Defer shared-executor lifecycle or larger concurrency restructuring. |
 
 The Type 1/2/3 retrieval routes now use `def` instead of `async def`, so FastAPI automatically runs them in its worker thread pool. Previously, synchronous database/gRPC calls inside `async def` occupied the event loop while waiting. Those calls now wait in worker threads, leaving the event loop available for other requests; the underlying calls remain synchronous.
+
+Permission checks previously made one extra role query per non-owned trial with a project, even when trials shared the same project. They now fetch roles for those projects in one parameterized query and filter the trials in their original order. A search needing project permissions uses two queries instead of one plus a query per qualifying trial; owner-only and superadmin searches need no role query.
 
 ## Concurrent Adapter Lifecycle
 
