@@ -29,6 +29,7 @@ from gen import models_pb2, models_pb2_grpc, service_pb2, service_pb2_grpc
 # Import timestamp for proto conversion
 from google.protobuf import timestamp_pb2
 from psycopg2 import sql
+from psycopg2.pool import ThreadedConnectionPool
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +73,9 @@ returned_rows_histogram = meter.create_histogram(
 # ==========================================
 
 
+GRPC_MAX_WORKERS = 10
+
+
 class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
     """Implementation of the DataService gRPC service."""
     
@@ -80,14 +84,19 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
         self.logger = logging.getLogger(__name__)
         self._setup_logging(debug)
         
-        conn = self._get_connection()
-        if not conn:
-            raise Exception("Unable to connect to the kv database") 
-        else:
-            self.logger.info("kv database connection success!")
-        
-        # Cache for database connections
-        self._db_cache: dict = {}
+        try:
+            self._pool = ThreadedConnectionPool(
+                GRPC_MAX_WORKERS, GRPC_MAX_WORKERS,
+                host=db_config.get('host', 'localhost'),
+                port=db_config.get('port', 5432),
+                database=db_config.get('database', 'mfi_kv'),
+                user=db_config.get('user', 'mfi'),
+                password=db_config.get('password', 'mfiddb'),
+            )
+        except psycopg2.Error:
+            db_connection_failures.add(1)
+            raise
+        self.logger.info("kv database connection pool ready")
         
     def _setup_logging(self, debug: bool = False):
         """Configure logging format and level."""
@@ -98,20 +107,30 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
         )
     
     def _get_connection(self) -> Optional[psycopg2.extensions.connection]:
-        """Get a database connection."""
+        """Borrow a connection exclusively for this request."""
+        conn = None
         try:
-            return psycopg2.connect(
-                host=self.db_config.get('host', 'localhost'),
-                port=self.db_config.get('port', 5432),
-                database=self.db_config.get('database', 'mfi_kv'),
-                user=self.db_config.get('user', 'mfi'),
-                password=self.db_config.get('password', 'mfiddb')
-            )
+            conn = self._pool.getconn()
+            conn.autocommit = True
+            return conn
         except psycopg2.Error as e:
-            db_connection_failures.add(1)  # <-- 2. Record connection failures
-            self.logger.error(f"Failed to connect to PostgreSQL: {e}")
+            if conn is not None:
+                self._pool.putconn(conn, close=True)
+            db_connection_failures.add(1)
+            self.logger.error(f"Failed to acquire PostgreSQL connection: {e}")
             return None
-    
+
+    def _return_connection(self, conn, cursor):
+        """Close the request cursor and return or discard its connection."""
+        try:
+            if cursor is not None:
+                cursor.close()
+        finally:
+            self._pool.putconn(conn, close=bool(conn.closed))
+
+    def close(self):
+        self._pool.closeall()
+
     def _timestamp_to_datetime(self, timestamp_msg) -> datetime:
         """Convert protobuf Timestamp to Python datetime."""
         return datetime.fromtimestamp(
@@ -162,6 +181,7 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
             context.set_details("Failed to connect to database")
             return service_pb2.GetDataPointResponse()
         
+        cursor = None
         try:
             cursor = conn.cursor()
             
@@ -240,7 +260,7 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
             context.set_details(f"Database error: {str(e)}")
             return service_pb2.GetDataPointResponse()
         finally:
-            conn.close()
+            self._return_connection(conn, cursor)
     
     def _topic_to_regex(self, topic_pattern: str) -> str:
         """Translate an MQTT topic filter into a full-match PostgreSQL regex.
@@ -288,6 +308,7 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
             context.set_details("Failed to connect to database")
             return service_pb2.GetDataRangeResponse()
         
+        cursor = None
         try:
             cursor = conn.cursor()
             
@@ -366,7 +387,7 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
             context.set_details(f"Database error: {str(e)}")
             return service_pb2.GetDataRangeResponse()
         finally:
-            conn.close()
+            self._return_connection(conn, cursor)
     
     def StreamData(self, request, context):
         """Stream datapoints in real-time."""
@@ -377,6 +398,7 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
             context.set_details("Failed to connect to database")
             return
         
+        cursor = None
         try:
             cursor = conn.cursor()
             
@@ -426,26 +448,28 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details(f"Database error: {str(e)}")
         finally:
-            conn.close()
+            self._return_connection(conn, cursor)
 
 
 def serve(db_config: dict, port: int = 50051, debug: bool = False):
     """Start the gRPC server."""
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    executor = futures.ThreadPoolExecutor(max_workers=GRPC_MAX_WORKERS)
+    server = grpc.server(executor)
+    servicer = DataServiceServicer(db_config, debug=debug)
     service_pb2_grpc.add_DataServiceServicer_to_server(
-        DataServiceServicer(db_config, debug=debug), server
+        servicer, server
     )
     server.add_insecure_port(f'[::]:{port}')
-    server.start()
-    
-    logging.info(f"DWS Server started on port {port}")
-        
     try:
-        while True:
-            time.sleep(86400)
+        server.start()
+        logging.info(f"DWS Server started on port {port}")
+        server.wait_for_termination()
     except KeyboardInterrupt:
-        server.stop(0)
         logging.info("DWS Server stopped")
+    finally:
+        server.stop(0).wait()
+        executor.shutdown(wait=True)
+        servicer.close()
 
 
 def main():    
