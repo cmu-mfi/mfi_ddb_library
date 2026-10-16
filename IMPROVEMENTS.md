@@ -1,7 +1,7 @@
 | Improvement | File relative to project | Proposed change |
 |---|---|---|
 | Blocking adapter startup — implemented | `mfi_ddb_data_adapter/data_adapter_app/backend/app/api/v0/router.py` | Lifecycle calls run concurrently in the framework worker pool, with per-connection locks to serialize requests for the same ID.|
-| Timescale INSERT overhead | `mfi_ddb_database_nodes/timescaledb/connector/db.py` | Replace `execute_batch` with multi-row `execute_values`. |
+| Timescale INSERT overhead — implemented | `mfi_ddb_database_nodes/timescaledb/connector/db.py` | Use `execute_values` for one multi-row INSERT per page of up to 500 rows, reducing repeated SQL statement processing. |
 | Topic/time indexing | `mfi_ddb_database_nodes/timescaledb/connector/db.py` | Check existing indexes and query plans; add `(topic, time)` if justified. |
 | Connection per request | `mfi_ddb_database_nodes/kv-psql/dws/server.py` | Add connection pooling within the existing service structure. |
 | COUNT on every page | `mfi_ddb_database_nodes/kv-psql/dws/server.py` | Fetch `page_size + 1` rows to determine whether another page exists. |

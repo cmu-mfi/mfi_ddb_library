@@ -1,7 +1,7 @@
 """TimeScaleDB writer helper for batch inserts. Batch inserts are more efficient than single-row inserts for high-throughput data."""
 
 import psycopg2
-from psycopg2.extras import execute_batch
+from psycopg2.extras import execute_values
 from typing import Optional, Any
 
 # Define the schema initialization script as a constant
@@ -103,14 +103,14 @@ class TimeScaleWriter:
         sql = """
         INSERT INTO timeseries_data
         (time, topic, component, metric, value_num, value_text, value_json)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        VALUES %s
         """
         conn = self.conn
         if conn is None:
             raise RuntimeError("Database connection is not initialized")
 
         with conn.cursor() as cur:
-            execute_batch(cur, sql, rows, page_size=500)
+            execute_values(cur, sql, rows, page_size=500)
 
         # Record exact completion time (float with microsecond/millisecond precision)
         tsdb_insert_executed_at.set(
