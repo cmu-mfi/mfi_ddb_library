@@ -339,10 +339,6 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
                 time_filter = "timestamp >= %s AND timestamp <= %s"
                 params = (start_time, end_time)
             
-            count_query = f"""
-                SELECT COUNT(*) FROM kv_data WHERE {topic_clause} AND {time_filter}
-            """
-            
             data_query = f"""
                 SELECT timestamp, topic, payload
                 FROM kv_data
@@ -351,19 +347,17 @@ class DataServiceServicer(service_pb2_grpc.DataServiceServicer):
                 LIMIT %s
             """
             
-            cursor.execute(count_query, (topic_param, *params))
-            count_result = cursor.fetchone()
-            total_count = count_result[0] if count_result else 0
-            
-            cursor.execute(data_query, (topic_param, *params, page_size))
+            cursor.execute(data_query, (topic_param, *params, page_size + 1))
             rows = cursor.fetchall()
+            has_more = len(rows) > page_size
+            rows = rows[:page_size]
             
             # Convert to protobuf messages
             datapoints = [self._datapoint_to_proto(row) for row in rows]
             
             # Generate next page token if there are more results
             next_page_token = ""
-            if len(rows) == page_size and total_count > len(rows):
+            if has_more:
                 last_timestamp = rows[-1][0]
                 next_page_token = str(last_timestamp.timestamp())
             
