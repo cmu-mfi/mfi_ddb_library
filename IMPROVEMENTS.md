@@ -6,7 +6,7 @@
 | Connection per request — implemented | `mfi_ddb_database_nodes/kv-psql/dws/server.py` | Reuse a thread-safe connection pool sized to the existing gRPC workers; close cursors and return connections after requests/streams, and close the pool on shutdown. |
 | COUNT on every page — implemented | `mfi_ddb_database_nodes/kv-psql/dws/server.py` | Fetch `page_size + 1` rows in one query, return at most `page_size`, and issue a next-page token only when an extra row exists. |
 | Full blob-index scans | `mfi_ddb_database_nodes/blob/dws/blobapi.py`, `mfi_ddb_database_nodes/blob/connector/connector.py` | Add SQLite indexing while continuing to maintain JSONL. Fall back to JSONL when SQLite is unavailable or incomplete. **Separate PR if this exceeds the scope limit.** |
-| Sequential PI requests | `mfi_ddb_database_nodes/aveva-pi/dws/piwebapi.py` | Use bounded parallel requests or an existing batch endpoint, subject to the scope limit. |
+| Sequential PI requests — implemented | `mfi_ddb_database_nodes/aveva-pi/dws/piwebapi.py` | Fetch independent streams in parallel using the default bounded worker pool and separate HTTP sessions; merge in stream order to preserve sorting and page-token behavior. Keep single-stream requests on the existing path. |
 | Duplicate parsing/validation | `mfi_ddb_retrieval_api/metadata_store_pg/connector.py` | Cache the validator and parse/validate once within this connector; leave the package untouched. |
 | Blocking retrieval API | `mfi_ddb_retrieval_api/rws/app/api/v0/router.py` | Use synchronous handlers or offload blocking database/gRPC calls. |
 | Permission-query N+1 | `mfi_ddb_retrieval_api/rws/app/services/pg_mds.py` | Batch role lookups while preserving existing authorization rules. |
