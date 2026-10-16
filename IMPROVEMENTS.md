@@ -1,16 +1,13 @@
-| Point | File / line | Why inefficient | Suggested improvement |
-|---|---|---|---|
-| Blocking adapter startup | `mfi_ddb_data_adapter/data_adapter_app/backend/app/api/v0/router.py:202` | Synchronous initialization blocks the async API event loop. | Run startup in a bounded worker thread. |
-| Incorrect connection wait | `mfi_ddb_package/src/mfi_ddb/data_adapters/mtconnect.py:141` | `or` forces the full timeout even when healthy; an unreachable agent can loop forever. | Use `response is None and elapsed < timeout`. |
-| MQTT startup polling | `mfi_ddb_package/src/mfi_ddb/streamer/_mqtt.py:79` | One-second polling delays readiness detection and has no deadline. | Signal an event from `on_connect`; wait with a timeout. |
-| Thread per update | `mfi_ddb_package/src/mfi_ddb/data_adapters/base.py:138` | Every notification creates a thread; bursts cause excessive threads and scheduling overhead. | Use a bounded queue and persistent workers. |
-| Repeated INSERT statements | `mfi_ddb_database_nodes/timescaledb/connector/db.py:113` | `execute_batch` still executes individual INSERT statements. | Use multi-row `execute_values`; consider `COPY` for larger batches. |
-| Missing topic/time index in initialization | `mfi_ddb_database_nodes/timescaledb/connector/db.py:11` | Schema initialization defines no composite index for frequent topic/time queries. | Evaluate a `(topic, time)` index with query plans. |
-| Connection per request | `mfi_ddb_database_nodes/kv-psql/dws/server.py:281` | Each range request opens and closes a PostgreSQL connection. | Reuse connections through a thread-safe pool. |
-| COUNT on every page | `mfi_ddb_database_nodes/kv-psql/dws/server.py:333` | Counts all remaining matches before fetching a limited page. | Fetch `page_size + 1` rows to detect another page. |
-| Full blob-index scans | `mfi_ddb_database_nodes/blob/dws/blobapi.py:59` | Every lookup scans and parses the entire JSONL index; ranges also sort matches. | Store index records in an indexed database, such as SQLite. |
-| Sequential PI requests | `mfi_ddb_database_nodes/aveva-pi/dws/piwebapi.py:82` | Wildcard retrieval fetches streams sequentially, then discards results beyond the page limit. | Use PI batch requests or bounded parallel fetching. |
-| Duplicate parsing/validation | `mfi_ddb_retrieval_api/metadata_store_pg/connector.py:86` | Reads the schema and validates, then `process_message()` repeats parsing, schema loading, and validation. | Cache the validator; parse and validate once. |
-| Blocking retrieval API | `mfi_ddb_retrieval_api/rws/app/api/v0/router.py:198` | Async routes directly execute synchronous PostgreSQL and gRPC retrieval. | Use synchronous routes or offload blocking calls to workers. |
-| Permission-query N+1 | `mfi_ddb_retrieval_api/rws/app/services/pg_mds.py:210` | Executes a role lookup per qualifying trial, repeatedly querying the same projects. | Filter permissions using SQL `EXISTS` or batch project-role lookups. |
-| Fixed retrieval fan-out | `mfi_ddb_retrieval_api/rws/app/services/dws_agent.py:177` | Processes servers sequentially and creates a new executor with ten chunks even for small ranges. | Reuse a bounded executor; adapt chunk count and schedule independent servers together. |
+| Improvement | File relative to project | Proposed change |
+|---|---|---|
+| Blocking adapter startup | `mfi_ddb_data_adapter/data_adapter_app/backend/app/api/v0/router.py` | Offload blocking lifecycle calls to a bounded worker; preserve connection-state safety. |
+| Timescale INSERT overhead | `mfi_ddb_database_nodes/timescaledb/connector/db.py` | Replace `execute_batch` with multi-row `execute_values`. |
+| Topic/time indexing | `mfi_ddb_database_nodes/timescaledb/connector/db.py` | Check existing indexes and query plans; add `(topic, time)` if justified. |
+| Connection per request | `mfi_ddb_database_nodes/kv-psql/dws/server.py` | Add connection pooling within the existing service structure. |
+| COUNT on every page | `mfi_ddb_database_nodes/kv-psql/dws/server.py` | Fetch `page_size + 1` rows to determine whether another page exists. |
+| Full blob-index scans | `mfi_ddb_database_nodes/blob/dws/blobapi.py`, `mfi_ddb_database_nodes/blob/connector/connector.py` | Add SQLite indexing while continuing to maintain JSONL. Fall back to JSONL when SQLite is unavailable or incomplete. **Separate PR if this exceeds the scope limit.** |
+| Sequential PI requests | `mfi_ddb_database_nodes/aveva-pi/dws/piwebapi.py` | Use bounded parallel requests or an existing batch endpoint, subject to the scope limit. |
+| Duplicate parsing/validation | `mfi_ddb_retrieval_api/metadata_store_pg/connector.py` | Cache the validator and parse/validate once within this connector; leave the package untouched. |
+| Blocking retrieval API | `mfi_ddb_retrieval_api/rws/app/api/v0/router.py` | Use synchronous handlers or offload blocking database/gRPC calls. |
+| Permission-query N+1 | `mfi_ddb_retrieval_api/rws/app/services/pg_mds.py` | Batch role lookups while preserving existing authorization rules. |
+| Fixed retrieval fan-out | `mfi_ddb_retrieval_api/rws/app/services/dws_agent.py` | Adapt chunk count for small requests. Defer shared-executor lifecycle or larger concurrency restructuring. |
