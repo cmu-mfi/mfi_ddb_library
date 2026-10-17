@@ -3,6 +3,7 @@ import Modal from "./Modal";
 import { ConnectionManager } from "./ConnectionManager";
 import { makeDefaultStreamerConfig } from "../data/defaults";
 import { getConnCtr, setConnCtr } from "../state/conn_ctr";
+import { formatValidationErrors } from "../lib/validation.js";
 import {
   fetchAdapters,
   validateAdapterConfig,
@@ -65,6 +66,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
   const [adapters, setAdapters] = useState([]);
   const [step, setStep] = useState("");
   const [validationError, setValidationError] = useState("");
+  const [validationRequestError, setValidationRequestError] = useState("");
   const [saveError, setSaveError] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -110,6 +112,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
     setIsPolling(true);
     setPollingRateHz("1");
     setValidationError("");
+    setValidationRequestError("");
     lastValidatedRef.current = "";
   }, [exampleConfigMap]);
 
@@ -129,20 +132,36 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
 
   const validateConfiguration = useCallback(async () => {
     setValidationError("");
+    setValidationRequestError("");
     setValidationWarnings([]);
     setIsValidating(true);
     try {
-      if (!connectionType) throw new Error("Select connection type");
-      if (!configuration.trim()) throw new Error("Enter YAML config");
-      const [adp_valid, streamer_valid] = await Promise.all([
+      if (!connectionType || !configuration.trim() || !streamerConfig.trim()) {
+        setValidationError(!connectionType ? "Select a data adapter."
+          : !configuration.trim() ? "Adapter configuration: Enter a YAML configuration."
+          : "Streamer configuration: Enter a YAML configuration.");
+        return { valid: false };
+      }
+      const results = await Promise.allSettled([
         validateAdapterConfig(connectionType, configuration),
         validateStreamerConfig(streamerConfig),
       ]);
-      if (!adp_valid) setValidationError((p) => p + "Data Adapter configuration validation error.\n");
-      if (!streamer_valid) setValidationError((p) => p + "Streamer configuration validation error.\n");
-      return { valid: adp_valid && streamer_valid };
+      const labels = ["Adapter configuration", "Streamer configuration"];
+      const configErrors = [];
+      const requestErrors = [];
+      results.forEach((result, index) => {
+        if (result.status === "rejected") {
+          requestErrors.push(`${labels[index]}: ${result.reason.message}`);
+        } else if (!result.value.is_valid) {
+          configErrors.push(formatValidationErrors(labels[index], result.value.errors));
+        }
+      });
+      setValidationError(configErrors.join("\n\n"));
+      setValidationRequestError(requestErrors.join("\n\n"));
+      return { valid: configErrors.length === 0 && requestErrors.length === 0 };
     } catch (e) {
       console.error("Validation error:", e);
+      setValidationRequestError("Could not validate the configuration. Please retry.");
       return { valid: false };
     } finally {
       setIsValidating(false);
@@ -208,7 +227,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
   );
   const isEditMode = Boolean(initialData.id);
   const helpData = configHelpMap[connectionType];
-  const displayedError = validationError || saveError;
+  const displayedError = [validationError, validationRequestError, saveError].filter(Boolean).join("\n\n");
 
   // ─── Effects ──────────────────────────────────────────────────────────────
 
@@ -225,6 +244,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
     setPollingRateHz(initialData.pollingRateHz != null ? String(initialData.pollingRateHz) : "1");
     setStep("");
     setValidationError("");
+    setValidationRequestError("");
     setSaveError("");
     setSelectedFile(null);
     setIsSubmitting(false);
@@ -233,7 +253,11 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
   }, [isOpen, initialData]);
 
   useEffect(() => {
-    if (!isOpen || !connectionType || !configuration.trim()) { setValidationError(""); return; }
+    if (!isOpen || !connectionType || !configuration.trim()) {
+      setValidationError("");
+      setValidationRequestError("");
+      return;
+    }
     const id = setTimeout(() => {
       const combined = `adapter:${connectionType}||${configuration}||${streamerConfig}`;
       if (combined !== lastValidatedRef.current) {
@@ -379,8 +403,10 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
           </div>
         )}
         {displayedError && (
-          <div className="bg-red-50 border border-red-200 rounded p-3">
-            <span className="text-red-800 font-semibold block mb-2 text-sm">Error:</span>
+          <div role="alert" className="bg-red-50 border border-red-200 rounded p-3">
+            <span className="text-red-800 font-semibold block mb-2 text-sm">
+              {validationError ? "Configuration errors:" : validationRequestError ? "Unable to validate:" : "Error:"}
+            </span>
             <pre className="text-red-800 text-xs font-mono whitespace-pre-wrap m-0">{displayedError}</pre>
           </div>
         )}

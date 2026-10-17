@@ -5,11 +5,15 @@ Provides functions for loading and parsing YAML configurations from various sour
 including file uploads and raw text input. Handles validation and error reporting.
 """
 
+import logging
 import time  # <-- 1. Added time for latency tracking
 from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
 from fastapi import HTTPException, UploadFile
+from pydantic import ValidationError
+
+logger = logging.getLogger(__name__)
 
 # ==========================================
 # OPENTELEMETRY CUSTOM METRICS SETUP
@@ -39,12 +43,14 @@ def load_config(file: UploadFile = None, text: str = None) -> dict:
     
     if file:
         try:
-            # Note: Depending on your FastAPI setup, file.read() might be synchronous 
-            # if using standard synchronous file wrappers, matching your original code.
-            text = (file.read()).decode()
-        except Exception as e:
+            text = file.file.read().decode("utf-8")
+        except UnicodeDecodeError:
             config_parse_errors.add(1, {"source": "file", "error_type": "file_read_error"})
-            raise HTTPException(400, f"Failed to read uploaded file: {e}")
+            raise HTTPException(400, "Uploaded configuration must use UTF-8 encoding.")
+        except Exception:
+            config_parse_errors.add(1, {"source": "file", "error_type": "file_read_error"})
+            logger.exception("Could not read uploaded configuration")
+            raise HTTPException(500, "Could not read the uploaded configuration. Please retry.")
 
     if not text or not text.strip():
         config_parse_errors.add(1, {"source": source_type, "error_type": "empty_payload"})
@@ -63,10 +69,39 @@ def load_config(file: UploadFile = None, text: str = None) -> dict:
 
     except yaml.YAMLError as e:
         config_parse_errors.add(1, {"source": source_type, "error_type": "yaml_syntax_error"})
-        raise HTTPException(400, f"YAML parse error: {e}")
-    except Exception as e:
+        mark = getattr(e, "problem_mark", None)
+        detail = {"message": getattr(e, "problem", None) or "Invalid YAML syntax.", "type": "yaml_syntax"}
+        if mark is not None:
+            detail.update(line=mark.line + 1, column=mark.column + 1)
+        raise HTTPException(400, detail=detail)
+    except HTTPException:
+        raise
+    except Exception:
         config_parse_errors.add(1, {"source": source_type, "error_type": "unknown_error"})
-        raise HTTPException(400, f"Error loading configuration: {e}")
+        logger.exception("Configuration parsing failed")
+        raise HTTPException(500, "Configuration parsing is unavailable. Please retry.")
+
+
+def validate_config(schema: Any, file: UploadFile = None, text: str = None) -> dict:
+    """Return field errors without serializing rejected inputs or validator context."""
+    try:
+        config = load_config(file, text)
+    except HTTPException as error:
+        if error.status_code != 400:
+            raise
+        detail = error.detail if isinstance(error.detail, dict) else {"message": str(error.detail)}
+        issue = {"loc": [], "type": "configuration", **detail}
+        raise HTTPException(400, detail={"is_valid": False, "errors": [issue]}) from error
+
+    try:
+        schema.model_validate(config)
+    except ValidationError as error:
+        errors = [
+            {"loc": list(issue["loc"]), "message": issue["msg"], "type": issue["type"]}
+            for issue in error.errors(include_url=False, include_context=False, include_input=False)
+        ]
+        return {"is_valid": False, "errors": errors}
+    return {"is_valid": True, "errors": []}
 
 
 def _decode_bytes(obj: Any) -> Any:

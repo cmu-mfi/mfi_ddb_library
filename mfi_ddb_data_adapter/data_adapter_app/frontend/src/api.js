@@ -119,35 +119,68 @@ export async function fetchAdapters() {
   }
 }
 
-export async function validateAdapterConfig(adapter_name, adapter_cfg) {
-  try {
-    const adp_form = new FormData();
-    adp_form.append("adapter_name", adapter_name);
-    adp_form.append("text", adapter_cfg);
-    const adp_resp = await fetch(`${API_BASE_URL}/connections/validate/adapter`, {
-      method: "POST",
-      body: adp_form,
-    });
-    const adp_data = await adp_resp.json();
-    return adp_data.is_valid;
-  } catch (error) {
-    console.error(`Failed to validate adapter configuration:`, error);
-    return false;
+function validationRequestError(message, status) {
+  const error = new Error(message);
+  error.kind = "request";
+  error.status = status;
+  return error;
+}
+
+function validationResult(data) {
+  const errors = Array.isArray(data.errors) && data.errors.length
+    ? data.errors : [{ loc: [], message: "Configuration is invalid.", type: "configuration" }];
+  if (!data.is_valid && errors.some(issue => !issue || typeof issue !== "object" ||
+      typeof (issue.message ?? issue.msg) !== "string" ||
+      (issue.loc !== undefined && (!Array.isArray(issue.loc) ||
+        issue.loc.some(key => typeof key !== "string" && typeof key !== "number"))))) {
+    throw validationRequestError("The validation service returned invalid error details. Please retry.");
   }
+  return {
+    is_valid: data.is_valid,
+    errors: data.is_valid ? [] : errors.map(issue => ({
+      loc: Array.isArray(issue.loc) ? issue.loc : [],
+      message: issue.message || issue.msg || "Invalid value.",
+      type: issue.type || "configuration",
+      line: issue.line,
+      column: issue.column,
+    })),
+  };
+}
+
+async function validateConfig(target, form) {
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}/connections/validate/${target}`, { method: "POST", body: form });
+  } catch {
+    throw validationRequestError("Could not reach the validation service. Check the connection and retry.");
+  }
+  let data;
+  try { data = await response.json(); } catch { /* Report invalid or non-JSON responses below. */ }
+  if (!response.ok) {
+    if (response.status === 400 || response.status === 422) {
+      if (data?.detail?.is_valid === false) return validationResult(data.detail);
+      if (typeof data?.detail === "string") {
+        return validationResult({ is_valid: false, errors: [{ message: data.detail }] });
+      }
+      if (Array.isArray(data?.detail)) return validationResult({ is_valid: false, errors: data.detail });
+    }
+    throw validationRequestError(`Validation service request failed (HTTP ${response.status}). Please retry.`, response.status);
+  }
+  if (typeof data?.is_valid !== "boolean") {
+    throw validationRequestError("The validation service returned an invalid response. Please retry.", response.status);
+  }
+  return validationResult(data);
+}
+
+export async function validateAdapterConfig(adapter_name, adapter_cfg) {
+  const form = new FormData();
+  form.append("adapter_name", adapter_name);
+  form.append("text", adapter_cfg);
+  return validateConfig("adapter", form);
 }
 
 export async function validateStreamerConfig(streamer_cfg) {
-  try {
-    const streamer_form = new FormData();
-    streamer_form.append("text", streamer_cfg);
-    const streamer_resp = await fetch(`${API_BASE_URL}/connections/validate/streamer`, {
-      method: "POST",
-      body: streamer_form,
-    });
-    const streamer_data = await streamer_resp.json();
-    return streamer_data.is_valid;
-  } catch (error) {
-    console.error(`Failed to validate streamer configuration:`, error);
-    return false;
-  }
+  const form = new FormData();
+  form.append("text", streamer_cfg);
+  return validateConfig("streamer", form);
 }
