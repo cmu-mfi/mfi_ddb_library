@@ -4,8 +4,6 @@ import { ConnectionManager } from "./ConnectionManager";
 import { makeDefaultStreamerConfig } from "../data/defaults";
 import { getConnCtr, setConnCtr } from "../state/conn_ctr";
 import {
-  connectConnection,
-  disconnectConnection,
   fetchAdapters,
   validateAdapterConfig,
   validateStreamerConfig,
@@ -73,7 +71,6 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
   const [isValidating, setIsValidating] = useState(false);
   const [validationWarnings, setValidationWarnings] = useState([]);
   const [showHelp, setShowHelp] = useState(false);
-  const [activeConnectionId, setActiveConnectionId] = useState(null);
   const [isPolling, setIsPolling] = useState(true);
   const [pollingRateHz, setPollingRateHz] = useState("1");
   const fileInputRef = useRef(null);
@@ -125,14 +122,10 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
     r.readAsText(f);
   }, []);
 
-  const handleClose = useCallback(async () => {
+  const handleClose = useCallback(() => {
     if (isSubmitting) return;
-    if (activeConnectionId) {
-      await disconnectConnection(activeConnectionId).catch(console.error);
-      setActiveConnectionId(null);
-    }
     onClose();
-  }, [isSubmitting, activeConnectionId, onClose]);
+  }, [isSubmitting, onClose]);
 
   const validateConfiguration = useCallback(async () => {
     setValidationError("");
@@ -187,10 +180,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
 
       const id = getConnCtr() + 1;
       setConnCtr(id);
-      setActiveConnectionId(id);
       setStep("Connecting to adapter...");
-
-      await connectConnection(id, connectionType, configuration, streamerConfig, effectiveIsPolling, hzInt);
 
       const saved = {
         id,
@@ -201,7 +191,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
         pollingRateHz: hzInt,
         savedAt: new Date().toISOString(),
       };
-      ConnectionManager.saveConnection(id, saved);
+      await ConnectionManager.createConnection(id, saved);
       onSave(saved);
       onClose();
     } catch (e) {

@@ -19,13 +19,50 @@ export class ConnectionManager {
       config.isPolling !== false,
       config.pollingRateHz ?? 1
     );
-    const result = await response.json();
-    if (!response.ok || !result.is_connected || !result.is_streaming) {
-      const detail = typeof result.detail === "string" ? result.detail : null;
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      throw new Error(response.ok
+        ? "The server returned an invalid connection response. Settings were not saved."
+        : `Connection failed (HTTP ${response.status}). Settings were not saved.`);
+    }
+    if (!response.ok || result?.is_connected !== true || result?.is_streaming !== true) {
+      const detail = typeof result?.detail === "string" ? result.detail : null;
       throw new Error(detail || `Connection did not start (HTTP ${response.status}).`);
     }
     if (state === "paused" && !(await pauseConnection(connectionId))) {
       throw new Error("Could not pause the updated connection.");
+    }
+  }
+
+  static async createConnection(connectionId, config) {
+    if (this.getSavedConnections()[connectionId]) {
+      throw new Error("This connection ID is already saved. Please retry with a new ID.");
+    }
+    if (this.isUpdatingConnection(connectionId)) {
+      throw new Error("This connection is already being created or updated.");
+    }
+
+    this.updatingConnections.add(String(connectionId));
+    try {
+      await this.connectWithState(connectionId, config, "streaming");
+      try {
+        this.saveConnection(connectionId, config);
+      } catch {
+        let cleanedUp = false;
+        try {
+          cleanedUp = await disconnectConnection(connectionId);
+        } catch {
+          // Cleanup could not be confirmed; surface that state to the user.
+        }
+        throw new Error(cleanedUp
+          ? "The adapter connected, but its settings could not be saved. It was disconnected. Please retry."
+          : "The adapter connected, but its settings could not be saved or disconnection confirmed. Check the backend connection before retrying.");
+      }
+      return config;
+    } finally {
+      this.updatingConnections.delete(String(connectionId));
     }
   }
 
