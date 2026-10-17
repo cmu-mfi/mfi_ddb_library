@@ -76,6 +76,8 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
   const [showHelp, setShowHelp] = useState(false);
   const [isPolling, setIsPolling] = useState(true);
   const [pollingRateHz, setPollingRateHz] = useState("1");
+  const [adapterLoadError, setAdapterLoadError] = useState("");
+  const [isLoadingAdapters, setIsLoadingAdapters] = useState(true);
   const fileInputRef = useRef(null);
   const lastValidatedRef = useRef("");
   const validationRequestsRef = useRef(null);
@@ -84,6 +86,28 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
   }
   const submittingRef = useRef(false);
   const activeRef = useRef(isOpen);
+  const adapterLoadRef = useRef(null);
+
+  const loadAdapters = useCallback(async () => {
+    if (!activeRef.current || submittingRef.current || adapterLoadRef.current) return;
+    const controller = new AbortController();
+    adapterLoadRef.current = controller;
+    setIsLoadingAdapters(true);
+    setAdapterLoadError("");
+    try {
+      const result = await fetchAdapters({ signal: controller.signal });
+      if (!controller.signal.aborted && activeRef.current) setAdapters(result);
+    } catch (error) {
+      if (!controller.signal.aborted && activeRef.current) {
+        setAdapterLoadError(error?.message || "Could not load data adapters. Please retry.");
+      }
+    } finally {
+      if (adapterLoadRef.current === controller) {
+        adapterLoadRef.current = null;
+        if (!controller.signal.aborted && activeRef.current) setIsLoadingAdapters(false);
+      }
+    }
+  }, []);
 
   const invalidateValidation = useCallback(() => {
     validationRequestsRef.current.cancel();
@@ -157,6 +181,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
 
   const handleClose = useCallback(() => {
     if (submittingRef.current) return;
+    adapterLoadRef.current?.abort();
     invalidateValidation();
     activeRef.current = false;
     onClose();
@@ -209,7 +234,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
   }, [connectionType, configuration, streamerConfig]);
 
   const handleSave = useCallback(async () => {
-    if (submittingRef.current) return;
+    if (submittingRef.current || isLoadingAdapters || adapterLoadError || !selectedAdapter) return;
     submittingRef.current = true;
     setIsSubmitting(true);
     setValidationError("");
@@ -258,7 +283,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
       onClose();
     } catch (e) {
       console.error(e);
-      if (activeRef.current) setSaveError(e.message || "Could not save the adapter. Please retry.");
+      if (activeRef.current) setSaveError(e?.message || "Could not save the adapter. Please retry.");
     } finally {
       submittingRef.current = false;
       if (activeRef.current) {
@@ -266,10 +291,10 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
         setIsSubmitting(false);
       }
     }
-  }, [validateConfiguration, configuration, connectionType, streamerConfig, initialData, onSave, onClose, supportsCallback, isPolling, pollingRateHz]);
+  }, [validateConfiguration, configuration, connectionType, streamerConfig, initialData, onSave, onClose, supportsCallback, isPolling, pollingRateHz, isLoadingAdapters, adapterLoadError, selectedAdapter]);
 
   const canSave = Boolean(
-    connectionType && configuration.trim() && !validationError && !isValidating && !isSubmitting
+    selectedAdapter && !isLoadingAdapters && !adapterLoadError && configuration.trim() && !validationError && !isValidating && !isSubmitting
   );
   const isEditMode = Boolean(initialData.id);
   const helpData = configHelpMap[connectionType];
@@ -287,12 +312,12 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
 
   useEffect(() => {
     if (!isOpen) return;
-    const controller = new AbortController();
-    fetchAdapters({ signal: controller.signal })
-      .then(result => { if (!controller.signal.aborted) setAdapters(result); })
-      .catch(error => { if (!controller.signal.aborted) console.error(error); });
-    return () => controller.abort();
-  }, [isOpen]);
+    loadAdapters();
+    return () => {
+      adapterLoadRef.current?.abort();
+      adapterLoadRef.current = null;
+    };
+  }, [isOpen, loadAdapters]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -339,10 +364,20 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
           <label className="block mb-1.5 text-sm font-medium text-gray-800" htmlFor="connection-type">
             Data Adapter:
           </label>
-          <select id="connection-type" value={connectionType} onChange={handleTypeChange} className={inputCls} disabled={isSubmitting}>
+          <select id="connection-type" value={connectionType} onChange={handleTypeChange} className={inputCls} disabled={isSubmitting || isLoadingAdapters || Boolean(adapterLoadError)}>
             <option value="">Select a type</option>
+            {connectionType && !connectionTypes.includes(connectionType) && <option value={connectionType}>{connectionType}</option>}
             {connectionTypes.map((type) => <option key={type} value={type}>{type}</option>)}
           </select>
+          {isLoadingAdapters && <p role="status" className="mt-2 text-sm text-gray-600">Loading data adapters…</p>}
+          {!isLoadingAdapters && (adapterLoadError || !adapters.length || (connectionType && !selectedAdapter)) && (
+            <div role="alert" className="mt-2 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              <p>{adapterLoadError || (!adapters.length ? "No data adapters are available." : "The saved adapter is unavailable. Select another adapter or retry loading.")}</p>
+              <button type="button" className="mt-2 font-medium underline disabled:opacity-50" onClick={loadAdapters} disabled={isSubmitting}>
+                Retry loading adapters
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Configuration YAML */}
@@ -460,7 +495,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
         {displayedError && (
           <div role="alert" className="bg-red-50 border border-red-200 rounded p-3">
             <span className="text-red-800 font-semibold block mb-2 text-sm">
-              {validationError ? "Configuration errors:" : validationRequestError ? "Unable to validate:" : "Error:"}
+              {validationError ? "Configuration errors:" : validationRequestError ? "Unable to validate:" : "Could not save adapter:"}
             </span>
             <pre className="text-red-800 text-xs font-mono whitespace-pre-wrap m-0">{displayedError}</pre>
           </div>
@@ -472,7 +507,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
             Cancel
           </button>
           <button type="button" className="flex-none px-4 py-2 text-sm rounded min-w-[120px] bg-green-600 text-white hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed" onClick={handleSave} disabled={!canSave}>
-            {isSubmitting ? "Saving…" : "Save"}
+            {isSubmitting ? "Saving…" : saveError || validationRequestError ? "Retry Save" : "Save"}
           </button>
         </div>
 

@@ -32,9 +32,12 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [localState, setLocalState] = useState(() => ConnectionManager.getConnectionState(connection.id).state);
   const [actionError, setActionError] = useState("");
+  const [failedAction, setFailedAction] = useState("");
+  const [statusError, setStatusError] = useState("");
   const statusVersionRef = useRef(0);
   const statusRequestRef = useRef(null);
   const mountedRef = useRef(true);
+  const processingRef = useRef(false);
 
   const isCallback = connection.isPolling === false;
 
@@ -47,7 +50,7 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
   }, []);
 
   const checkStatus = useCallback(async () => {
-    if (!mountedRef.current || statusRequestRef.current || ConnectionManager.isUpdatingConnection(connection.id) ||
+    if (!mountedRef.current || processingRef.current || statusRequestRef.current || ConnectionManager.isUpdatingConnection(connection.id) ||
         ConnectionManager.getConnectionState(connection.id).state === "stopped") return;
     const controller = new AbortController();
     statusRequestRef.current = controller;
@@ -58,12 +61,12 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
     try {
       const response = await fetchStreamingStatus(connection.id, { signal: controller.signal });
       if (!canApplyStatus()) return;
+      setStatusError("");
       setStreamingStatus(response);
       setLocalState(response.is_streaming ? "streaming" : "paused");
     } catch (error) {
       if (!canApplyStatus()) return;
-      console.error(`Failed to check streaming status for ${connection.id}:`, error);
-      setStreamingStatus({ streaming_mode: "inactive", is_connected: false, is_streaming: false });
+      setStatusError(error?.message || "Could not check connection status. Please retry.");
     } finally {
       if (statusRequestRef.current === controller) statusRequestRef.current = null;
     }
@@ -87,90 +90,65 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
 
   // ─── Actions ──────────────────────────────────────────────────────────────
 
-  const handlePause = async (e) => {
-    e.stopPropagation();
+  const runAction = async (name, operation, nextState) => {
+    if (processingRef.current || !mountedRef.current) return;
+    processingRef.current = true;
     setIsProcessing(true);
     setActionError("");
+    setFailedAction("");
     invalidateStatus();
     try {
-      const status = await ConnectionManager.pauseConnection(connection.id);
+      const status = await operation();
       if (!mountedRef.current) return;
-      setStreamingStatus(status);
-      setLocalState("paused");
+      if (nextState) {
+        setStatusError("");
+        setStreamingStatus(status);
+        setLocalState(nextState);
+      }
     } catch (error) {
-      if (mountedRef.current) setActionError(error.message || "Could not pause the connection. Please retry.");
+      if (mountedRef.current) {
+        const labels = { pause: "pause", resume: "resume", stop: "stop", reconnect: "reconnect", delete: "remove" };
+        setActionError(`Could not ${labels[name]} connection ${connection.id}. ${error?.message || "Please try again."}`);
+        setFailedAction(name);
+      }
     } finally {
+      processingRef.current = false;
       if (mountedRef.current) setIsProcessing(false);
     }
   };
 
-  const handleResume = async (e) => {
+  const handlePause = (e) => {
     e.stopPropagation();
-    setIsProcessing(true);
-    setActionError("");
-    invalidateStatus();
-    try {
-      const status = await ConnectionManager.resumeConnection(connection.id, connection);
-      if (!mountedRef.current) return;
-      setStreamingStatus(status);
-      setLocalState("streaming");
-    } catch (error) {
-      if (mountedRef.current) setActionError(error.message || "Could not resume the connection. Please retry.");
-    } finally {
-      if (mountedRef.current) setIsProcessing(false);
-    }
+    return runAction("pause", () => ConnectionManager.pauseConnection(connection.id), "paused");
+  };
+
+  const handleResume = (e) => {
+    e.stopPropagation();
+    return runAction("resume", () => ConnectionManager.resumeConnection(connection.id, connection), "streaming");
   };
 
   // Stop: disconnect from backend but keep config in localStorage
-  const handleStop = async (e) => {
+  const handleStop = (e) => {
     e.stopPropagation();
-    setIsProcessing(true);
-    setActionError("");
-    invalidateStatus();
-    try {
-      const status = await ConnectionManager.stopConnection(connection.id);
-      if (!mountedRef.current) return;
-      setStreamingStatus(status);
-      setLocalState("stopped");
-    } catch (error) {
-      if (mountedRef.current) setActionError(error.message || "Could not stop the connection. Please retry.");
-    } finally {
-      if (mountedRef.current) setIsProcessing(false);
-    }
+    return runAction("stop", () => ConnectionManager.stopConnection(connection.id), "stopped");
   };
 
   // Reconnect: keep the config and persist streaming only after confirmation.
-  const handleReconnect = async (e) => {
+  const handleReconnect = (e) => {
     e.stopPropagation();
-    setIsProcessing(true);
-    setActionError("");
-    invalidateStatus();
-    try {
-      const status = await ConnectionManager.reconnectConnection(connection.id, connection);
-      if (!mountedRef.current) return;
-      setStreamingStatus(status);
-      setLocalState("streaming");
-    } catch (err) {
-      if (mountedRef.current) setActionError(err.message || "Could not reconnect. Please retry.");
-    } finally {
-      if (mountedRef.current) setIsProcessing(false);
-    }
+    return runAction("reconnect", () => ConnectionManager.reconnectConnection(connection.id, connection), "streaming");
   };
 
   const handleDelete = async (e) => {
     e.stopPropagation();
-    if (window.confirm(`Are you sure you want to remove connection?\n${connection.id} - ${connection.adapter}`)) {
-      setIsProcessing(true);
-      setActionError("");
-      invalidateStatus();
-      try {
-        await onTerminate(connection.id);
-      } catch (error) {
-        if (mountedRef.current) setActionError(error.message || "Could not remove the connection. Please retry.");
-      } finally {
-        if (mountedRef.current) setIsProcessing(false);
-      }
+    if (!processingRef.current && window.confirm(`Are you sure you want to remove connection?\n${connection.id} - ${connection.adapter}`)) {
+      return runAction("delete", () => onTerminate(connection.id));
     }
+  };
+
+  const handleRetryAction = (e) => {
+    const handlers = { pause: handlePause, resume: handleResume, stop: handleStop, reconnect: handleReconnect, delete: handleDelete };
+    return handlers[failedAction]?.(e);
   };
 
   // ─── Derived state ────────────────────────────────────────────────────────
@@ -189,6 +167,9 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
   const getBannerStatus = () => {
     if (isStopped) {
       return { color: "grey", text: `Connection ${connection.id} - ${connection.adapter}`, detail: "Disconnected — click Reconnect to resume" };
+    }
+    if (statusError) {
+      return { color: "checking", text: `Connection ${connection.id} - ${connection.adapter}`, detail: "Unable to confirm current status" };
     }
     if (!streamingStatus) {
       return { color: "grey", text: "Checking status...", detail: "Initializing connection" };
@@ -269,7 +250,18 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
             </button>
           </div>
         </div>
-        {actionError && <p role="alert" className="mt-2 text-sm text-red-700">{actionError}</p>}
+        {statusError && (
+          <div role="alert" className="mt-2 text-sm text-red-700">
+            <p>{statusError}</p>
+            <button type="button" className="mt-1 font-medium underline disabled:opacity-50" onClick={checkStatus} disabled={isProcessing}>Retry status check</button>
+          </div>
+        )}
+        {actionError && (
+          <div role="alert" className="mt-2 text-sm text-red-700">
+            <p>{actionError}</p>
+            <button type="button" className="mt-1 font-medium underline disabled:opacity-50" onClick={handleRetryAction} disabled={isProcessing}>Retry {failedAction === "delete" ? "remove" : failedAction}</button>
+          </div>
+        )}
       </div>
     </div>
   );

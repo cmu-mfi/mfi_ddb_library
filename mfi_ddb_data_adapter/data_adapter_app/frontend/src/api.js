@@ -1,43 +1,43 @@
 import { API_BASE_URL } from "./data/defaults.js";
 import { request, isRequestInterruption } from "./lib/request.js";
 
-export async function pauseConnection(connectionId, options) {
-  try {
-    return await request(`${API_BASE_URL}/connections/pause/${connectionId}`, {
-      method: "POST",
-    }, async response => {
-      const response_data = await response.json();
-      if (response.ok) {
-        const paused = response_data.is_connected === true && response_data.is_streaming === false;
-        if (!paused) console.error(`Pause succeeded but ${connectionId} is still streaming`);
-        return paused;
-      }
-      console.error(`Pause ${connectionId} failed (${response.status}):`, response_data);
-      return false;
-    }, options);
-  } catch (error) {
+async function readActionResponse(response, action) {
+  let data;
+  try { data = await response.json(); } catch (error) {
     if (isRequestInterruption(error)) throw error;
-    console.error(`Failed to pause ${connectionId}:`, error);
-    return false;
   }
+  if (!response.ok) {
+    const detail = typeof data?.detail === "string" ? ` ${data.detail}` : "";
+    const error = new Error(`Could not ${action} (HTTP ${response.status}).${detail}`);
+    error.status = response.status;
+    throw error;
+  }
+  if (!data || typeof data !== "object") {
+    throw new Error(`Could not ${action}: the server returned an invalid response. Please retry.`);
+  }
+  return data;
+}
+
+function actionRequest(path, init, action, consume, options) {
+  return request(`${API_BASE_URL}/connections/${path}`, init, consume, options).catch(error => {
+    if (isRequestInterruption(error) || error?.status || !(error instanceof TypeError)) throw error;
+    throw new Error(`Could not ${action}. Check the server connection and try again.`);
+  });
+}
+
+export async function pauseConnection(connectionId, options) {
+  return actionRequest(`pause/${connectionId}`, { method: "POST" }, "pause the connection", async response => {
+    const data = await readActionResponse(response, "pause the connection");
+    if (data.is_connected !== true || data.is_streaming !== false) {
+      throw new Error("The backend did not confirm that the connection paused. Please retry.");
+    }
+    return true;
+  }, options);
 }
 
 export async function resumeConnection(connectionId, options) {
-  return request(`${API_BASE_URL}/connections/resume/${connectionId}`, {
-    method: "POST",
-  }, async response => {
-    let data;
-    try {
-      data = await response.json();
-    } catch {
-      if (response.ok) throw new Error("The server returned an invalid resume response.");
-    }
-    if (!response.ok) {
-      const error = new Error(typeof data?.detail === "string"
-        ? data.detail : `Could not resume connection (HTTP ${response.status}).`);
-      error.status = response.status;
-      throw error;
-    }
+  return actionRequest(`resume/${connectionId}`, { method: "POST" }, "resume the connection", async response => {
+    const data = await readActionResponse(response, "resume the connection");
     if (data?.is_connected !== true || data?.is_streaming !== true) {
       throw new Error("The backend did not confirm that the connection resumed.");
     }
@@ -61,73 +61,46 @@ export async function connectConnection(
   form.append("is_polling", String(is_polling));
   form.append("polling_rate_hz", String(polling_rate_hz));
 
-  console.log(`DEBUG: Calling connection endpoint ${API_BASE_URL}/connections/connect/${connectionId}`);
-  return request(`${API_BASE_URL}/connections/connect/${connectionId}`, {
+  return actionRequest(`connect/${connectionId}`, {
     method: "POST",
     body: form,
-  }, async response => {
-    let data;
-    try {
-      data = await response.json();
-    } catch {
-      throw new Error(response.ok
-        ? "The server returned an invalid connection response. Settings were not saved."
-        : `Connection failed (HTTP ${response.status}). Settings were not saved.`);
-    }
+  }, "connect the adapter", async response => {
+    const data = await readActionResponse(response, "connect the adapter");
     // Return parsed data so callers cannot read a body outside the deadline.
     return { ok: response.ok, status: response.status, data };
   }, options);
 }
 
 export async function disconnectConnection(connectionId, options) {
-  try {
-    return await request(`${API_BASE_URL}/connections/disconnect/${connectionId}`, {
-      method: "POST",
-    }, async response => {
-      if (response.status === 404) return true;
-      if (!response.ok) return false;
-      const data = await response.json();
-      return data.disconnected === true;
-    }, options);
-  } catch (error) {
-    if (isRequestInterruption(error)) throw error;
-    console.error(`Failed to disconnect ${connectionId} on backend:`, error);
-    return false;
-  }
+  return actionRequest(`disconnect/${connectionId}`, { method: "POST" }, "disconnect the connection", async response => {
+    if (response.status === 404) return true;
+    const data = await readActionResponse(response, "disconnect the connection");
+    if (data.disconnected !== true) {
+      throw new Error("The backend did not confirm disconnection. Please retry.");
+    }
+    return true;
+  }, options);
 }
 
-export async function fetchStreamingStatus(connectionId, options) {
-  try {
-    return await request(`${API_BASE_URL}/connections/streaming-status/${connectionId}`, {}, async response => {
-      if (!response.ok) {
-        const error = new Error(`HTTP error! status: ${response.status}`);
-        error.status = response.status;
-        throw error;
-      }
-      const data = await response.json();
-      if (typeof data?.is_connected !== "boolean" || typeof data?.is_streaming !== "boolean") {
-        throw new Error("The server returned an invalid streaming status response.");
-      }
-      return data;
-    }, options);
-  } catch (error) {
-    if (isRequestInterruption(error)) throw error;
-    const failure = new Error(`Failed to fetch streaming status for ${connectionId}: ${error.message}`);
-    failure.status = error.status;
-    throw failure;
-  }
+export function fetchStreamingStatus(connectionId, options) {
+  return actionRequest(`streaming-status/${connectionId}`, {}, "check connection status", async response => {
+    const data = await readActionResponse(response, "check connection status");
+    if (typeof data?.is_connected !== "boolean" || typeof data?.is_streaming !== "boolean") {
+      throw new Error("The server returned an invalid streaming status response.");
+    }
+    return data;
+  }, options);
 }
 
-export async function fetchAdapters(options) {
-  try {
-    return await request(`${API_BASE_URL}/connections/adapters`, {}, async response => {
-      if (!response.ok) throw new Error("Failed to fetch adapters");
-      return await response.json();
-    }, options);
-  } catch (e) {
-    if (isRequestInterruption(e)) throw e;
-    throw new Error(`Failed to fetch adapters: ${e.message}`);
-  }
+export function fetchAdapters(options) {
+  return actionRequest("adapters", {}, "load data adapters", async response => {
+    const data = await readActionResponse(response, "load data adapters");
+    if (!Array.isArray(data) || data.some(adapter => !adapter || typeof adapter.name !== "string" || !adapter.name.trim() ||
+        (adapter.configExample?.configuration != null && typeof adapter.configExample.configuration !== "string"))) {
+      throw new Error("The server returned an invalid adapter list. Please retry loading adapters.");
+    }
+    return data;
+  }, options);
 }
 
 export function fetchServerHealth(options) {

@@ -5,6 +5,8 @@ import { ConnectionManager } from "./components/ConnectionManager";
 import logoMfi from "./images/logo_mfi.png";
 import { disconnectConnection, fetchServerHealth } from "./api";
 
+const EMPTY_INITIAL_DATA = {};
+
 const serverStatusCls = {
   online:   "bg-green-600 text-white",
   offline:  "bg-red-600 text-white",
@@ -17,6 +19,7 @@ function App() {
   const [editingConnection, setEditingConnection] = useState(null);
   const [serverStatus, setServerStatus] = useState("checking");
   const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreError, setRestoreError] = useState("");
   const hasAutoRestoredRef = useRef(false);
   const restorationInProgressRef = useRef(false);
   const verificationInProgressRef = useRef(false);
@@ -55,13 +58,18 @@ function App() {
     const signal = lifetimeRef.current?.signal;
     if (signal?.aborted) return;
     if (hasAutoRestoredRef.current || restorationInProgressRef.current) return;
-    if (!ConnectionManager.shouldRestoreOnStartup()) return;
     restorationInProgressRef.current = true;
-    setIsRestoring(true);
     try {
+      if (!ConnectionManager.shouldRestoreOnStartup()) {
+        hasAutoRestoredRef.current = true;
+        return;
+      }
+      setIsRestoring(true);
+      setRestoreError("");
       const connectionIds = Object.keys(ConnectionManager.getSavedConnections());
       let successCount = 0;
       let errorCount = 0;
+      const failures = [];
       for (const connectionId of connectionIds) {
         if (signal?.aborted) return;
         try {
@@ -71,14 +79,18 @@ function App() {
           if (signal?.aborted) return;
           console.error(`Error restoring ${connectionId}:`, error);
           errorCount++;
+          failures.push(`Connection ${connectionId}: ${error?.message || "Could not restore this adapter."}`);
         }
       }
 
       if (signal?.aborted) return;
+      setRestoreError(failures.join("\n"));
       console.log(`Restore complete — success: ${successCount}, error: ${errorCount}`);
       hasAutoRestoredRef.current = true;
       ConnectionManager.markRestorationComplete();
       loadConnections();
+    } catch (error) {
+      if (!signal?.aborted) setRestoreError(error?.message || "Could not restore saved adapters. Please retry.");
     } finally {
       restorationInProgressRef.current = false;
       if (!signal?.aborted) setIsRestoring(false);
@@ -110,19 +122,20 @@ function App() {
   }, [serverStatus, performStartupRestore]);
 
   const handleRestoreAdapter = useCallback(async () => {
-    ConnectionManager.resetRestorationState();
-    hasAutoRestoredRef.current = false;
-    await performStartupRestore();
+    if (restorationInProgressRef.current) return;
+    try {
+      ConnectionManager.resetRestorationState();
+      hasAutoRestoredRef.current = false;
+      await performStartupRestore();
+    } catch (error) {
+      if (!lifetimeRef.current?.signal.aborted) setRestoreError(error?.message || "Could not retry restoration. Please try again.");
+    }
   }, [performStartupRestore]);
 
-  const handleSaveConnection = useCallback(async () => {
-    try {
-      loadConnections();
-      setIsModalOpen(false);
-      setEditingConnection(null);
-    } catch (error) {
-      console.error("Error saving connection:", error);
-    }
+  const handleSaveConnection = useCallback(() => {
+    loadConnections();
+    setIsModalOpen(false);
+    setEditingConnection(null);
   }, [loadConnections]);
 
   const handleEditConnection = useCallback((connection) => {
@@ -229,6 +242,7 @@ function App() {
           onTerminateConnection={handleTerminateConnection}
           onRestoreConnections={handleRestoreAdapter}
           isRestoring={isRestoring}
+          restoreError={restoreError}
         />
       </main>
 
@@ -237,7 +251,7 @@ function App() {
           isOpen={isModalOpen}
           onClose={() => { setIsModalOpen(false); setEditingConnection(null); }}
           onSave={handleSaveConnection}
-          initialData={editingConnection || {}}
+          initialData={editingConnection || EMPTY_INITIAL_DATA}
         />
       )}
     </div>

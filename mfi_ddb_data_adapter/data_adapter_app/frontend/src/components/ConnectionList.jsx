@@ -7,6 +7,7 @@ const ConnectionList = ({
   onTerminateConnection,
   onRestoreConnections,
   isRestoring,
+  restoreError,
 }) => {
   const hasItems = connections.length > 0;
 
@@ -24,6 +25,16 @@ const ConnectionList = ({
             </button>
           </div>
         </div>
+
+        {restoreError && (
+          <div role="alert" className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <p className="font-semibold">Could not restore all saved adapters:</p>
+            <p className="mt-1 whitespace-pre-wrap">{restoreError}</p>
+            <button type="button" className="mt-2 font-medium underline disabled:opacity-50" onClick={onRestoreConnections} disabled={isRestoring}>
+              {isRestoring ? "Restoring…" : "Retry restore"}
+            </button>
+          </div>
+        )}
 
         <div className={`flex flex-col gap-4 ${hasItems ? "mt-8" : ""}`}>
           {connections.map((connection) => (
