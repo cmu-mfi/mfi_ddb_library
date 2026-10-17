@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Pencil, Play, Pause, Trash2, Square } from "lucide-react";
 import { ConnectionManager } from "./ConnectionManager";
-import { pauseConnection, resumeConnection, connectConnection, disconnectConnection, fetchStreamingStatus } from "../api";
+import { fetchStreamingStatus } from "../api";
 
 const bannerBg = {
   green:    "bg-gradient-to-br from-green-100 to-green-200 border-l-4 border-green-500",
@@ -27,28 +27,50 @@ const detailColor = {
   grey:     "text-gray-500",
 };
 
-export default function ConnectionItem({ connection, onEdit, onTerminate, onPause, onResume }) {
+export default function ConnectionItem({ connection, onEdit, onTerminate }) {
   const [streamingStatus, setStreamingStatus] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [localState, setLocalState] = useState("streaming");
-  const statusCheckIntervalRef = useRef(null);
+  const [localState, setLocalState] = useState(() => ConnectionManager.getConnectionState(connection.id).state);
+  const [actionError, setActionError] = useState("");
+  const [failedAction, setFailedAction] = useState("");
+  const [statusError, setStatusError] = useState("");
+  const statusVersionRef = useRef(0);
+  const statusRequestRef = useRef(null);
+  const mountedRef = useRef(true);
+  const processingRef = useRef(false);
 
   const isCallback = connection.isPolling === false;
 
   // ─── Status polling ───────────────────────────────────────────────────────
 
+  const invalidateStatus = useCallback(() => {
+    statusVersionRef.current++;
+    statusRequestRef.current?.abort();
+    statusRequestRef.current = null;
+  }, []);
+
   const checkStatus = useCallback(async () => {
-    // Don't poll the backend if we know the connection is intentionally stopped
-    if (localState === "stopped") return;
+    if (!mountedRef.current || processingRef.current || statusRequestRef.current || ConnectionManager.isUpdatingConnection(connection.id) ||
+        ConnectionManager.getConnectionState(connection.id).state === "stopped") return;
+    const controller = new AbortController();
+    statusRequestRef.current = controller;
+    const version = ++statusVersionRef.current;
+    const canApplyStatus = () => !controller.signal.aborted && version === statusVersionRef.current &&
+      !ConnectionManager.isUpdatingConnection(connection.id) &&
+      ConnectionManager.getConnectionState(connection.id).state !== "stopped";
     try {
-      const response = await fetchStreamingStatus(connection.id);
+      const response = await fetchStreamingStatus(connection.id, { signal: controller.signal });
+      if (!canApplyStatus()) return;
+      setStatusError("");
       setStreamingStatus(response);
       setLocalState(response.is_streaming ? "streaming" : "paused");
     } catch (error) {
-      console.error(`Failed to check streaming status for ${connection.id}:`, error);
-      setStreamingStatus({ streaming_mode: "inactive", is_connected: false, is_streaming: false });
+      if (!canApplyStatus()) return;
+      setStatusError(error?.message || "Could not check connection status. Please retry.");
+    } finally {
+      if (statusRequestRef.current === controller) statusRequestRef.current = null;
     }
-  }, [connection.id, localState]);
+  }, [connection.id]);
 
   useEffect(() => {
     const savedState = ConnectionManager.getConnectionState(connection.id);
@@ -56,85 +78,77 @@ export default function ConnectionItem({ connection, onEdit, onTerminate, onPaus
   }, [connection.id]);
 
   useEffect(() => {
+    mountedRef.current = true;
     checkStatus();
-    const intervalRef = setInterval(checkStatus, 5000);
-    statusCheckIntervalRef.current = intervalRef;
-    return () => clearInterval(statusCheckIntervalRef.current);
-  }, [checkStatus]);
+    const interval = setInterval(checkStatus, 5000);
+    return () => {
+      clearInterval(interval);
+      mountedRef.current = false;
+      invalidateStatus();
+    };
+  }, [checkStatus, invalidateStatus]);
 
   // ─── Actions ──────────────────────────────────────────────────────────────
 
-  const handlePause = async (e) => {
-    e.stopPropagation();
+  const runAction = async (name, operation, nextState) => {
+    if (processingRef.current || !mountedRef.current) return;
+    processingRef.current = true;
     setIsProcessing(true);
-    const ok = await pauseConnection(connection.id);
-    if (ok) {
-      setLocalState("paused");
-      ConnectionManager.saveConnectionState(connection.id, "paused", "user");
-      if (onPause) onPause(connection.id);
+    setActionError("");
+    setFailedAction("");
+    invalidateStatus();
+    try {
+      const status = await operation();
+      if (!mountedRef.current) return;
+      if (nextState) {
+        setStatusError("");
+        setStreamingStatus(status);
+        setLocalState(nextState);
+      }
+    } catch (error) {
+      if (mountedRef.current) {
+        const labels = { pause: "pause", resume: "resume", stop: "stop", reconnect: "reconnect", delete: "remove" };
+        setActionError(`Could not ${labels[name]} connection ${connection.id}. ${error?.message || "Please try again."}`);
+        setFailedAction(name);
+      }
+    } finally {
+      processingRef.current = false;
+      if (mountedRef.current) setIsProcessing(false);
     }
-    setIsProcessing(false);
   };
 
-  const handleResume = async (e) => {
+  const handlePause = (e) => {
     e.stopPropagation();
-    setIsProcessing(true);
-    const ok = await resumeConnection(connection.id);
-    if (ok) {
-      setLocalState("streaming");
-      ConnectionManager.saveConnectionState(connection.id, "streaming", "user");
-      if (onResume) onResume(connection.id);
-    }
-    setIsProcessing(false);
+    return runAction("pause", () => ConnectionManager.pauseConnection(connection.id), "paused");
+  };
+
+  const handleResume = (e) => {
+    e.stopPropagation();
+    return runAction("resume", () => ConnectionManager.resumeConnection(connection.id, connection), "streaming");
   };
 
   // Stop: disconnect from backend but keep config in localStorage
-  const handleStop = async (e) => {
+  const handleStop = (e) => {
     e.stopPropagation();
-    setIsProcessing(true);
-    const ok = await disconnectConnection(connection.id);
-    if (ok) {
-      setStreamingStatus({ streaming_mode: "inactive", is_connected: false, is_streaming: false });
-      setLocalState("stopped");
-      ConnectionManager.saveConnectionState(connection.id, "stopped", "user");
-      if (onPause) onPause(connection.id);
-    }
-    setIsProcessing(false);
+    return runAction("stop", () => ConnectionManager.stopConnection(connection.id), "stopped");
   };
 
-  // Reconnect: re-establish using saved config, no localStorage change
-  const handleReconnect = async (e) => {
+  // Reconnect: keep the config and persist streaming only after confirmation.
+  const handleReconnect = (e) => {
     e.stopPropagation();
-    setIsProcessing(true);
-    try {
-      const response = await connectConnection(
-        connection.id,
-        connection.adapter,
-        connection.adapterConfig,
-        connection.streamerConfig,
-        connection.isPolling !== false,
-        connection.pollingRateHz ?? 1
-      );
-      if (response.ok) {
-        setLocalState("streaming");
-        ConnectionManager.saveConnectionState(connection.id, "streaming", "user");
-        if (onResume) onResume(connection.id);
-        // Let checkStatus pick up the real state
-        setTimeout(checkStatus, 500);
-      } else {
-        console.error(`Reconnect failed for ${connection.id}: ${response.status}`);
-      }
-    } catch (err) {
-      console.error(`Reconnect error for ${connection.id}:`, err);
-    }
-    setIsProcessing(false);
+    return runAction("reconnect", () => ConnectionManager.reconnectConnection(connection.id, connection), "streaming");
   };
 
   const handleDelete = async (e) => {
     e.stopPropagation();
-    if (window.confirm(`Are you sure you want to remove connection?\n${connection.id} - ${connection.adapter}`)) {
-      onTerminate(connection.id);
+    if (!processingRef.current && window.confirm(`Are you sure you want to remove connection?\n${connection.id} - ${connection.adapter}`)) {
+      return runAction("delete", () => onTerminate(connection.id));
     }
+  };
+
+  const handleRetryAction = (e) => {
+    const handlers = { pause: handlePause, resume: handleResume, stop: handleStop, reconnect: handleReconnect, delete: handleDelete };
+    return handlers[failedAction]?.(e);
   };
 
   // ─── Derived state ────────────────────────────────────────────────────────
@@ -153,6 +167,9 @@ export default function ConnectionItem({ connection, onEdit, onTerminate, onPaus
   const getBannerStatus = () => {
     if (isStopped) {
       return { color: "grey", text: `Connection ${connection.id} - ${connection.adapter}`, detail: "Disconnected — click Reconnect to resume" };
+    }
+    if (statusError) {
+      return { color: "checking", text: `Connection ${connection.id} - ${connection.adapter}`, detail: "Unable to confirm current status" };
     }
     if (!streamingStatus) {
       return { color: "grey", text: "Checking status...", detail: "Initializing connection" };
@@ -233,6 +250,18 @@ export default function ConnectionItem({ connection, onEdit, onTerminate, onPaus
             </button>
           </div>
         </div>
+        {statusError && (
+          <div role="alert" className="mt-2 text-sm text-red-700">
+            <p>{statusError}</p>
+            <button type="button" className="mt-1 font-medium underline disabled:opacity-50" onClick={checkStatus} disabled={isProcessing}>Retry status check</button>
+          </div>
+        )}
+        {actionError && (
+          <div role="alert" className="mt-2 text-sm text-red-700">
+            <p>{actionError}</p>
+            <button type="button" className="mt-1 font-medium underline disabled:opacity-50" onClick={handleRetryAction} disabled={isProcessing}>Retry {failedAction === "delete" ? "remove" : failedAction}</button>
+          </div>
+        )}
       </div>
     </div>
   );
