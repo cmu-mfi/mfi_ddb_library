@@ -1,9 +1,99 @@
-import { fetchStreamingStatus } from "../api";
+import { connectConnection, disconnectConnection, fetchStreamingStatus, pauseConnection } from "../api.js";
 
 export class ConnectionManager {
   static STORAGE_KEY = "adapter_connections";
   static STATE_KEY = "adapter_states";
   static SESSION_KEY = "session_info";
+  static updatingConnections = new Set();
+
+  static isUpdatingConnection(connectionId) {
+    return this.updatingConnections.has(String(connectionId));
+  }
+
+  static async connectWithState(connectionId, config, state) {
+    const response = await connectConnection(
+      connectionId,
+      config.adapter,
+      config.adapterConfig,
+      config.streamerConfig,
+      config.isPolling !== false,
+      config.pollingRateHz ?? 1
+    );
+    const result = await response.json();
+    if (!response.ok || !result.is_connected || !result.is_streaming) {
+      const detail = typeof result.detail === "string" ? result.detail : null;
+      throw new Error(detail || `Connection did not start (HTTP ${response.status}).`);
+    }
+    if (state === "paused" && !(await pauseConnection(connectionId))) {
+      throw new Error("Could not pause the updated connection.");
+    }
+  }
+
+  static async updateConnection(connectionId, updated) {
+    const previous = this.getSavedConnections()[connectionId];
+    if (!previous) throw new Error("The saved connection could not be found.");
+    if (this.isUpdatingConnection(connectionId)) {
+      throw new Error("This connection is already being updated.");
+    }
+
+    this.updatingConnections.add(String(connectionId));
+    let previousStatus = null;
+    let disconnected = false;
+    let replacementAttempted = false;
+    try {
+      try {
+        previousStatus = await fetchStreamingStatus(connectionId);
+      } catch (error) {
+        if (error.status !== 404) throw error;
+      }
+
+      const targetState = this.getConnectionState(connectionId).state;
+      if (targetState === "paused" && updated.isPolling === false) {
+        throw new Error("Resume this connection before switching to Callback mode.");
+      }
+
+      // The connect endpoint reuses existing IDs, so remove the old instance
+      // before sending new settings. Keep intentionally inactive adapters idle.
+      if (previousStatus) {
+        if (!(await disconnectConnection(connectionId))) {
+          throw new Error("Could not disconnect the existing connection. Settings were not saved.");
+        }
+        disconnected = true;
+      }
+      if (targetState !== "stopped" && (previousStatus || targetState === "streaming")) {
+        replacementAttempted = true;
+        await this.connectWithState(connectionId, updated, targetState);
+      }
+
+      this.saveConnection(connectionId, updated);
+      return updated;
+    } catch (error) {
+      if (disconnected || replacementAttempted) {
+        try {
+          // A failed or lost connect response may still have created an instance.
+          if (replacementAttempted && !(await disconnectConnection(connectionId))) {
+            throw new Error("Could not remove the replacement connection.");
+          }
+          if (previousStatus) {
+            await this.connectWithState(
+              connectionId,
+              previous,
+              previousStatus.is_streaming ? "streaming" : "paused"
+            );
+          }
+        } catch (restoreError) {
+          throw new Error(`${error.message} Previous settings remain saved, but restoring the connection failed: ${restoreError.message}`);
+        }
+        const recovery = previousStatus
+          ? "The previous connection was restored."
+          : "The saved settings were not changed.";
+        throw new Error(`${error.message} ${recovery}`);
+      }
+      throw error;
+    } finally {
+      this.updatingConnections.delete(String(connectionId));
+    }
+  }
 
   static saveConnection(connectionId, connectionData) {
     const connections = this.getSavedConnections();
@@ -151,7 +241,9 @@ export class ConnectionManager {
     const connections = this.getSavedConnections();
     const results = Object.fromEntries(
       await Promise.all(
-        Object.entries(connections).map(async ([id]) => [id, await fetchStreamingStatus(id)])
+        Object.entries(connections)
+          .filter(([id]) => !this.isUpdatingConnection(id))
+          .map(async ([id]) => [id, await fetchStreamingStatus(id)])
       )
     );
     return results;

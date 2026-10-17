@@ -67,6 +67,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
   const [adapters, setAdapters] = useState([]);
   const [step, setStep] = useState("");
   const [validationError, setValidationError] = useState("");
+  const [saveError, setSaveError] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
@@ -159,6 +160,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
     if (isSubmitting) return;
     setIsSubmitting(true);
     setValidationError("");
+    setSaveError("");
     try {
       const validation = await validateConfiguration();
       if (!validation?.valid) { setIsSubmitting(false); return; }
@@ -172,9 +174,12 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
           adapter: connectionType,
           adapterConfig: configuration,
           streamerConfig,
+          isPolling: effectiveIsPolling,
+          pollingRateHz: hzInt,
           updatedAt: new Date().toISOString(),
         };
-        ConnectionManager.saveConnection(initialData.id, updated);
+        setStep("Applying adapter changes...");
+        await ConnectionManager.updateConnection(initialData.id, updated);
         onSave(updated);
         onClose();
         return;
@@ -201,6 +206,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
       onClose();
     } catch (e) {
       console.error(e);
+      setSaveError(e.message || "Could not save the adapter. Please retry.");
     } finally {
       setStep("");
       setIsSubmitting(false);
@@ -212,6 +218,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
   );
   const isEditMode = Boolean(initialData.id);
   const helpData = configHelpMap[connectionType];
+  const displayedError = validationError || saveError;
 
   // ─── Effects ──────────────────────────────────────────────────────────────
 
@@ -228,6 +235,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
     setPollingRateHz(initialData.pollingRateHz != null ? String(initialData.pollingRateHz) : "1");
     setStep("");
     setValidationError("");
+    setSaveError("");
     setSelectedFile(null);
     setIsSubmitting(false);
     lastValidatedRef.current = "";
@@ -380,10 +388,10 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
             </ul>
           </div>
         )}
-        {validationError && (
+        {displayedError && (
           <div className="bg-red-50 border border-red-200 rounded p-3">
             <span className="text-red-800 font-semibold block mb-2 text-sm">Error:</span>
-            <pre className="text-red-800 text-xs font-mono whitespace-pre-wrap m-0">{validationError}</pre>
+            <pre className="text-red-800 text-xs font-mono whitespace-pre-wrap m-0">{displayedError}</pre>
           </div>
         )}
 

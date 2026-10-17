@@ -67,6 +67,7 @@ function App() {
     let errorCount = 0;
 
     for (const connectionId of connectionIds) {
+      if (ConnectionManager.isUpdatingConnection(connectionId)) continue;
       const connectionData = savedConnections[connectionId];
       const savedState = savedStates[connectionId];
       const targetState = savedState?.state || "streaming";
@@ -79,6 +80,8 @@ function App() {
       } catch {
         currentStatus = "not_found";
       }
+
+      if (ConnectionManager.isUpdatingConnection(connectionId)) continue;
 
       if (currentStatus === targetState) {
         successCount++;
@@ -131,6 +134,7 @@ function App() {
       const connectionStatus = await ConnectionManager.verifyConnections();
       const savedStates = ConnectionManager.getConnectionStates();
       const needsRestoration = Object.entries(connectionStatus).some(([id, status]) => {
+        if (ConnectionManager.isUpdatingConnection(id)) return false;
         const savedState = savedStates[id]?.state || "streaming";
         return savedState === "streaming" && (status.status === "not_found" || status.status === "error" || !status.is_streaming);
       });

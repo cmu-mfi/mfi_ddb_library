@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "./data/defaults";
+import { API_BASE_URL } from "./data/defaults.js";
 
 export async function pauseConnection(connectionId) {
   try {
@@ -91,11 +91,15 @@ export async function fetchStreamingStatus(connectionId) {
   try {
     const response = await fetch(`${API_BASE_URL}/connections/streaming-status/${connectionId}`);
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const error = new Error(`HTTP error! status: ${response.status}`);
+      error.status = response.status;
+      throw error;
     }
     return await response.json();
   } catch (error) {
-    throw new Error(`Failed to fetch streaming status for ${connectionId}: ${error.message}`);
+    const failure = new Error(`Failed to fetch streaming status for ${connectionId}: ${error.message}`);
+    failure.status = error.status;
+    throw failure;
   }
 }
 
