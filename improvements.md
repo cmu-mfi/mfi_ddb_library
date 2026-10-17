@@ -2,9 +2,11 @@
 
 Review scope: the data adapter frontend on `feature/performance-testing`, including backend behavior that affects frontend controls and deployment.
 
+Progress: **1 of 13 items fixed**. The remaining items are pending.
+
 | Issue title | Location | Why is it a problem? | Expected result after fixing it | Benefit |
 | --- | --- | --- | --- | --- |
-| **High — Pause / Resume does not restart polling** | [AdapterFactory.connect_and_stream / resume_streaming / pause_streaming](mfi_ddb_data_adapter/data_adapter_app/backend/app/services/adapter_factory.py) | Pausing allows the polling thread to exit. Resume sets the event and `is_streaming` flag without restarting the worker, so the UI can show streaming while no data is being polled. | Keep the worker alive while paused, or safely restart it on resume. Report streaming only when the worker is running. | Reliable data collection and an accurate streaming indicator. |
+| **Fixed — High — Pause / Resume does not restart polling** | [AdapterFactory.connect_and_stream / resume_streaming / pause_streaming / disconnect](mfi_ddb_data_adapter/data_adapter_app/backend/app/services/adapter_factory.py), [Lifecycle regression tests](mfi_ddb_data_adapter/data_adapter_app/backend/tests/test_adapter_factory.py) | Previously, pausing allowed the polling thread to exit. Resume set the event and `is_streaming` flag without restarting the worker, so the UI could show streaming while no data was being polled. | The worker now waits on a condition while paused and wakes on Resume. A separate shutdown event stops it on Disconnect. Each worker retains its own shutdown event and streamer so it cannot reactivate against a replacement connection. | Polling resumes on the existing worker without duplicate workers, and paused workers can shut down cleanly. Verified by four lifecycle regression tests. |
 | **High — Edits do not update the running connection** | [ConnectionModal.handleSave](mfi_ddb_data_adapter/data_adapter_app/frontend/src/components/ConnectionModal.jsx) | Editing only updates browser storage. The running backend connection keeps its previous configuration. The edit path also retains the old polling mode and frequency instead of saving the selected values. | Apply the edited configuration to the backend through an update or controlled reconnect, and persist every edited field after success. | Saved settings match the actual connection behavior, including polling mode and rate. |
 | **High — Failed connection attempts are saved as successful** | [ConnectionModal.handleSave](mfi_ddb_data_adapter/data_adapter_app/frontend/src/components/ConnectionModal.jsx), [connectConnection](mfi_ddb_data_adapter/data_adapter_app/frontend/src/api.js) | The creation flow ignores the connect response. An HTTP failure such as 502 still saves the adapter and closes the modal; exceptions are only logged. | Check the response and returned connection state before completing creation. Display failures and keep the form open for correction or retry. | Prevents misleading saved connections and makes connection failures actionable. |
 | **High — Callback Stop / Reconnect state is inconsistent** | [ConnectionItem.handleStop](mfi_ddb_data_adapter/data_adapter_app/frontend/src/components/ConnectionItem.jsx), [App.handlePauseConnection / performStartupRestore](mfi_ddb_data_adapter/data_adapter_app/frontend/src/App.jsx) | Stop saves `stopped`, then calls the pause callback, which overwrites it with `paused`. After refresh, a callback adapter can lose its Reconnect control. Separately, restoration treats a saved `stopped` state as something to reconnect. | Preserve distinct stopped, paused, and streaming states throughout saving, rendering, and restoration. Keep intentionally stopped connections stopped until the user reconnects them. | Predictable controls across refreshes and preservation of the user's intent. |
@@ -18,8 +20,26 @@ Review scope: the data adapter frontend on `feature/performance-testing`, includ
 | **Improvement — Modal keyboard accessibility is incomplete** | [Modal](mfi_ddb_data_adapter/data_adapter_app/frontend/src/components/Modal.jsx), [ConnectionModal](mfi_ddb_data_adapter/data_adapter_app/frontend/src/components/ConnectionModal.jsx) | The modal lacks dialog semantics, managed initial focus, a focus trap, Escape handling, and focus restoration. Keyboard focus can move into the background while the modal is open. | Add an accessible dialog name and semantics, contain focus, support Escape when dismissal is allowed, and return focus to the opening control. | More reliable keyboard navigation and screen-reader use. |
 | **Improvement — Unused frontend dependencies and components add maintenance work** | [package.json](mfi_ddb_data_adapter/data_adapter_app/frontend/package.json), [main.jsx](mfi_ddb_data_adapter/data_adapter_app/frontend/src/main.jsx), [SchemaForm](mfi_ddb_data_adapter/data_adapter_app/frontend/src/components/SchemaForm.jsx) | Axios and js-yaml are not used by the current frontend source. React Query is initialized without queries or mutations, and SchemaForm is not rendered. These add dependencies or code without supporting a current UI flow. | Remove unused packages, providers, and components, or integrate them where they replace existing duplicated behavior. Update the lockfile with dependency changes. | A clearer codebase, fewer packages to maintain, and potentially smaller production bundles. |
 
-## Review validation
+## Completed fixes
+
+### 1. Pause / Resume polling lifecycle
+
+Updated the backend factory used by the frontend's existing Pause and Resume controls. Pausing keeps the polling worker waiting without repeated wakeups; resuming wakes that worker instead of only changing the status flag. Disconnect signals shutdown and wakes a paused worker, and shutdown also interrupts polling error backoff. Each connection's worker retains its own streamer and shutdown signal so a previous in-flight worker cannot begin polling a replacement connection.
+
+A poll already in progress may finish after Pause; subsequent polls wait until Resume.
+
+Added four network-independent regression tests covering repeated pause/resume cycles, repeated Resume while a poll is in flight, disconnecting a paused worker, and reconnecting before the old worker finishes. The pre-fix run reproduced the missing polling after Resume and the old worker continuing after reconnect. All four tests pass after the fix.
+
+Run from `mfi_ddb_data_adapter/data_adapter_app/backend`:
+
+```sh
+python3 -m pytest -p no:cacheprovider tests/test_adapter_factory.py -q
+```
+
+Result: **4 passed**. No live MQTT broker, browser session, or complete deployment was used for these regression tests.
+
+## Original review validation
 
 Source inspection and isolated behavior probes confirmed the failed-save flow, ignored edit settings, conflicting stopped-state writes, restoration of a saved stopped connection, rejection of the verification batch when one connection is missing, and polling remaining stopped after Resume while `is_streaming` is true.
 
-Build and lint could not execute because the environment returned `SecItemCopyMatching failed -50`. Browser rendering and a complete live deployment were not verified. The items above are a review backlog; implementation fixes have not been applied.
+Frontend build and lint could not execute during the original review because the environment returned `SecItemCopyMatching failed -50`. Browser rendering and a complete live deployment were not verified. The first issue is now fixed and verified as described above; the remaining items are a review backlog.
