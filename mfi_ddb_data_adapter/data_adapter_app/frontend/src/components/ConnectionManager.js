@@ -34,6 +34,7 @@ export class ConnectionManager {
     if (state === "paused" && !(await pauseConnection(connectionId))) {
       throw new Error("Could not pause the updated connection.");
     }
+    return result;
   }
 
   static async createConnection(connectionId, config) {
@@ -132,6 +133,51 @@ export class ConnectionManager {
     }
   }
 
+  static async stopConnection(connectionId) {
+    if (this.isUpdatingConnection(connectionId)) {
+      throw new Error("This connection is already being changed.");
+    }
+    this.updatingConnections.add(String(connectionId));
+    try {
+      if (!(await disconnectConnection(connectionId))) {
+        throw new Error("Could not stop the connection. Please retry.");
+      }
+      this.saveConnectionState(connectionId, "stopped", "user");
+      return { streaming_mode: "inactive", is_connected: false, is_streaming: false };
+    } finally {
+      this.updatingConnections.delete(String(connectionId));
+    }
+  }
+
+  static async reconnectConnection(connectionId, config) {
+    if (this.isUpdatingConnection(connectionId)) {
+      throw new Error("This connection is already being changed.");
+    }
+    this.updatingConnections.add(String(connectionId));
+    try {
+      const result = await this.connectWithState(connectionId, config, "streaming");
+      try {
+        this.saveConnectionState(connectionId, "streaming", "user");
+      } catch {
+        let cleanedUp = false;
+        try {
+          cleanedUp = await disconnectConnection(connectionId);
+        } catch {
+          // Retain the stopped intent if reconnect persistence fails.
+        }
+        throw new Error(cleanedUp
+          ? "The adapter reconnected, but its state could not be saved. It was disconnected. Please retry."
+          : "The adapter reconnected, but its state could not be saved or disconnection confirmed. Check the backend connection before retrying.");
+      }
+      return {
+        ...result,
+        streaming_mode: result.mode || (config.isPolling === false ? "callback" : "polling"),
+      };
+    } finally {
+      this.updatingConnections.delete(String(connectionId));
+    }
+  }
+
   static saveConnection(connectionId, connectionData) {
     const connections = this.getSavedConnections();
     connections[connectionId] = {
@@ -175,7 +221,13 @@ export class ConnectionManager {
 
   static getConnectionState(connectionId) {
     const states = this.getConnectionStates();
-    return states[connectionId] || { state: "streaming", source: "default" };
+    const saved = states[connectionId] || { state: "streaming", source: "default" };
+    // Older Stop actions incorrectly persisted "paused" for callback adapters,
+    // which cannot pause. Interpret those legacy records as stopped.
+    if (saved.state === "paused" && this.getSavedConnections()[connectionId]?.isPolling === false) {
+      return { ...saved, state: "stopped" };
+    }
+    return saved;
   }
 
   static getConnectionStates() {
@@ -279,7 +331,7 @@ export class ConnectionManager {
     const results = Object.fromEntries(
       await Promise.all(
         Object.entries(connections)
-          .filter(([id]) => !this.isUpdatingConnection(id))
+          .filter(([id]) => !this.isUpdatingConnection(id) && this.getConnectionState(id).state !== "stopped")
           .map(async ([id]) => [id, await fetchStreamingStatus(id)])
       )
     );

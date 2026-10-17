@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Pencil, Play, Pause, Trash2, Square } from "lucide-react";
 import { ConnectionManager } from "./ConnectionManager";
-import { pauseConnection, resumeConnection, connectConnection, disconnectConnection, fetchStreamingStatus } from "../api";
+import { pauseConnection, resumeConnection, fetchStreamingStatus } from "../api";
 
 const bannerBg = {
   green:    "bg-gradient-to-br from-green-100 to-green-200 border-l-4 border-green-500",
@@ -30,25 +30,32 @@ const detailColor = {
 export default function ConnectionItem({ connection, onEdit, onTerminate, onPause, onResume }) {
   const [streamingStatus, setStreamingStatus] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [localState, setLocalState] = useState("streaming");
-  const statusCheckIntervalRef = useRef(null);
+  const [localState, setLocalState] = useState(() => ConnectionManager.getConnectionState(connection.id).state);
+  const [actionError, setActionError] = useState("");
+  const statusVersionRef = useRef(0);
 
   const isCallback = connection.isPolling === false;
 
   // ─── Status polling ───────────────────────────────────────────────────────
 
   const checkStatus = useCallback(async () => {
-    // Don't poll the backend if we know the connection is intentionally stopped
-    if (localState === "stopped") return;
+    if (ConnectionManager.isUpdatingConnection(connection.id) ||
+        ConnectionManager.getConnectionState(connection.id).state === "stopped") return;
+    const version = ++statusVersionRef.current;
+    const canApplyStatus = () => version === statusVersionRef.current &&
+      !ConnectionManager.isUpdatingConnection(connection.id) &&
+      ConnectionManager.getConnectionState(connection.id).state !== "stopped";
     try {
       const response = await fetchStreamingStatus(connection.id);
+      if (!canApplyStatus()) return;
       setStreamingStatus(response);
       setLocalState(response.is_streaming ? "streaming" : "paused");
     } catch (error) {
+      if (!canApplyStatus()) return;
       console.error(`Failed to check streaming status for ${connection.id}:`, error);
       setStreamingStatus({ streaming_mode: "inactive", is_connected: false, is_streaming: false });
     }
-  }, [connection.id, localState]);
+  }, [connection.id]);
 
   useEffect(() => {
     const savedState = ConnectionManager.getConnectionState(connection.id);
@@ -57,9 +64,11 @@ export default function ConnectionItem({ connection, onEdit, onTerminate, onPaus
 
   useEffect(() => {
     checkStatus();
-    const intervalRef = setInterval(checkStatus, 5000);
-    statusCheckIntervalRef.current = intervalRef;
-    return () => clearInterval(statusCheckIntervalRef.current);
+    const interval = setInterval(checkStatus, 5000);
+    return () => {
+      clearInterval(interval);
+      statusVersionRef.current++;
+    };
   }, [checkStatus]);
 
   // ─── Actions ──────────────────────────────────────────────────────────────
@@ -92,42 +101,34 @@ export default function ConnectionItem({ connection, onEdit, onTerminate, onPaus
   const handleStop = async (e) => {
     e.stopPropagation();
     setIsProcessing(true);
-    const ok = await disconnectConnection(connection.id);
-    if (ok) {
-      setStreamingStatus({ streaming_mode: "inactive", is_connected: false, is_streaming: false });
+    setActionError("");
+    statusVersionRef.current++;
+    try {
+      const status = await ConnectionManager.stopConnection(connection.id);
+      setStreamingStatus(status);
       setLocalState("stopped");
-      ConnectionManager.saveConnectionState(connection.id, "stopped", "user");
-      if (onPause) onPause(connection.id);
+    } catch (error) {
+      setActionError(error.message || "Could not stop the connection. Please retry.");
+    } finally {
+      setIsProcessing(false);
     }
-    setIsProcessing(false);
   };
 
-  // Reconnect: re-establish using saved config, no localStorage change
+  // Reconnect: keep the config and persist streaming only after confirmation.
   const handleReconnect = async (e) => {
     e.stopPropagation();
     setIsProcessing(true);
+    setActionError("");
+    statusVersionRef.current++;
     try {
-      const response = await connectConnection(
-        connection.id,
-        connection.adapter,
-        connection.adapterConfig,
-        connection.streamerConfig,
-        connection.isPolling !== false,
-        connection.pollingRateHz ?? 1
-      );
-      if (response.ok) {
-        setLocalState("streaming");
-        ConnectionManager.saveConnectionState(connection.id, "streaming", "user");
-        if (onResume) onResume(connection.id);
-        // Let checkStatus pick up the real state
-        setTimeout(checkStatus, 500);
-      } else {
-        console.error(`Reconnect failed for ${connection.id}: ${response.status}`);
-      }
+      const status = await ConnectionManager.reconnectConnection(connection.id, connection);
+      setStreamingStatus(status);
+      setLocalState("streaming");
     } catch (err) {
-      console.error(`Reconnect error for ${connection.id}:`, err);
+      setActionError(err.message || "Could not reconnect. Please retry.");
+    } finally {
+      setIsProcessing(false);
     }
-    setIsProcessing(false);
   };
 
   const handleDelete = async (e) => {
@@ -233,6 +234,7 @@ export default function ConnectionItem({ connection, onEdit, onTerminate, onPaus
             </button>
           </div>
         </div>
+        {actionError && <p role="alert" className="mt-2 text-sm text-red-700">{actionError}</p>}
       </div>
     </div>
   );

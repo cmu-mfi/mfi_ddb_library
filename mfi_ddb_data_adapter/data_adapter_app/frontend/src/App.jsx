@@ -55,7 +55,6 @@ function App() {
     setIsRestoring(true);
 
     const savedConnections = ConnectionManager.getSavedConnections();
-    const savedStates = ConnectionManager.getConnectionStates();
     const connectionIds = Object.keys(savedConnections);
 
     if (connectionIds.length === 0) {
@@ -69,8 +68,8 @@ function App() {
     for (const connectionId of connectionIds) {
       if (ConnectionManager.isUpdatingConnection(connectionId)) continue;
       const connectionData = savedConnections[connectionId];
-      const savedState = savedStates[connectionId];
-      const targetState = savedState?.state || "streaming";
+      let targetState = ConnectionManager.getConnectionState(connectionId).state;
+      if (targetState === "stopped") continue;
 
       // Determine current backend state, treating any error as "not_found"
       let currentStatus;
@@ -82,18 +81,21 @@ function App() {
       }
 
       if (ConnectionManager.isUpdatingConnection(connectionId)) continue;
+      targetState = ConnectionManager.getConnectionState(connectionId).state;
+      if (targetState === "stopped") continue;
 
       if (currentStatus === targetState) {
         successCount++;
         continue;
       }
 
+      ConnectionManager.updatingConnections.add(String(connectionId));
       try {
         if (targetState === "paused") {
           // Connection should be paused — if it doesn't exist on backend that's fine,
           // we just leave it as-is and keep the saved "paused" state.
           successCount++;
-        } else {
+        } else if (targetState === "streaming") {
           // targetState === "streaming"
           if (currentStatus === "not_found") {
             const connectResponse = await connectConnection(
@@ -118,6 +120,8 @@ function App() {
       } catch (error) {
         console.error(`ERROR: Exception restoring ${connectionId}:`, error);
         errorCount++;
+      } finally {
+        ConnectionManager.updatingConnections.delete(String(connectionId));
       }
     }
 
@@ -132,10 +136,9 @@ function App() {
     if (serverStatus !== "online") return;
     try {
       const connectionStatus = await ConnectionManager.verifyConnections();
-      const savedStates = ConnectionManager.getConnectionStates();
       const needsRestoration = Object.entries(connectionStatus).some(([id, status]) => {
         if (ConnectionManager.isUpdatingConnection(id)) return false;
-        const savedState = savedStates[id]?.state || "streaming";
+        const savedState = ConnectionManager.getConnectionState(id).state;
         return savedState === "streaming" && (status.status === "not_found" || status.status === "error" || !status.is_streaming);
       });
       if (needsRestoration) {
