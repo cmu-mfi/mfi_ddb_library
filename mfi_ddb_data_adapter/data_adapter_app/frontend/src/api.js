@@ -147,15 +147,19 @@ function validationResult(data) {
   };
 }
 
-async function validateConfig(target, form) {
+async function validateConfig(target, form, { signal } = {}) {
   let response;
   try {
-    response = await fetch(`${API_BASE_URL}/connections/validate/${target}`, { method: "POST", body: form });
-  } catch {
+    response = await fetch(`${API_BASE_URL}/connections/validate/${target}`, { method: "POST", body: form, signal });
+  } catch (error) {
+    if (signal?.aborted || error.name === "AbortError") throw error;
     throw validationRequestError("Could not reach the validation service. Check the connection and retry.");
   }
   let data;
-  try { data = await response.json(); } catch { /* Report invalid or non-JSON responses below. */ }
+  try { data = await response.json(); } catch (error) {
+    if (signal?.aborted || error.name === "AbortError") throw error;
+    // Report invalid or non-JSON responses below.
+  }
   if (!response.ok) {
     if (response.status === 400 || response.status === 422) {
       if (data?.detail?.is_valid === false) return validationResult(data.detail);
@@ -172,15 +176,15 @@ async function validateConfig(target, form) {
   return validationResult(data);
 }
 
-export async function validateAdapterConfig(adapter_name, adapter_cfg) {
+export async function validateAdapterConfig(adapter_name, adapter_cfg, options) {
   const form = new FormData();
   form.append("adapter_name", adapter_name);
   form.append("text", adapter_cfg);
-  return validateConfig("adapter", form);
+  return validateConfig("adapter", form, options);
 }
 
-export async function validateStreamerConfig(streamer_cfg) {
+export async function validateStreamerConfig(streamer_cfg, options) {
   const form = new FormData();
   form.append("text", streamer_cfg);
-  return validateConfig("streamer", form);
+  return validateConfig("streamer", form, options);
 }

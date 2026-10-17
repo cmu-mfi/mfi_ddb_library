@@ -4,6 +4,7 @@ import { ConnectionManager } from "./ConnectionManager";
 import { makeDefaultStreamerConfig } from "../data/defaults";
 import { getConnCtr, setConnCtr } from "../state/conn_ctr";
 import { formatValidationErrors } from "../lib/validation.js";
+import { createValidationRequests } from "../lib/validation-requests.js";
 import {
   fetchAdapters,
   validateAdapterConfig,
@@ -77,6 +78,32 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
   const [pollingRateHz, setPollingRateHz] = useState("1");
   const fileInputRef = useRef(null);
   const lastValidatedRef = useRef("");
+  const validationRequestsRef = useRef(null);
+  if (validationRequestsRef.current === null) {
+    validationRequestsRef.current = createValidationRequests();
+  }
+  const submittingRef = useRef(false);
+  const activeRef = useRef(isOpen);
+
+  const invalidateValidation = useCallback(() => {
+    validationRequestsRef.current.cancel();
+    lastValidatedRef.current = "";
+    if (!activeRef.current) return;
+    setValidationError("");
+    setValidationRequestError("");
+    setValidationWarnings([]);
+    setIsValidating(false);
+  }, []);
+
+  const handleConfigurationChange = useCallback((value) => {
+    invalidateValidation();
+    setConfiguration(value);
+  }, [invalidateValidation]);
+
+  const handleStreamerChange = useCallback((value) => {
+    invalidateValidation();
+    setStreamerConfig(value);
+  }, [invalidateValidation]);
 
   const connectionTypes = adapters.map((a) => a.name);
 
@@ -105,32 +132,39 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
   // ─── Handlers ─────────────────────────────────────────────────────────────
 
   const handleTypeChange = useCallback((e) => {
+    invalidateValidation();
     const t = e.target.value;
     setConnectionType(t);
     setConfiguration(exampleConfigMap[t] || "");
     setStreamerConfig(makeDefaultStreamerConfig());
     setIsPolling(true);
     setPollingRateHz("1");
-    setValidationError("");
-    setValidationRequestError("");
-    lastValidatedRef.current = "";
-  }, [exampleConfigMap]);
+  }, [exampleConfigMap, invalidateValidation]);
 
   const handleFileUpload = useCallback((e) => {
     const f = e.target.files?.[0];
     if (!f) return setSelectedFile(null);
+    invalidateValidation();
     setSelectedFile(f);
     const r = new FileReader();
-    r.onload = ({ target }) => typeof target.result === "string" && setConfiguration(target.result);
+    r.onload = ({ target }) => {
+      if (activeRef.current && typeof target.result === "string") {
+        handleConfigurationChange(target.result);
+      }
+    };
     r.readAsText(f);
-  }, []);
+  }, [invalidateValidation, handleConfigurationChange]);
 
   const handleClose = useCallback(() => {
-    if (isSubmitting) return;
+    if (submittingRef.current) return;
+    invalidateValidation();
+    activeRef.current = false;
     onClose();
-  }, [isSubmitting, onClose]);
+  }, [invalidateValidation, onClose]);
 
   const validateConfiguration = useCallback(async () => {
+    if (!activeRef.current) return { valid: false };
+    const request = validationRequestsRef.current.start();
     setValidationError("");
     setValidationRequestError("");
     setValidationWarnings([]);
@@ -143,9 +177,10 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
         return { valid: false };
       }
       const results = await Promise.allSettled([
-        validateAdapterConfig(connectionType, configuration),
-        validateStreamerConfig(streamerConfig),
+        validateAdapterConfig(connectionType, configuration, { signal: request.signal }),
+        validateStreamerConfig(streamerConfig, { signal: request.signal }),
       ]);
+      if (!request.isCurrent()) return { valid: false };
       const labels = ["Adapter configuration", "Streamer configuration"];
       const configErrors = [];
       const requestErrors = [];
@@ -158,24 +193,30 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
       });
       setValidationError(configErrors.join("\n\n"));
       setValidationRequestError(requestErrors.join("\n\n"));
-      return { valid: configErrors.length === 0 && requestErrors.length === 0 };
+      lastValidatedRef.current = JSON.stringify([connectionType, configuration, streamerConfig]);
+      return { valid: configErrors.length === 0 && requestErrors.length === 0, isCurrent: request.isCurrent };
     } catch (e) {
+      if (!request.isCurrent()) return { valid: false };
       console.error("Validation error:", e);
       setValidationRequestError("Could not validate the configuration. Please retry.");
       return { valid: false };
     } finally {
-      setIsValidating(false);
+      if (request.isCurrent()) {
+        setIsValidating(false);
+        request.finish();
+      }
     }
   }, [connectionType, configuration, streamerConfig]);
 
   const handleSave = useCallback(async () => {
-    if (isSubmitting) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setIsSubmitting(true);
     setValidationError("");
     setSaveError("");
     try {
       const validation = await validateConfiguration();
-      if (!validation?.valid) { setIsSubmitting(false); return; }
+      if (!validation?.valid || !validation.isCurrent()) return;
 
       const effectiveIsPolling = supportsCallback ? isPolling : true;
       const hzInt = Math.max(1, parseInt((pollingRateHz || "1").trim(), 10) || 1);
@@ -217,10 +258,13 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
       console.error(e);
       setSaveError(e.message || "Could not save the adapter. Please retry.");
     } finally {
-      setStep("");
-      setIsSubmitting(false);
+      submittingRef.current = false;
+      if (activeRef.current) {
+        setStep("");
+        setIsSubmitting(false);
+      }
     }
-  }, [isSubmitting, validateConfiguration, configuration, connectionType, streamerConfig, initialData, onSave, onClose, supportsCallback, isPolling, pollingRateHz]);
+  }, [validateConfiguration, configuration, connectionType, streamerConfig, initialData, onSave, onClose, supportsCallback, isPolling, pollingRateHz]);
 
   const canSave = Boolean(
     connectionType && configuration.trim() && !validationError && !isValidating && !isSubmitting
@@ -232,11 +276,20 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
   // ─── Effects ──────────────────────────────────────────────────────────────
 
   useEffect(() => {
+    activeRef.current = isOpen;
+    return () => {
+      activeRef.current = false;
+      validationRequestsRef.current.cancel();
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
     fetchAdapters().then(setAdapters).catch(console.error);
   }, []);
 
   useEffect(() => {
     if (!isOpen) return;
+    invalidateValidation();
     setConnectionType(initialData.adapter || "");
     setConfiguration(initialData.adapterConfig || "");
     setStreamerConfig(initialData.streamerConfig || makeDefaultStreamerConfig());
@@ -250,23 +303,18 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
     setIsSubmitting(false);
     lastValidatedRef.current = "";
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [isOpen, initialData]);
+  }, [isOpen, initialData, invalidateValidation]);
 
   useEffect(() => {
-    if (!isOpen || !connectionType || !configuration.trim()) {
-      setValidationError("");
-      setValidationRequestError("");
-      return;
-    }
+    if (!isOpen || isSubmitting || !connectionType || !configuration.trim()) return;
     const id = setTimeout(() => {
-      const combined = `adapter:${connectionType}||${configuration}||${streamerConfig}`;
-      if (combined !== lastValidatedRef.current) {
-        lastValidatedRef.current = combined;
+      const combined = JSON.stringify([connectionType, configuration, streamerConfig]);
+      if (!submittingRef.current && combined !== lastValidatedRef.current) {
         validateConfiguration();
       }
     }, 800);
     return () => clearTimeout(id);
-  }, [isOpen, connectionType, configuration, streamerConfig, validateConfiguration]);
+  }, [isOpen, isSubmitting, connectionType, configuration, streamerConfig, validateConfiguration]);
 
   // ─── Shared input classes ──────────────────────────────────────────────────
 
@@ -322,7 +370,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
             rows={8}
             className={textareaCls}
             value={configuration}
-            onChange={(e) => setConfiguration(e.target.value)}
+            onChange={(e) => handleConfigurationChange(e.target.value)}
             disabled={isSubmitting}
             placeholder={exampleConfigMap[connectionType] || "Enter your YAML configuration here..."}
           />
@@ -357,7 +405,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
             rows={7}
             className={textareaCls}
             value={streamerConfig}
-            onChange={(e) => setStreamerConfig(e.target.value)}
+            onChange={(e) => handleStreamerChange(e.target.value)}
             disabled={isSubmitting}
             placeholder="Streamer configuration..."
           />
