@@ -356,7 +356,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title={isEditMode ? "Edit Adapter" : "New Adapter"}>
+    <Modal isOpen={isOpen} onClose={handleClose} title={isEditMode ? "Edit Adapter" : "New Adapter"} dismissible={!isSubmitting}>
       <div className="p-6 space-y-5">
 
         {/* Adapter type */}
