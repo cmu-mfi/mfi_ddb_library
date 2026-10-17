@@ -1,5 +1,6 @@
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor
 
 from flask import json
 import requests
@@ -78,14 +79,14 @@ class PIWebAPI:
         token_map = json.loads(page_token) if page_token else {}
         
         # 1. FETCH EACH STREAM INDEPENDENTLY WITH ITS OWN TOKEN
-        all_items = []
-        for webid, topic_name in webid_topic_map.items():
+        def fetch_stream(entry):
+            webid, topic_name = entry
             stream_start = token_map.get(webid, iso_start_time)
             self.logger.debug(f"Stream '{topic_name}' | webid={webid} | stream_start={stream_start}")
             
             if stream_start >= iso_end_time:
                 self.logger.debug(f"Stream '{topic_name}' is exhausted, skipping")
-                continue
+                return []
             
             get_request = f"{self.url}/streams/{webid}/recorded"
             parameters = {
@@ -97,7 +98,12 @@ class PIWebAPI:
             get_request += "?" + "&".join([f"{key}={value}" for key, value in parameters.items()])
             self.logger.debug(f"GET request: {get_request}")
             
-            response = self.__make_get_request(get_request)
+            if len(webid_topic_map) == 1:
+                response = self.__make_get_request(get_request)
+            else:
+                with requests.Session() as session:
+                    session.auth = HTTPBasicAuth(self.__secrets['username'], self.__secrets['password'])
+                    response = self.__make_get_request(get_request, session=session)
             items = response.get('Items', [])
             self.logger.debug(f"Stream '{topic_name}' returned {len(items)} items")
             
@@ -106,13 +112,23 @@ class PIWebAPI:
                 self.logger.debug(f"Stripping boundary duplicate for stream '{topic_name}'")
                 items = items[1:]
             
+            stream_items = []
             for item in items:
-                all_items.append({
+                stream_items.append({
                     "timestamp": item["Timestamp"],
                     "topic": topic_name,
                     "value": item["Value"],
                     "_webid": webid,
                 })
+            return stream_items
+
+        if len(webid_topic_map) == 1:
+            all_items = fetch_stream(next(iter(webid_topic_map.items())))
+        else:
+            all_items = []
+            with ThreadPoolExecutor() as executor:
+                for stream_items in executor.map(fetch_stream, webid_topic_map.items()):
+                    all_items.extend(stream_items)
         
         self.logger.debug(f"Total items fetched across all streams: {len(all_items)}")
         
@@ -222,9 +238,9 @@ class PIWebAPI:
             return {webid: topic_name}
 
         
-    def __make_get_request(self, url):
+    def __make_get_request(self, url, session=None):
         
-        response = self.session.get(url)
+        response = (session if session is not None else self.session).get(url)
         
         if response.status_code != 200:
             self.logger.error(f"GET request failed. URL: {url}, Status Code: {response.status_code}, Response: {response.text}")

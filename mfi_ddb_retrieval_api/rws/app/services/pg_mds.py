@@ -141,6 +141,10 @@ class MdsReader:
                     )
                     values.append(v[1])
 
+                elif op == "in":
+                    where_clauses.append(sql.SQL("{} IN %s").format(col))
+                    values.append(tuple(v[1]))
+
                 elif op == "between":
                     if len(v) != 3:
                         raise ValueError(f"'between' requires exactly 2 values for {k}")
@@ -201,17 +205,28 @@ class MdsReader:
         if user == ("superadmin", "superadmin"):
             return trial_rows
         
+        project_ids = {
+            row["project_id"] for row in trial_rows
+            if row["project_id"] is not None
+            and user != (row["user_id"], row["user_domain"])
+        }
+        roles_by_project = {}
+        if project_ids:
+            user_roles = self._lookup("user_project_role_linking", {
+                "project_id": ("in", project_ids),
+                "user_id": user[0],
+                "domain": user[1],
+            })
+            for role in user_roles or []:
+                roles_by_project.setdefault(role["project_id"], []).append(role)
+
         for row in trial_rows:
             if user == (row["user_id"], row["user_domain"]):
                 filtered_rows.append(row)
                 continue
             if row["project_id"] is None:
                 continue
-            user_roles = self._lookup("user_project_role_linking", {
-                "project_id":row["project_id"],
-                "user_id":user[0],
-                "domain":user[1]
-            })
+            user_roles = roles_by_project.get(row["project_id"], [])
             if user_roles is None or len(user_roles)==0:
                 continue
             if len(user_roles) > 1:
@@ -313,14 +328,17 @@ class MdsReader:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute(query, values)
                 rows = cur.fetchall()
-                rows = self._validate_access_and_filter_trial_rows(rows, (user_id,user_domain))
-                
-                # Record successful search trials duration
-                duration = time.perf_counter() - start_time
-                db_query_duration.record(duration, {"query_type": "find_trials", "status": "SUCCESS"})
-                db_query_counter.add(1, {"query_type": "find_trials", "status": "SUCCESS"})
-                
-                return [dict(row) for row in rows] if rows else []
+            # Release the search connection before the batched permission lookup.
+            self.__conn_pool.putconn(conn)
+            conn = None
+            rows = self._validate_access_and_filter_trial_rows(rows, (user_id,user_domain))
+
+            # Record successful search trials duration
+            duration = time.perf_counter() - start_time
+            db_query_duration.record(duration, {"query_type": "find_trials", "status": "SUCCESS"})
+            db_query_counter.add(1, {"query_type": "find_trials", "status": "SUCCESS"})
+
+            return [dict(row) for row in rows] if rows else []
         except Exception as e:
             # Record failed search trials duration
             duration = time.perf_counter() - start_time

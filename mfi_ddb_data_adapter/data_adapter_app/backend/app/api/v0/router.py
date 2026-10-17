@@ -12,12 +12,14 @@ import inspect
 import logging
 import pkgutil
 from contextlib import asynccontextmanager
+from weakref import WeakValueDictionary
 from typing import Any, Dict, List, Optional, Tuple, Iterable
 
 import app.utils.utils as utils
 import yaml
 from app.services.adapter_factory import AdapterFactory
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from starlette.concurrency import run_in_threadpool
 from fastapi import Path as FastAPIPath
 
 # ==========================================
@@ -40,6 +42,15 @@ adapter_validation_counter = meter.create_counter(
 
 # Active connections map
 active_connections: Dict[str, AdapterFactory] = {}
+
+# Serialize each connection's lifecycle while independent IDs run concurrently.
+connection_locks: WeakValueDictionary[str, asyncio.Lock] = WeakValueDictionary()
+
+
+async def serialize_lifecycle(conn_id: str):
+    lock = connection_locks.setdefault(conn_id, asyncio.Lock())
+    async with lock:
+        yield
 
 # Asynchronous gauges to expose dynamic connection state to Prometheus in real-time
 def get_active_connections_count(options) -> Iterable[Observation]:
@@ -162,7 +173,7 @@ async def validate_streamer(
         raise HTTPException(400, f"Validation failed: {str(e)}")
 
 
-@router.post("/connect/{conn_id}")
+@router.post("/connect/{conn_id}", dependencies=[Depends(serialize_lifecycle)])
 async def connect_endpoint(
     conn_id: str = FastAPIPath(...),
     adapter_name: str = Form(...),
@@ -199,7 +210,7 @@ async def connect_endpoint(
 
     if not connection.is_connected:
         try:
-            connection.connect_and_stream()
+            await run_in_threadpool(connection.connect_and_stream)
             active_connections[conn_id] = connection
             logger.info("Stored connection: conn_id=%s keys_now=%s", conn_id, list(active_connections.keys()))
             
@@ -211,7 +222,7 @@ async def connect_endpoint(
 
     elif not connection.is_streaming:
         try:
-            connection.resume_streaming()
+            await run_in_threadpool(connection.resume_streaming)
             adapter_lifecycle_counter.add(1, {"event": "resume", "adapter_name": adapter_name, "status": "SUCCESS"})
         except Exception as err:
             adapter_lifecycle_counter.add(1, {"event": "resume", "adapter_name": adapter_name, "status": "ERROR"})
@@ -226,7 +237,7 @@ async def connect_endpoint(
     }
 
 
-@router.post("/resume/{conn_id}")
+@router.post("/resume/{conn_id}", dependencies=[Depends(serialize_lifecycle)])
 async def resume_endpoint(
     conn_id: str = FastAPIPath(...),
 ) -> dict:
@@ -236,7 +247,7 @@ async def resume_endpoint(
     connection = active_connections[conn_id]
     adapter_name = connection.adp_name
     try:
-        connection.resume_streaming()
+        await run_in_threadpool(connection.resume_streaming)
         adapter_lifecycle_counter.add(1, {"event": "resume", "adapter_name": adapter_name, "status": "SUCCESS"})
     except Exception as err:
         adapter_lifecycle_counter.add(1, {"event": "resume", "adapter_name": adapter_name, "status": "ERROR"})
@@ -251,7 +262,7 @@ async def resume_endpoint(
     }      
 
 
-@router.post("/pause/{conn_id}")
+@router.post("/pause/{conn_id}", dependencies=[Depends(serialize_lifecycle)])
 async def pause_endpoint(
     conn_id: str = FastAPIPath(...)
 ) -> dict:
@@ -262,7 +273,7 @@ async def pause_endpoint(
     connection = active_connections[conn_id]
     adapter_name = connection.adp_name
     try:
-        connection.pause_streaming()
+        await run_in_threadpool(connection.pause_streaming)
         adapter_lifecycle_counter.add(1, {"event": "pause", "adapter_name": adapter_name, "status": "SUCCESS"})
     except Exception as err:
         adapter_lifecycle_counter.add(1, {"event": "pause", "adapter_name": adapter_name, "status": "ERROR"})
@@ -275,7 +286,7 @@ async def pause_endpoint(
     }
 
 
-@router.post("/disconnect/{conn_id}")
+@router.post("/disconnect/{conn_id}", dependencies=[Depends(serialize_lifecycle)])
 async def disconnect_endpoint(
     conn_id: str = FastAPIPath(...)
 ) -> dict:
@@ -286,7 +297,7 @@ async def disconnect_endpoint(
     connection = active_connections[conn_id]
     adapter_name = connection.adp_name   
     try:
-        connection.disconnect()
+        await run_in_threadpool(connection.disconnect)
         
         if connection.is_connected:
             adapter_lifecycle_counter.add(1, {"event": "disconnect", "adapter_name": adapter_name, "status": "ERROR"})
