@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.concurrency import run_in_threadpool
 
 # ==============================================================================
 # 1. INITIALIZE TELEMETRY FIRST (Must run before loading database modules)
@@ -44,6 +45,7 @@ http_request_duration = meter.create_histogram(
 # Now we can safely import our local modules that will use telemetry
 from app.api.v0.router import router
 from app.services.pg_mds import MdsReader
+from app.services.dws_agent import DwsAgent
 
 logger = logging.getLogger(__name__)
 
@@ -53,10 +55,12 @@ async def lifespan(app: FastAPI):
     # Startup: initialize metadata_reader
     config_file = 'pg_database.test.ini' if 'pytest' in sys.modules else 'pg_database.ini'
     app.state.metadata_reader = MdsReader(config_file=config_file)
-    yield
-    # Shutdown: cleanup
-    if hasattr(app.state, 'metadata_reader'):
-        del app.state.metadata_reader
+    try:
+        yield
+    finally:
+        await run_in_threadpool(DwsAgent.close)
+        if hasattr(app.state, 'metadata_reader'):
+            del app.state.metadata_reader
         
 app = FastAPI(
     title="Retrieval API",
