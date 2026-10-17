@@ -4,7 +4,7 @@ import ConnectionModal from "./components/ConnectionModal";
 import { ConnectionManager } from "./components/ConnectionManager";
 import logoMfi from "./images/logo_mfi.png";
 import { API_BASE_URL } from "./data/defaults";
-import { disconnectConnection, fetchStreamingStatus, connectConnection, resumeConnection } from "./api";
+import { disconnectConnection } from "./api";
 
 const serverStatusCls = {
   online:   "bg-green-600 text-white",
@@ -19,6 +19,7 @@ function App() {
   const [serverStatus, setServerStatus] = useState("checking");
   const [isRestoring, setIsRestoring] = useState(false);
   const hasAutoRestoredRef = useRef(false);
+  const restorationInProgressRef = useRef(false);
 
   const checkServerHealth = useCallback(async () => {
     try {
@@ -47,90 +48,33 @@ function App() {
   }, []);
 
   const performStartupRestore = useCallback(async () => {
-    if (hasAutoRestoredRef.current) return;
-
-    const shouldRestore = ConnectionManager.shouldRestoreOnStartup();
-    if (!shouldRestore) return;
-
+    if (hasAutoRestoredRef.current || restorationInProgressRef.current) return;
+    if (!ConnectionManager.shouldRestoreOnStartup()) return;
+    restorationInProgressRef.current = true;
     setIsRestoring(true);
-
-    const savedConnections = ConnectionManager.getSavedConnections();
-    const connectionIds = Object.keys(savedConnections);
-
-    if (connectionIds.length === 0) {
-      setIsRestoring(false);
-      return;
-    }
-
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (const connectionId of connectionIds) {
-      if (ConnectionManager.isUpdatingConnection(connectionId)) continue;
-      const connectionData = savedConnections[connectionId];
-      let targetState = ConnectionManager.getConnectionState(connectionId).state;
-      if (targetState === "stopped") continue;
-
-      // Determine current backend state, treating any error as "not_found"
-      let currentStatus;
-      try {
-        const statusResponse = await fetchStreamingStatus(connectionId);
-        currentStatus = statusResponse.is_streaming ? "streaming" : "paused";
-      } catch {
-        currentStatus = "not_found";
-      }
-
-      if (ConnectionManager.isUpdatingConnection(connectionId)) continue;
-      targetState = ConnectionManager.getConnectionState(connectionId).state;
-      if (targetState === "stopped") continue;
-
-      if (currentStatus === targetState) {
-        successCount++;
-        continue;
-      }
-
-      ConnectionManager.updatingConnections.add(String(connectionId));
-      try {
-        if (targetState === "paused") {
-          // Connection should be paused — if it doesn't exist on backend that's fine,
-          // we just leave it as-is and keep the saved "paused" state.
-          successCount++;
-        } else if (targetState === "streaming") {
-          // targetState === "streaming"
-          if (currentStatus === "not_found") {
-            const connectResponse = await connectConnection(
-              connectionId,
-              connectionData.adapter,
-              connectionData.adapterConfig,
-              connectionData.streamerConfig,
-              connectionData.isPolling !== false,
-              connectionData.pollingRateHz ?? 1
-            );
-            if (!connectResponse.ok) {
-              console.error(`Failed to reconnect ${connectionId}`);
-              errorCount++;
-              continue;
-            }
-            successCount++;
-          } else if (currentStatus === "paused") {
-            const resumeSuccess = await resumeConnection(connectionId);
-            if (resumeSuccess) { successCount++; } else { errorCount++; }
-          }
+    try {
+      const connectionIds = Object.keys(ConnectionManager.getSavedConnections());
+      let successCount = 0;
+      let errorCount = 0;
+      for (const connectionId of connectionIds) {
+        try {
+          const result = await ConnectionManager.restoreConnection(connectionId);
+          if (result !== "skipped") successCount++;
+        } catch (error) {
+          console.error(`Error restoring ${connectionId}:`, error);
+          errorCount++;
         }
-      } catch (error) {
-        console.error(`ERROR: Exception restoring ${connectionId}:`, error);
-        errorCount++;
-      } finally {
-        ConnectionManager.updatingConnections.delete(String(connectionId));
       }
-    }
 
-    console.log(`Restore complete — success: ${successCount}, error: ${errorCount}`);
-    hasAutoRestoredRef.current = true;
-    ConnectionManager.markRestorationComplete();
-    setIsRestoring(false);
-    loadConnections();
-  }, [loadConnections, isRestoring, serverStatus]);
+      console.log(`Restore complete — success: ${successCount}, error: ${errorCount}`);
+      hasAutoRestoredRef.current = true;
+      ConnectionManager.markRestorationComplete();
+      loadConnections();
+    } finally {
+      restorationInProgressRef.current = false;
+      setIsRestoring(false);
+    }
+  }, [loadConnections]);
 
   const verifyAndRestoreConnections = useCallback(async () => {
     if (serverStatus !== "online") return;
@@ -139,7 +83,8 @@ function App() {
       const needsRestoration = Object.entries(connectionStatus).some(([id, status]) => {
         if (ConnectionManager.isUpdatingConnection(id)) return false;
         const savedState = ConnectionManager.getConnectionState(id).state;
-        return savedState === "streaming" && (status.status === "not_found" || status.status === "error" || !status.is_streaming);
+        return savedState === "streaming" && status.status !== "error" &&
+          (status.status === "not_found" || !status.is_connected || !status.is_streaming);
       });
       if (needsRestoration) {
         ConnectionManager.resetRestorationState();
@@ -178,14 +123,6 @@ function App() {
     ConnectionManager.removeConnection(connectionId);
     loadConnections();
   }, [loadConnections]);
-
-  const handlePauseConnection = useCallback((connectionId) => {
-    ConnectionManager.saveConnectionState(connectionId, "paused", "user");
-  }, []);
-
-  const handleResumeConnection = useCallback((connectionId) => {
-    ConnectionManager.saveConnectionState(connectionId, "streaming", "user");
-  }, []);
 
   const handleNewConnection = useCallback(() => setIsModalOpen(true), []);
 
@@ -260,8 +197,6 @@ function App() {
           onEditConnection={handleEditConnection}
           onTerminateConnection={handleTerminateConnection}
           onRestoreConnections={handleRestoreAdapter}
-          onPauseConnection={handlePauseConnection}
-          onResumeConnection={handleResumeConnection}
           isRestoring={isRestoring}
         />
       </main>

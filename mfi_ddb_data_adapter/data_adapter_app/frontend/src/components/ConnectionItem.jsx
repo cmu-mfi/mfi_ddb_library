@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Pencil, Play, Pause, Trash2, Square } from "lucide-react";
 import { ConnectionManager } from "./ConnectionManager";
-import { pauseConnection, resumeConnection, fetchStreamingStatus } from "../api";
+import { fetchStreamingStatus } from "../api";
 
 const bannerBg = {
   green:    "bg-gradient-to-br from-green-100 to-green-200 border-l-4 border-green-500",
@@ -27,7 +27,7 @@ const detailColor = {
   grey:     "text-gray-500",
 };
 
-export default function ConnectionItem({ connection, onEdit, onTerminate, onPause, onResume }) {
+export default function ConnectionItem({ connection, onEdit, onTerminate }) {
   const [streamingStatus, setStreamingStatus] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [localState, setLocalState] = useState(() => ConnectionManager.getConnectionState(connection.id).state);
@@ -76,25 +76,33 @@ export default function ConnectionItem({ connection, onEdit, onTerminate, onPaus
   const handlePause = async (e) => {
     e.stopPropagation();
     setIsProcessing(true);
-    const ok = await pauseConnection(connection.id);
-    if (ok) {
+    setActionError("");
+    statusVersionRef.current++;
+    try {
+      const status = await ConnectionManager.pauseConnection(connection.id);
+      setStreamingStatus(status);
       setLocalState("paused");
-      ConnectionManager.saveConnectionState(connection.id, "paused", "user");
-      if (onPause) onPause(connection.id);
+    } catch (error) {
+      setActionError(error.message || "Could not pause the connection. Please retry.");
+    } finally {
+      setIsProcessing(false);
     }
-    setIsProcessing(false);
   };
 
   const handleResume = async (e) => {
     e.stopPropagation();
     setIsProcessing(true);
-    const ok = await resumeConnection(connection.id);
-    if (ok) {
+    setActionError("");
+    statusVersionRef.current++;
+    try {
+      const status = await ConnectionManager.resumeConnection(connection.id, connection);
+      setStreamingStatus(status);
       setLocalState("streaming");
-      ConnectionManager.saveConnectionState(connection.id, "streaming", "user");
-      if (onResume) onResume(connection.id);
+    } catch (error) {
+      setActionError(error.message || "Could not resume the connection. Please retry.");
+    } finally {
+      setIsProcessing(false);
     }
-    setIsProcessing(false);
   };
 
   // Stop: disconnect from backend but keep config in localStorage

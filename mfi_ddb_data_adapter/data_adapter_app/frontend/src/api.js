@@ -7,7 +7,7 @@ export async function pauseConnection(connectionId) {
     });
     const response_data = await response.json();
     if (response.ok) {
-      const paused = !response_data.is_streaming;
+      const paused = response_data.is_connected === true && response_data.is_streaming === false;
       if (!paused) console.error(`Pause succeeded but ${connectionId} is still streaming`);
       return paused;
     }
@@ -20,23 +20,25 @@ export async function pauseConnection(connectionId) {
 }
 
 export async function resumeConnection(connectionId) {
-  let response;
+  const response = await fetch(`${API_BASE_URL}/connections/resume/${connectionId}`, {
+    method: "POST",
+  });
+  let data;
   try {
-    response = await fetch(`${API_BASE_URL}/connections/resume/${connectionId}`, {
-      method: "POST",
-    });
-  } catch (error) {
-    console.error(`Failed to resume ${connectionId} on backend:`, error);
-    return false;
+    data = await response.json();
+  } catch {
+    if (response.ok) throw new Error("The server returned an invalid resume response.");
   }
-  const response_data = await response.json();
-  if (response.ok && response_data.is_streaming) {
-    console.log(`System resumed ${connectionId} on backend (not saved to localStorage)`);
-    return true;
-  } else if (response.ok) {
-    console.error(`Failed to resume ${connectionId} on backend`);
-    return false;
+  if (!response.ok) {
+    const error = new Error(typeof data?.detail === "string"
+      ? data.detail : `Could not resume connection (HTTP ${response.status}).`);
+    error.status = response.status;
+    throw error;
   }
+  if (data?.is_connected !== true || data?.is_streaming !== true) {
+    throw new Error("The backend did not confirm that the connection resumed.");
+  }
+  return data;
 }
 
 export async function connectConnection(
@@ -95,7 +97,11 @@ export async function fetchStreamingStatus(connectionId) {
       error.status = response.status;
       throw error;
     }
-    return await response.json();
+    const data = await response.json();
+    if (typeof data?.is_connected !== "boolean" || typeof data?.is_streaming !== "boolean") {
+      throw new Error("The server returned an invalid streaming status response.");
+    }
+    return data;
   } catch (error) {
     const failure = new Error(`Failed to fetch streaming status for ${connectionId}: ${error.message}`);
     failure.status = error.status;

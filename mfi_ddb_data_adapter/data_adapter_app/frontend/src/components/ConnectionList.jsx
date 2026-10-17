@@ -6,8 +6,6 @@ const ConnectionList = ({
   onEditConnection,
   onTerminateConnection,
   onRestoreConnections,
-  onPauseConnection,
-  onResumeConnection,
   isRestoring,
 }) => {
   const hasItems = connections.length > 0;
@@ -34,8 +32,6 @@ const ConnectionList = ({
               connection={connection}
               onEdit={onEditConnection}
               onTerminate={onTerminateConnection}
-              onPause={onPauseConnection}
-              onResume={onResumeConnection}
             />
           ))}
           {!hasItems && (

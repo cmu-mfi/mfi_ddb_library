@@ -1,4 +1,4 @@
-import { connectConnection, disconnectConnection, fetchStreamingStatus, pauseConnection } from "../api.js";
+import { connectConnection, disconnectConnection, fetchStreamingStatus, pauseConnection as pauseConnectionOnBackend, resumeConnection as resumeConnectionOnBackend } from "../api.js";
 
 export class ConnectionManager {
   static STORAGE_KEY = "adapter_connections";
@@ -31,7 +31,7 @@ export class ConnectionManager {
       const detail = typeof result?.detail === "string" ? result.detail : null;
       throw new Error(detail || `Connection did not start (HTTP ${response.status}).`);
     }
-    if (state === "paused" && !(await pauseConnection(connectionId))) {
+    if (state === "paused" && !(await pauseConnectionOnBackend(connectionId))) {
       throw new Error("Could not pause the updated connection.");
     }
     return result;
@@ -149,13 +149,45 @@ export class ConnectionManager {
     }
   }
 
-  static async reconnectConnection(connectionId, config) {
+  static async pauseConnection(connectionId) {
     if (this.isUpdatingConnection(connectionId)) {
       throw new Error("This connection is already being changed.");
     }
     this.updatingConnections.add(String(connectionId));
     try {
-      const result = await this.connectWithState(connectionId, config, "streaming");
+      if (!(await pauseConnectionOnBackend(connectionId))) {
+        throw new Error("Could not pause the connection. Please retry.");
+      }
+      this.saveConnectionState(connectionId, "paused", "user");
+      return { streaming_mode: "polling", is_connected: true, is_streaming: false };
+    } finally {
+      this.updatingConnections.delete(String(connectionId));
+    }
+  }
+
+  static async ensureStreamingConnection(connectionId, config) {
+    try {
+      return await resumeConnectionOnBackend(connectionId);
+    } catch (error) {
+      if (error.status !== 404) throw error;
+      // Only a confirmed missing instance is safe to recreate from saved config.
+      return await this.connectWithState(connectionId, config, "streaming");
+    }
+  }
+
+  static async resumeConnection(connectionId, config) {
+    return this.reconnectConnection(connectionId, config, { resumeExisting: true });
+  }
+
+  static async reconnectConnection(connectionId, config, { resumeExisting = false } = {}) {
+    if (this.isUpdatingConnection(connectionId)) {
+      throw new Error("This connection is already being changed.");
+    }
+    this.updatingConnections.add(String(connectionId));
+    try {
+      const result = resumeExisting
+        ? await this.ensureStreamingConnection(connectionId, config)
+        : await this.connectWithState(connectionId, config, "streaming");
       try {
         this.saveConnectionState(connectionId, "streaming", "user");
       } catch {
@@ -163,16 +195,44 @@ export class ConnectionManager {
         try {
           cleanedUp = await disconnectConnection(connectionId);
         } catch {
-          // Retain the stopped intent if reconnect persistence fails.
+          // Retain the previous intent if streaming-state persistence fails.
         }
         throw new Error(cleanedUp
-          ? "The adapter reconnected, but its state could not be saved. It was disconnected. Please retry."
-          : "The adapter reconnected, but its state could not be saved or disconnection confirmed. Check the backend connection before retrying.");
+          ? "Streaming started, but its state could not be saved. The adapter was disconnected. Please retry."
+          : "Streaming started, but its state could not be saved or disconnection confirmed. Check the backend connection before retrying.");
       }
       return {
         ...result,
         streaming_mode: result.mode || (config.isPolling === false ? "callback" : "polling"),
       };
+    } finally {
+      this.updatingConnections.delete(String(connectionId));
+    }
+  }
+
+  static async restoreConnection(connectionId) {
+    const shouldRestore = () => !this.isUpdatingConnection(connectionId) &&
+      this.getConnectionState(connectionId).state === "streaming";
+    if (!shouldRestore()) return "skipped";
+
+    let status = null;
+    try {
+      status = await fetchStreamingStatus(connectionId);
+    } catch (error) {
+      if (error.status !== 404) throw error;
+    }
+
+    // Intent or configuration may have changed while the status request ran.
+    if (!shouldRestore()) return "skipped";
+    const config = this.getSavedConnections()[connectionId];
+    if (!config) return "skipped";
+    if (status?.is_connected === true && status.is_streaming === true) return "unchanged";
+
+    this.updatingConnections.add(String(connectionId));
+    try {
+      if (status === null) await this.connectWithState(connectionId, config, "streaming");
+      else await this.ensureStreamingConnection(connectionId, config);
+      return "restored";
     } finally {
       this.updatingConnections.delete(String(connectionId));
     }
@@ -332,7 +392,17 @@ export class ConnectionManager {
       await Promise.all(
         Object.entries(connections)
           .filter(([id]) => !this.isUpdatingConnection(id) && this.getConnectionState(id).state !== "stopped")
-          .map(async ([id]) => [id, await fetchStreamingStatus(id)])
+          .map(async ([id]) => {
+            try {
+              return [id, await fetchStreamingStatus(id)];
+            } catch (error) {
+              return [id, {
+                status: error.status === 404 ? "not_found" : "error",
+                error: error.message,
+                httpStatus: error.status ?? null,
+              }];
+            }
+          })
       )
     );
     return results;
