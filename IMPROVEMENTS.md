@@ -2,7 +2,6 @@
 |---|---|---|
 | Blocking adapter startup — implemented | `mfi_ddb_data_adapter/data_adapter_app/backend/app/api/v0/router.py` | Lifecycle calls run concurrently in the framework worker pool, with per-connection locks to serialize requests for the same ID.|
 | Timescale INSERT overhead — implemented | `mfi_ddb_database_nodes/timescaledb/connector/db.py` | Use `execute_values` for one multi-row INSERT per page of up to 500 rows, reducing repeated SQL statement processing. |
-| Topic/time indexing | `mfi_ddb_database_nodes/timescaledb/connector/db.py` | Check existing indexes and query plans; add `(topic, time)` if justified. |
 | Connection per request — implemented | `mfi_ddb_database_nodes/kv-psql/dws/server.py` | Reuse a thread-safe connection pool sized to the existing gRPC workers; close cursors and return connections after requests/streams, and close the pool on shutdown. |
 | COUNT on every page — implemented | `mfi_ddb_database_nodes/kv-psql/dws/server.py` | Fetch `page_size + 1` rows in one query, return at most `page_size`, and issue a next-page token only when an extra row exists. |
 | Sequential PI requests — implemented | `mfi_ddb_database_nodes/aveva-pi/dws/piwebapi.py` | Fetch independent streams in parallel using the default bounded worker pool and separate HTTP sessions; merge in stream order to preserve sorting and page-token behavior. Keep single-stream requests on the existing path. |
