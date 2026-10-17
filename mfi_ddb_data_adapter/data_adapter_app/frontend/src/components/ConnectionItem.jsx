@@ -33,20 +33,30 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
   const [localState, setLocalState] = useState(() => ConnectionManager.getConnectionState(connection.id).state);
   const [actionError, setActionError] = useState("");
   const statusVersionRef = useRef(0);
+  const statusRequestRef = useRef(null);
+  const mountedRef = useRef(true);
 
   const isCallback = connection.isPolling === false;
 
   // ─── Status polling ───────────────────────────────────────────────────────
 
+  const invalidateStatus = useCallback(() => {
+    statusVersionRef.current++;
+    statusRequestRef.current?.abort();
+    statusRequestRef.current = null;
+  }, []);
+
   const checkStatus = useCallback(async () => {
-    if (ConnectionManager.isUpdatingConnection(connection.id) ||
+    if (!mountedRef.current || statusRequestRef.current || ConnectionManager.isUpdatingConnection(connection.id) ||
         ConnectionManager.getConnectionState(connection.id).state === "stopped") return;
+    const controller = new AbortController();
+    statusRequestRef.current = controller;
     const version = ++statusVersionRef.current;
-    const canApplyStatus = () => version === statusVersionRef.current &&
+    const canApplyStatus = () => !controller.signal.aborted && version === statusVersionRef.current &&
       !ConnectionManager.isUpdatingConnection(connection.id) &&
       ConnectionManager.getConnectionState(connection.id).state !== "stopped";
     try {
-      const response = await fetchStreamingStatus(connection.id);
+      const response = await fetchStreamingStatus(connection.id, { signal: controller.signal });
       if (!canApplyStatus()) return;
       setStreamingStatus(response);
       setLocalState(response.is_streaming ? "streaming" : "paused");
@@ -54,6 +64,8 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
       if (!canApplyStatus()) return;
       console.error(`Failed to check streaming status for ${connection.id}:`, error);
       setStreamingStatus({ streaming_mode: "inactive", is_connected: false, is_streaming: false });
+    } finally {
+      if (statusRequestRef.current === controller) statusRequestRef.current = null;
     }
   }, [connection.id]);
 
@@ -63,13 +75,15 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
   }, [connection.id]);
 
   useEffect(() => {
+    mountedRef.current = true;
     checkStatus();
     const interval = setInterval(checkStatus, 5000);
     return () => {
       clearInterval(interval);
-      statusVersionRef.current++;
+      mountedRef.current = false;
+      invalidateStatus();
     };
-  }, [checkStatus]);
+  }, [checkStatus, invalidateStatus]);
 
   // ─── Actions ──────────────────────────────────────────────────────────────
 
@@ -77,15 +91,16 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
     e.stopPropagation();
     setIsProcessing(true);
     setActionError("");
-    statusVersionRef.current++;
+    invalidateStatus();
     try {
       const status = await ConnectionManager.pauseConnection(connection.id);
+      if (!mountedRef.current) return;
       setStreamingStatus(status);
       setLocalState("paused");
     } catch (error) {
-      setActionError(error.message || "Could not pause the connection. Please retry.");
+      if (mountedRef.current) setActionError(error.message || "Could not pause the connection. Please retry.");
     } finally {
-      setIsProcessing(false);
+      if (mountedRef.current) setIsProcessing(false);
     }
   };
 
@@ -93,15 +108,16 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
     e.stopPropagation();
     setIsProcessing(true);
     setActionError("");
-    statusVersionRef.current++;
+    invalidateStatus();
     try {
       const status = await ConnectionManager.resumeConnection(connection.id, connection);
+      if (!mountedRef.current) return;
       setStreamingStatus(status);
       setLocalState("streaming");
     } catch (error) {
-      setActionError(error.message || "Could not resume the connection. Please retry.");
+      if (mountedRef.current) setActionError(error.message || "Could not resume the connection. Please retry.");
     } finally {
-      setIsProcessing(false);
+      if (mountedRef.current) setIsProcessing(false);
     }
   };
 
@@ -110,15 +126,16 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
     e.stopPropagation();
     setIsProcessing(true);
     setActionError("");
-    statusVersionRef.current++;
+    invalidateStatus();
     try {
       const status = await ConnectionManager.stopConnection(connection.id);
+      if (!mountedRef.current) return;
       setStreamingStatus(status);
       setLocalState("stopped");
     } catch (error) {
-      setActionError(error.message || "Could not stop the connection. Please retry.");
+      if (mountedRef.current) setActionError(error.message || "Could not stop the connection. Please retry.");
     } finally {
-      setIsProcessing(false);
+      if (mountedRef.current) setIsProcessing(false);
     }
   };
 
@@ -127,22 +144,32 @@ export default function ConnectionItem({ connection, onEdit, onTerminate }) {
     e.stopPropagation();
     setIsProcessing(true);
     setActionError("");
-    statusVersionRef.current++;
+    invalidateStatus();
     try {
       const status = await ConnectionManager.reconnectConnection(connection.id, connection);
+      if (!mountedRef.current) return;
       setStreamingStatus(status);
       setLocalState("streaming");
     } catch (err) {
-      setActionError(err.message || "Could not reconnect. Please retry.");
+      if (mountedRef.current) setActionError(err.message || "Could not reconnect. Please retry.");
     } finally {
-      setIsProcessing(false);
+      if (mountedRef.current) setIsProcessing(false);
     }
   };
 
   const handleDelete = async (e) => {
     e.stopPropagation();
     if (window.confirm(`Are you sure you want to remove connection?\n${connection.id} - ${connection.adapter}`)) {
-      onTerminate(connection.id);
+      setIsProcessing(true);
+      setActionError("");
+      invalidateStatus();
+      try {
+        await onTerminate(connection.id);
+      } catch (error) {
+        if (mountedRef.current) setActionError(error.message || "Could not remove the connection. Please retry.");
+      } finally {
+        if (mountedRef.current) setIsProcessing(false);
+      }
     }
   };
 

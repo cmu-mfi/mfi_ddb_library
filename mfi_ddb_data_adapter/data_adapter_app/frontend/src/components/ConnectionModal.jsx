@@ -233,6 +233,7 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
         };
         setStep("Applying adapter changes...");
         await ConnectionManager.updateConnection(initialData.id, updated);
+        if (!activeRef.current) return;
         onSave(updated);
         onClose();
         return;
@@ -252,11 +253,12 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
         savedAt: new Date().toISOString(),
       };
       await ConnectionManager.createConnection(id, saved);
+      if (!activeRef.current) return;
       onSave(saved);
       onClose();
     } catch (e) {
       console.error(e);
-      setSaveError(e.message || "Could not save the adapter. Please retry.");
+      if (activeRef.current) setSaveError(e.message || "Could not save the adapter. Please retry.");
     } finally {
       submittingRef.current = false;
       if (activeRef.current) {
@@ -284,8 +286,13 @@ export default function ConnectionModal({ isOpen, onClose, onSave, initialData =
   }, [isOpen]);
 
   useEffect(() => {
-    fetchAdapters().then(setAdapters).catch(console.error);
-  }, []);
+    if (!isOpen) return;
+    const controller = new AbortController();
+    fetchAdapters({ signal: controller.signal })
+      .then(result => { if (!controller.signal.aborted) setAdapters(result); })
+      .catch(error => { if (!controller.signal.aborted) console.error(error); });
+    return () => controller.abort();
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;

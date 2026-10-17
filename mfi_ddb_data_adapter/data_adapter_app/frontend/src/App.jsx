@@ -3,8 +3,7 @@ import ConnectionList from "./components/ConnectionList";
 import ConnectionModal from "./components/ConnectionModal";
 import { ConnectionManager } from "./components/ConnectionManager";
 import logoMfi from "./images/logo_mfi.png";
-import { API_BASE_URL } from "./data/defaults";
-import { disconnectConnection } from "./api";
+import { disconnectConnection, fetchServerHealth } from "./api";
 
 const serverStatusCls = {
   online:   "bg-green-600 text-white",
@@ -20,15 +19,20 @@ function App() {
   const [isRestoring, setIsRestoring] = useState(false);
   const hasAutoRestoredRef = useRef(false);
   const restorationInProgressRef = useRef(false);
+  const verificationInProgressRef = useRef(false);
+  const lifetimeRef = useRef(null);
 
-  const checkServerHealth = useCallback(async () => {
+  useEffect(() => {
+    const controller = new AbortController();
+    lifetimeRef.current = controller;
+    return () => controller.abort();
+  }, []);
+
+  const checkServerHealth = useCallback(async (signal) => {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-      const response = await fetch(`${API_BASE_URL}/connections/health`, { signal: controller.signal });
-      clearTimeout(timeoutId);
-      return response.ok;
+      return await fetchServerHealth({ signal });
     } catch (error) {
+      if (signal?.aborted) throw error;
       console.error("Health check failed:", error);
       return false;
     }
@@ -48,6 +52,8 @@ function App() {
   }, []);
 
   const performStartupRestore = useCallback(async () => {
+    const signal = lifetimeRef.current?.signal;
+    if (signal?.aborted) return;
     if (hasAutoRestoredRef.current || restorationInProgressRef.current) return;
     if (!ConnectionManager.shouldRestoreOnStartup()) return;
     restorationInProgressRef.current = true;
@@ -57,29 +63,34 @@ function App() {
       let successCount = 0;
       let errorCount = 0;
       for (const connectionId of connectionIds) {
+        if (signal?.aborted) return;
         try {
-          const result = await ConnectionManager.restoreConnection(connectionId);
+          const result = await ConnectionManager.restoreConnection(connectionId, { signal });
           if (result !== "skipped") successCount++;
         } catch (error) {
+          if (signal?.aborted) return;
           console.error(`Error restoring ${connectionId}:`, error);
           errorCount++;
         }
       }
 
+      if (signal?.aborted) return;
       console.log(`Restore complete — success: ${successCount}, error: ${errorCount}`);
       hasAutoRestoredRef.current = true;
       ConnectionManager.markRestorationComplete();
       loadConnections();
     } finally {
       restorationInProgressRef.current = false;
-      setIsRestoring(false);
+      if (!signal?.aborted) setIsRestoring(false);
     }
   }, [loadConnections]);
 
-  const verifyAndRestoreConnections = useCallback(async () => {
-    if (serverStatus !== "online") return;
+  const verifyAndRestoreConnections = useCallback(async ({ signal = lifetimeRef.current?.signal } = {}) => {
+    if (serverStatus !== "online" || signal?.aborted || verificationInProgressRef.current) return;
+    verificationInProgressRef.current = true;
     try {
-      const connectionStatus = await ConnectionManager.verifyConnections();
+      const connectionStatus = await ConnectionManager.verifyConnections({ signal });
+      if (signal?.aborted) return;
       const needsRestoration = Object.entries(connectionStatus).some(([id, status]) => {
         if (ConnectionManager.isUpdatingConnection(id)) return false;
         const savedState = ConnectionManager.getConnectionState(id).state;
@@ -92,7 +103,9 @@ function App() {
         await performStartupRestore();
       }
     } catch (error) {
-      console.error("Error verifying connections:", error);
+      if (!signal?.aborted) console.error("Error verifying connections:", error);
+    } finally {
+      verificationInProgressRef.current = false;
     }
   }, [serverStatus, performStartupRestore]);
 
@@ -119,29 +132,43 @@ function App() {
 
   const handleTerminateConnection = useCallback(async (connectionId) => {
     const result = await disconnectConnection(connectionId);
-    if (!result) return;
+    if (!result) throw new Error("Could not remove the connection. Please retry.");
     ConnectionManager.removeConnection(connectionId);
-    loadConnections();
+    if (!lifetimeRef.current?.signal.aborted) loadConnections();
   }, [loadConnections]);
 
   const handleNewConnection = useCallback(() => setIsModalOpen(true), []);
 
   // Server health monitor
   useEffect(() => {
+    const controller = new AbortController();
+    let pending = false;
     const monitorServer = async () => {
-      const isOnline = await checkServerHealth();
-      const newStatus = isOnline ? "online" : "offline";
-      if (newStatus !== serverStatus) {
-        setServerStatus(newStatus);
-        if (newStatus === "online" && serverStatus === "offline") {
-          hasAutoRestoredRef.current = false;
-          ConnectionManager.resetRestorationState();
+      if (pending || controller.signal.aborted) return;
+      pending = true;
+      try {
+        const isOnline = await checkServerHealth(controller.signal);
+        if (controller.signal.aborted) return;
+        const newStatus = isOnline ? "online" : "offline";
+        if (newStatus !== serverStatus) {
+          setServerStatus(newStatus);
+          if (newStatus === "online" && serverStatus === "offline") {
+            hasAutoRestoredRef.current = false;
+            ConnectionManager.resetRestorationState();
+          }
         }
+      } catch (error) {
+        if (!controller.signal.aborted) console.error("Health check failed:", error);
+      } finally {
+        pending = false;
       }
     };
     monitorServer();
     const interval = setInterval(monitorServer, 5000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      controller.abort();
+    };
   }, [checkServerHealth, serverStatus]);
 
   // Auto-restore when server comes online
@@ -155,8 +182,12 @@ function App() {
   // Periodic verification every 30 seconds
   useEffect(() => {
     if (serverStatus === "online") {
-      const interval = setInterval(verifyAndRestoreConnections, 30000);
-      return () => clearInterval(interval);
+      const controller = new AbortController();
+      const interval = setInterval(() => verifyAndRestoreConnections({ signal: controller.signal }), 30000);
+      return () => {
+        clearInterval(interval);
+        controller.abort();
+      };
     }
   }, [serverStatus, verifyAndRestoreConnections]);
 

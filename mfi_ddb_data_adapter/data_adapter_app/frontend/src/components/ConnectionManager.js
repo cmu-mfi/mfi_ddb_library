@@ -19,14 +19,7 @@ export class ConnectionManager {
       config.isPolling !== false,
       config.pollingRateHz ?? 1
     );
-    let result;
-    try {
-      result = await response.json();
-    } catch {
-      throw new Error(response.ok
-        ? "The server returned an invalid connection response. Settings were not saved."
-        : `Connection failed (HTTP ${response.status}). Settings were not saved.`);
-    }
+    const result = response.data;
     if (!response.ok || result?.is_connected !== true || result?.is_streaming !== true) {
       const detail = typeof result?.detail === "string" ? result.detail : null;
       throw new Error(detail || `Connection did not start (HTTP ${response.status}).`);
@@ -210,14 +203,14 @@ export class ConnectionManager {
     }
   }
 
-  static async restoreConnection(connectionId) {
-    const shouldRestore = () => !this.isUpdatingConnection(connectionId) &&
+  static async restoreConnection(connectionId, { signal } = {}) {
+    const shouldRestore = () => !signal?.aborted && !this.isUpdatingConnection(connectionId) &&
       this.getConnectionState(connectionId).state === "streaming";
     if (!shouldRestore()) return "skipped";
 
     let status = null;
     try {
-      status = await fetchStreamingStatus(connectionId);
+      status = await fetchStreamingStatus(connectionId, { signal });
     } catch (error) {
       if (error.status !== 404) throw error;
     }
@@ -386,7 +379,7 @@ export class ConnectionManager {
     console.log("DEBUG: Restoration state reset - next check will trigger restoration");
   }
 
-  static async verifyConnections() {
+  static async verifyConnections(options) {
     const connections = this.getSavedConnections();
     const results = Object.fromEntries(
       await Promise.all(
@@ -394,7 +387,7 @@ export class ConnectionManager {
           .filter(([id]) => !this.isUpdatingConnection(id) && this.getConnectionState(id).state !== "stopped")
           .map(async ([id]) => {
             try {
-              return [id, await fetchStreamingStatus(id)];
+              return [id, await fetchStreamingStatus(id, options)];
             } catch (error) {
               return [id, {
                 status: error.status === 404 ? "not_found" : "error",
