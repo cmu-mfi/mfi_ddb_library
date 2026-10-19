@@ -150,7 +150,7 @@ async def list_endpoints():
     summary="Type 1: Search Trials",
     response_model=schema.Type1Response,
 )
-async def search_trials(request: schema.Type1Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
+def search_trials(request: schema.Type1Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
     """Search for trials based on provided criteria."""
     time_start = _parse_time_value(request.time_start, "time_start")
     time_end = _parse_time_value(request.time_end, "time_end")
@@ -193,7 +193,7 @@ async def search_trials(request: schema.Type1Request, metadata_reader: MdsReader
     summary="Type 2: Get Trial Data",
     response_model=schema.Type2Response,
 )
-async def get_trial_details(request: schema.Type2Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
+def get_trial_details(request: schema.Type2Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
     """Retrieve detailed data for a specific trial."""
     trial = metadata_reader.get_trial_by_uuid(request.trial_uuid, request.user_id, request.user_domain)
     if not trial:
@@ -213,7 +213,7 @@ async def get_trial_details(request: schema.Type2Request, metadata_reader: MdsRe
     summary="Type 3: Search Trials and Get Data",
     response_model=schema.Type3Response,
 )
-async def search_trials_and_get_data(request: schema.Type3Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
+def search_trials_and_get_data(request: schema.Type3Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
     """Search for trials based on provided criteria and retrieve detailed data for matching trials."""
     time_start = _parse_time_value(request.time_start, "time_start")
     time_end = _parse_time_value(request.time_end, "time_end")

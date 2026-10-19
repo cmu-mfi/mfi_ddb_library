@@ -18,6 +18,9 @@ from mfi_ddb.utils.script_utils import get_topic_from_config
 logger = logging.getLogger(__name__)
 mds = None
 
+# The message schema is static for the lifetime of this connector process.
+SCHEMA_VALIDATOR = KeyValueTopicFamily.get_schema_validator()
+
 
 from prometheus_client import start_http_server
 from opentelemetry.exporter.prometheus import PrometheusMetricReader
@@ -74,20 +77,13 @@ def callback(config, topic, message):
         logging.error("MdsConnector not available")
         return
     
-    # Convert bytes to string safely if needed
-    if isinstance(message, bytes):
-        payload_str = message.decode('utf-8')
-    else:
-        payload_str = message
-
     try:
-        # Before parsing, let's look at what the schema validator says explicitly
-        import jsonschema
-        validator = KeyValueTopicFamily.get_schema_validator()
-        raw_json_dict = json.loads(payload_str)
-        
-        # Check for errors manually to print them out
-        errors = list(validator.iter_errors(raw_json_dict))
+        payload_str = message.decode('utf-8') if isinstance(message, bytes) else message
+        data = json.loads(payload_str)
+        if isinstance(data, dict):
+            data = KeyValueTopicFamily.apply_defaults(data, SCHEMA_VALIDATOR)
+
+        errors = list(SCHEMA_VALIDATOR.iter_errors(data))
         if errors:
             # --- 3. Track validation failures ---
             schema_failures_counter.add(1, {"topic": topic})
@@ -96,16 +92,9 @@ def callback(config, topic, message):
                 print(f"Field: {'.'.join(str(p) for p in error.path)}")
                 print(f"Error Message: {error.message}")
             print("------------------------------------------\n")
-
-        data: dict = KeyValueTopicFamily.process_message(payload_str)
+            return
     except Exception as e:
-        logging.info(f"Message payload: {json.dumps(json.loads(payload_str), indent=2)}")
         logging.error(f"Error occurred while processing message on topic {topic}: {str(e)}")
-        return
-
-    # SAFETY CHECK
-    if data is None:
-        logging.error(f"Message dropped: Core library could not parse payload on topic {topic}. Data was returned as None.")
         return
 
     logging.info(f"Received message of msg_type: {data.get('msg_type')} on topic: {topic}")

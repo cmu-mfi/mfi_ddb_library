@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
+from threading import BoundedSemaphore, Lock
 from typing import List, Optional, Union, Dict
 
 import grpc
@@ -70,7 +71,7 @@ def cached_iso_format(ts_seconds: int) -> str:
 
 
 class __DwsAgent:
-    def __init__(self, cfg_file: str = "dws.endpoints.yaml"):
+    def __init__(self, cfg_file: str = "dws.endpoints.yaml", max_workers: int = 10, chunk_seconds: int = 60, rpc_timeout: float = 60):
         current_dir = Path(__file__).parent
         dws_config_path = Path(current_dir, "../config", cfg_file)
         
@@ -78,6 +79,12 @@ class __DwsAgent:
         # Persistent channel & stub storage for connection reuse
         self._channels: Dict[str, grpc.Channel] = {}
         self._stubs: Dict[str, DataServiceStub] = {}
+        self._stub_lock = Lock()
+        if max_workers < 1 or chunk_seconds < 1 or rpc_timeout <= 0:
+            raise ValueError("Worker count, chunk duration and RPC timeout must be positive")
+        self._max_workers, self._chunk_seconds, self._rpc_timeout = max_workers, chunk_seconds, rpc_timeout
+        self._executor = ThreadPoolExecutor(max_workers=max_workers)
+        self._pending = BoundedSemaphore(max_workers)
         
     def _load_config(self, config_file):
         with open(config_file, 'r') as f:
@@ -98,18 +105,30 @@ class __DwsAgent:
 
     def _get_stub(self, server_url: str) -> DataServiceStub:
         """Reuse gRPC channels and stubs across worker threads."""
-        if server_url not in self._stubs:
-            # Configure gRPC channel with keepalive options to maintain persistent connection
-            options = [
-                ('grpc.keepalive_time_ms', 30000),
-                ('grpc.keepalive_timeout_ms', 10000),
-                ('grpc.keepalive_permit_without_calls', 1),
-                ('grpc.http2.max_pings_without_data', 0),
-            ]
-            channel = grpc.insecure_channel(server_url, options=options)
-            self._channels[server_url] = channel
-            self._stubs[server_url] = DataServiceStub(channel)
-        return self._stubs[server_url]
+        with self._stub_lock:
+            if server_url not in self._stubs:
+                # Configure gRPC channel with keepalive options to maintain persistent connection
+                options = [
+                    ('grpc.keepalive_time_ms', 30000),
+                    ('grpc.keepalive_timeout_ms', 10000),
+                    ('grpc.keepalive_permit_without_calls', 1),
+                    ('grpc.http2.max_pings_without_data', 0),
+                ]
+                channel = grpc.insecure_channel(server_url, options=options)
+                self._channels[server_url] = channel
+                self._stubs[server_url] = DataServiceStub(channel)
+            return self._stubs[server_url]
+
+    def _submit_fetch(self, *args):
+        if not self._pending.acquire(timeout=self._rpc_timeout):
+            raise TimeoutError("DWS retrieval queue is full")
+        try:
+            future = self._executor.submit(self._fetch_time_chunk, *args)
+        except BaseException:
+            self._pending.release()
+            raise
+        future.add_done_callback(lambda _: self._pending.release())
+        return future
 
     def _fetch_time_chunk(self, stub: DataServiceStub, topics_str: str, start_dt: datetime, end_dt: datetime) -> List[Datapoint]:
         """Worker thread function using a SHARED gRPC stub."""
@@ -122,13 +141,13 @@ class __DwsAgent:
         )
         
         datapoints = []
-        response: GetDataRangeResponse = stub.GetDataRange(request)
+        response: GetDataRangeResponse = stub.GetDataRange(request, timeout=self._rpc_timeout)
         datapoints.extend(response.datapoints)
         
         page_count = 1
         while response.next_page_token != "":
             request.page_token = response.next_page_token
-            response = stub.GetDataRange(request)
+            response = stub.GetDataRange(request, timeout=self._rpc_timeout)
             datapoints.extend(response.datapoints)
             page_count += 1
             
@@ -163,37 +182,41 @@ class __DwsAgent:
                 # ------------------------------------------------------------------
                 # 1. PARALLEL CHUNKED gRPC FETCH (REUSING CHANNELS)
                 # ------------------------------------------------------------------
-                grpc_start = time.perf_counter()
                 
                 total_duration_sec = (dt_end - dt_start).total_seconds()
-                chunk_duration_sec = total_duration_sec / max_workers
+                chunk_count = min(self._max_workers, max(1, max_workers), max(1, int(total_duration_sec // self._chunk_seconds)))
+                chunk_duration_sec = total_duration_sec / chunk_count
                 
                 time_chunks = []
-                for i in range(max_workers):
-                    chunk_start = dt_start + timedelta(seconds=i * chunk_duration_sec)
-                    chunk_end = dt_start + timedelta(seconds=(i + 1) * chunk_duration_sec) if i < max_workers - 1 else dt_end
+                for i in range(chunk_count):
+                    chunk_start = dt_start + timedelta(seconds=int(i * chunk_duration_sec))
+                    chunk_end = dt_start + timedelta(seconds=int((i + 1) * chunk_duration_sec)) if i < chunk_count - 1 else dt_end
                     time_chunks.append((chunk_start, chunk_end))
 
                 for server in servers:
-                    logger.info(f"Retrieving data in parallel across {max_workers} threads from server: {server['name']}")
+                    logger.info(f"Retrieving data across {chunk_count} chunks from server: {server['name']}")
                     
                     # Get persistent stub for this server
                     stub = self._get_stub(server['url'])
                     
-                    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                        futures = [
-                            executor.submit(
-                                self._fetch_time_chunk, 
+                    grpc_start = time.perf_counter()
+                    futures = []
+                    try:
+                        futures.extend(
+                            self._submit_fetch(
                                 stub, 
                                 topics_str, 
                                 c_start, 
                                 c_end
                             )
                             for c_start, c_end in time_chunks
-                        ]
+                        )
                         
                         for future in as_completed(futures):
                             data_points.extend(future.result())
+                    finally:
+                        for future in futures:
+                            future.cancel()
 
                     grpc_duration = time.perf_counter() - grpc_start
                     dws_grpc_call_duration.record(
@@ -268,8 +291,10 @@ class __DwsAgent:
             dws_retrieval_counter.add(1, {"trial_name": primary_topic, "status": "ERROR"})
             raise e
 
-    def __del__(self):
-        """Cleanup gRPC channels when the agent instance is destroyed."""
+    def close(self):
+        """Drain retrieval workers before closing shared gRPC channels."""
+        if executor := getattr(self, "_executor", None):
+            executor.shutdown(wait=True, cancel_futures=True)
         for channel in getattr(self, '_channels', {}).values():
             channel.close()
 
