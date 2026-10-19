@@ -16,6 +16,7 @@ from weakref import WeakValueDictionary
 from typing import Any, Dict, List, Optional, Tuple, Iterable
 
 import app.utils.utils as utils
+import mfi_ddb
 import yaml
 from app.services.adapter_factory import AdapterFactory
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -140,17 +141,24 @@ async def validate_adapter(
 ) -> Dict:
     """Validate adapter configuration against schema."""
     try:
-        config_dict = utils.load_config(file, text)
-        temporary_instance = AdapterFactory(adp_name=adapter_name, adp_cfg=config_dict)
-        is_valid = temporary_instance.validate_data_adapter_config()
+        adapter_cls = AdapterFactory.discover_adapters().get(adapter_name)
+        if adapter_cls is None:
+            raise HTTPException(400, detail={"is_valid": False, "errors": [{
+                "loc": ["adapter_name"], "message": "Select a supported data adapter.", "type": "unknown_adapter",
+            }]})
+        result = utils.validate_config(adapter_cls.SCHEMA, file, text)
 
-        status_label = "VALID" if is_valid else "INVALID"
+        status_label = "VALID" if result["is_valid"] else "INVALID"
         adapter_validation_counter.add(1, {"target": "adapter", "adapter_name": adapter_name, "status": status_label})
-        return {"is_valid": is_valid}
+        return result
 
-    except Exception as e:
+    except HTTPException as error:
+        adapter_validation_counter.add(1, {"target": "adapter", "adapter_name": adapter_name, "status": "ERROR" if error.status_code >= 500 else "INVALID"})
+        raise
+    except Exception:
         adapter_validation_counter.add(1, {"target": "adapter", "adapter_name": adapter_name, "status": "ERROR"})
-        raise HTTPException(400, f"Validation failed: {str(e)}")
+        logger.exception("Adapter configuration validation failed")
+        raise HTTPException(500, "Configuration validation is unavailable. Please retry.")
 
 
 @router.post("/validate/streamer")
@@ -160,17 +168,19 @@ async def validate_streamer(
 ) -> Dict:
     """Validate streamer configuration against schema."""
     try:
-        config_dict = utils.load_config(file, text)
-        temporary_instance = AdapterFactory(streamer_cfg=config_dict)
-        is_valid = temporary_instance.validate_streamer_config()
+        result = utils.validate_config(mfi_ddb.Streamer.SCHEMA, file, text)
 
-        status_label = "VALID" if is_valid else "INVALID"
+        status_label = "VALID" if result["is_valid"] else "INVALID"
         adapter_validation_counter.add(1, {"target": "streamer", "status": status_label})
-        return {"is_valid": is_valid}
+        return result
 
-    except Exception as e:
+    except HTTPException as error:
+        adapter_validation_counter.add(1, {"target": "streamer", "status": "ERROR" if error.status_code >= 500 else "INVALID"})
+        raise
+    except Exception:
         adapter_validation_counter.add(1, {"target": "streamer", "status": "ERROR"})
-        raise HTTPException(400, f"Validation failed: {str(e)}")
+        logger.exception("Streamer configuration validation failed")
+        raise HTTPException(500, "Configuration validation is unavailable. Please retry.")
 
 
 @router.post("/connect/{conn_id}", dependencies=[Depends(serialize_lifecycle)])

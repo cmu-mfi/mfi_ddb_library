@@ -82,6 +82,8 @@ class AdapterFactory:
         self.is_connected = False
         self.is_streaming = False
         self.poll_streaming = threading.Event()
+        self._poll_condition = threading.Condition()
+        self._poll_stop_event = threading.Event()
 
         if not self.adp_class.SELF_UPDATE and not self.is_polling:
             self.logger.warning(
@@ -142,13 +144,27 @@ class AdapterFactory:
         self.poll_streaming.set()
         
         if self.is_polling:
+            # Each connection owns its shutdown signal and streamer. An old
+            # in-flight poll must not resume against a replacement connection.
+            stop_event = threading.Event()
+            self._poll_stop_event = stop_event
+            streamer = self.streamer
+            polling_rate_hz = self.polling_rate_hz
+
             def polling_loop():
-                while self.poll_streaming.is_set():
+                while True:
+                    with self._poll_condition:
+                        self._poll_condition.wait_for(
+                            lambda: stop_event.is_set() or self.poll_streaming.is_set()
+                        )
+                        if stop_event.is_set():
+                            return
+
                     start_time = time.perf_counter()
 
                     try:
                         # Perform polling operation
-                        self.streamer.poll_and_stream_data(self.polling_rate_hz)
+                        streamer.poll_and_stream_data(polling_rate_hz)
                         
                         # Record metrics for success
                         duration = time.perf_counter() - start_time
@@ -162,7 +178,7 @@ class AdapterFactory:
                         self.logger.error(f"Error in adapter polling thread: {e}")
                         
                         # Prevent high-frequency spinning if the error is persistent
-                        time.sleep(1.0 / self.polling_rate_hz)
+                        stop_event.wait(1.0 / polling_rate_hz)
                         
             poll_thread = threading.Thread(target=polling_loop, daemon=True)
             poll_thread.start()
@@ -179,8 +195,10 @@ class AdapterFactory:
             return
         
         if self.is_polling:
-            self.poll_streaming.set()
-            self.is_streaming = True
+            with self._poll_condition:
+                self.poll_streaming.set()
+                self.is_streaming = True
+                self._poll_condition.notify_all()
             return
         
         self.streamer.reconnect()
@@ -188,8 +206,9 @@ class AdapterFactory:
         
     def pause_streaming(self) -> None:
         if self.is_polling:
-            self.poll_streaming.clear()
-            self.is_streaming = False
+            with self._poll_condition:
+                self.poll_streaming.clear()
+                self.is_streaming = False
             return
         
         raise Exception("Pause streaming is only supported in polling mode.")
@@ -200,7 +219,10 @@ class AdapterFactory:
             return
         
         if self.is_polling:
-            self.poll_streaming.clear()
+            with self._poll_condition:
+                self._poll_stop_event.set()
+                self.poll_streaming.clear()
+                self._poll_condition.notify_all()
         
         self.streamer.disconnect()
         self.is_connected = False
