@@ -1,0 +1,37 @@
+trial_id: Trial ID for the system. No spaces or special characters allowed.
+modbus:
+  host: IP address or hostname of the Modbus TCP server
+  port: '(optional) TCP port of the Modbus server (default: 502)'
+  framer: '(optional) ''socket'' (standard Modbus TCP) or ''rtu'' (Modbus RTU over
+    TCP) (default: socket)'
+  unit_id: '(optional) Default unit ID of the device (default: 1)'
+  timeout: '(optional) Request timeout in seconds (default: 3)'
+  retries: '(optional) Retries per request (default: 3)'
+  byte_order: '(optional) ''big'' or ''little'' byte order within a register (default:
+    big)'
+  word_order: '(optional) ''big'' or ''little'' word order for 32/64-bit values. ''little''
+    = low word first (default: big)'
+  max_read_gap: '(optional) Max unused addresses between registers to merge them into
+    one read request (default: 0)'
+attributes: (optional) Static metadata added to every component
+attribute_registers: (optional) Registers read once at startup and added to the attributes
+  of every component. Same keys as 'registers'.
+components:
+- component_id: Identifier for the component
+  unit_id: (optional) Override modbus.unit_id for this component
+  trial_id: (optional) Trial ID for the component
+  attributes: (optional) Static metadata for the component
+  attribute_registers: (optional) Registers read once at startup and added to the
+    component attributes. Same keys as 'registers'.
+  registers:
+  - name: Key used for the value in the streamed data
+    address: Modicon address as a string (e.g. '400001', '016394') or, if register_type
+      is set, the 0-based protocol offset
+    register_type: (optional) coil, discrete_input, input_register, holding_register
+    data_type: '(optional) bool, int16, uint16, int32, uint32, float32, int64, uint64,
+      float64, string (default: bool for bits, uint16 for registers)'
+    count: (optional) Number of registers for data_type 'string'
+    scale: (optional) Multiplier applied to numeric values
+    units: (optional) Engineering units, added to attributes
+    byte_order: (optional) Override modbus.byte_order
+    word_order: (optional) Override modbus.word_order

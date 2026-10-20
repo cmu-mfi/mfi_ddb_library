@@ -1,0 +1,55 @@
+adapter_name: my_modbus_adapter
+trial_id: trial_001
+modbus:
+  host: 192.168.1.50
+  port: 502
+  framer: socket
+  unit_id: 1
+  timeout: 3
+  retries: 3
+  byte_order: big
+  word_order: big
+  max_read_gap: 0
+attributes:
+  manufacturer: Example Corp
+  model: Example Machine
+attribute_registers:
+- name: serial_number
+  address: '400101'
+  data_type: string
+  count: 8
+- name: firmware_version
+  address: '400110'
+  data_type: uint16
+components:
+- component_id: machine-a/spindle
+  attributes:
+    location: cell-1
+  registers:
+  - name: running
+    address: '000001'
+  - name: fault
+    address: '100001'
+  - name: speed
+    address: '300001'
+    data_type: float32
+    units: rpm
+  - name: temperature
+    address: '400001'
+    data_type: int16
+    scale: 0.1
+    units: degC
+- component_id: machine-a/power_meter
+  unit_id: 2
+  registers:
+  - name: power
+    register_type: input_register
+    address: 100
+    data_type: float32
+    word_order: little
+    units: kW
+  - name: energy_total
+    register_type: holding_register
+    address: 200
+    data_type: uint32
+    units: Wh
