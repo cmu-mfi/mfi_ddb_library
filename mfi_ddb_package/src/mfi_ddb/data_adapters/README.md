@@ -25,6 +25,7 @@ Data Adapters are the objects that represent the data that needs to be streamed.
 * [MTConnect](src/mfi_ddb/data_adapters/mtconnect.py)
 * [gRPC](src/mfi_ddb/data_adapters/grpc.py)
 * [key_value](src/mfi_ddb/data_adapters/key_value.py)
+* [Modbus](src/mfi_ddb/data_adapters/modbus.py)
 
 ## New Data Adapter Checklist
 
