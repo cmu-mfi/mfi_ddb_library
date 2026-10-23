@@ -38,7 +38,7 @@ const SERVICES_REGISTRY = [
   }
 ];
 
-export default function Step1Selection({ selectedServices, toggleService, nextStep }) {
+export default function Step1Selection({ selectedServices, toggleService, prevStep, nextStep }) {
   return (
     <div className="flex-1 flex flex-col min-h-0 justify-between h-full animate-fade">
       
@@ -65,10 +65,15 @@ export default function Step1Selection({ selectedServices, toggleService, nextSt
       </div>
 
       {/* 3. BUTTONS ROW (FIXED ANCHOR) */}
-      <div className="flex-none flex justify-end pt-4 border-t border-neutral-200 mt-2 bg-white">
+      <div className="flex-none flex flex-wrap justify-between gap-3 pt-4 border-t border-neutral-200 mt-2 bg-white">
+        <button type="button" onClick={prevStep}
+          className="px-5 py-2.5 cursor-pointer bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-bold text-sm rounded-lg border border-neutral-200 transition">
+          ← Import Options
+        </button>
         <button 
           onClick={nextStep}
-          className="px-6 py-2.5 cursor-pointer bg-cmu-red hover:bg-cmu-red-hover text-white font-semibold text-sm rounded-lg shadow-sm transition active:scale-[0.98]"
+          disabled={!Object.values(selectedServices).some(Boolean)}
+          className="px-6 py-2.5 cursor-pointer bg-cmu-red hover:bg-cmu-red-hover disabled:opacity-50 text-white font-semibold text-sm rounded-lg shadow-sm transition active:scale-[0.98]"
         >
           Configure Parameters →
         </button>

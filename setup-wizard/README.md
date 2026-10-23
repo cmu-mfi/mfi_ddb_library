@@ -29,31 +29,46 @@ Download the MFI DDB Setup Wizard package shared with you for your operating sys
 If you receive a `.zip` package, extract it first, then open the installer or app
 inside it.
 
-## Choose services and enter settings
+## Import configurations or start fresh
 
 1. Open the app and click **Get Started**.
-2. Select the services you want to run. Include **Data Adapter App** if you want
-   to open its dashboard after setup.
-3. Click **Configure Parameters**.
-4. Review each configuration page and enter your settings. Use **Next
+2. When asked **Import saved configurations?**, choose one of these options:
+
+   - **Import Folder:** select a folder containing saved YAML configurations.
+   - **Upload ZIP:** select a configuration ZIP exported by the wizard.
+   - **No, configure manually:** continue with the usual setup pages.
+
+Keep the service folders and YAML filenames together when importing. For example,
+select the folder created when you extract an exported configuration ZIP. Each
+service needs its complete set of YAML files. The app shows an error if files
+are missing, invalid, or duplicated, so you can choose another folder or ZIP.
+
+## Choose services and review settings
+
+1. Select the services you want to run. Services with imported YAML files are
+   selected automatically. Confirm any other services you need, such as the
+   **MQTT Broker Node** or **Data Adapter App**.
+2. Click **Configure Parameters**.
+3. Review each configuration page. Imported values are already filled in; you
+   can edit them before launching. If you skipped importing, enter your settings
+   in the usual forms. Use **Next
    Configuration** to continue or **Previous Configuration** to go back. Your
    entries are kept as you move between pages.
 
-## Download your configurations
+## Export your configurations
 
-On the final configuration page, you can save a copy of your settings before
-starting the services. Choose either option:
-
-| Button | What you download |
-| --- | --- |
-| **Download JSON** | One `mfi-ddb-configurations.json` file containing your selected services and their settings. |
-| **Download YAML + JSON (ZIP)** | One `mfi-ddb-configurations.zip` archive containing individual YAML configuration files and the same JSON file. |
+On the final configuration page, click **Export YAML (ZIP)** to download
+`mfi-ddb-configurations.zip`. It contains only the actual YAML configuration
+files for your selected services, organized in their service folders.
 
 The save dialog starts in your **Downloads** folder. You can choose a different
-location. Extract the ZIP to read the individual YAML files.
+location. Extract the ZIP to read the individual YAML files, or keep the ZIP to
+import during a future setup.
 
-Saving a copy is optional. You can download either format without starting Docker
+Saving a copy is optional. You can export your settings without starting Docker
 services, and your entries stay in the wizard so you can continue with setup.
+Services without YAML configuration inputs have no files to export. If you select
+only those services, the export button is disabled.
 
 ## Start the services with Docker
 

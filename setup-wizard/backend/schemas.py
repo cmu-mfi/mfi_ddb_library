@@ -11,7 +11,7 @@ TEMPLATE_DIR = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent)) /
 MODULE_DIRS = {'kv': 'kv-psql', 'ts': 'timescale', 'blob': 'blob',
                'rws': 'metadata-rws', 'aveva': 'aveva', 'daa': 'data-adapter-app'}
 CONFIG_FILES = {
-    str(path.relative_to(TEMPLATE_DIR)): module
+    path.relative_to(TEMPLATE_DIR).as_posix(): module
     for module, directory in MODULE_DIRS.items()
     for path in (TEMPLATE_DIR / directory).glob('*.yaml')
     if not path.name.startswith('compose.')

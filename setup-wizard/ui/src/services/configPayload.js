@@ -1,5 +1,11 @@
 import { YAML_CONFIG_BLUEPRINT } from '../config/yamlConfig.js';
 
+export function getDefaultFormValues() {
+  return Object.fromEntries(Object.values(YAML_CONFIG_BLUEPRINT).flatMap(config =>
+    config.fields.map(field => [field.key,
+      Array.isArray(field.default) ? [...field.default] : field.default])));
+}
+
 export function buildConfigPayload(formValues, selectedServices) {
   const configs = {};
   for (const [filename, definition] of Object.entries(YAML_CONFIG_BLUEPRINT)) {

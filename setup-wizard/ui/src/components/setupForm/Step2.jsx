@@ -27,11 +27,11 @@ export default function Step2Configuration({ selectedServices, formValues, updat
   const [isDownloading, setIsDownloading] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
 
-  const handleDownloadConfiguration = async format => {
+  const handleDownloadConfiguration = async () => {
     setIsDownloading(true);
     setErrorMsg(null);
     try {
-      await downloadConfiguration(formValues, selectedServices, format);
+      await downloadConfiguration(formValues, selectedServices);
     } catch (err) {
       setErrorMsg(err.message || 'Unable to download configurations.');
     } finally {
@@ -101,20 +101,16 @@ export default function Step2Configuration({ selectedServices, formValues, updat
         </button>
         
         <div className="flex flex-wrap gap-3">
-          {isLastPage && [
-            { format: 'json', label: 'Download JSON' },
-            { format: 'yaml', label: 'Download YAML + JSON (ZIP)' },
-          ].map(({ format, label }) => (
+          {isLastPage && (
             <button
-              key={format}
               type="button"
-              onClick={() => handleDownloadConfiguration(format)}
-              disabled={isDeploying || isDownloading}
+              onClick={handleDownloadConfiguration}
+              disabled={isDeploying || isDownloading || pages.length === 0}
               className="px-5 py-2.5 cursor-pointer bg-white hover:bg-neutral-50 disabled:opacity-50 text-neutral-800 font-bold text-sm rounded-lg border border-neutral-300 shadow-sm transition"
             >
-              {isDownloading ? 'Preparing Download...' : label}
+              {isDownloading ? 'Preparing Download...' : 'Export YAML (ZIP)'}
             </button>
-          ))}
+          )}
           <button
             onClick={() => isLastPage ? handleLaunchPipeline() : goToPage(currentIndex + 1)}
             disabled={isDeploying || isDownloading}
