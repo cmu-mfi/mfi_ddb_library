@@ -1,0 +1,12 @@
+services:
+  aveva-pi-dws:
+    platform: linux/amd64
+    container_name: mfi-aveva-pi-dws
+    image: cmumfi/mfi-ddb-aveva-pi-dws:latest
+    ports:
+    - 50054:50051
+    networks:
+    - mfi_network
+    volumes:
+    - ./config.yaml:/app/config.yaml:ro
+    restart: always

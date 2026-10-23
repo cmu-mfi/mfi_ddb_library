@@ -1,0 +1,17 @@
+mqtt:
+  broker_address: "mfi-mqtt-broker"
+  broker_port: 1883
+  username: "username"
+  password: "password"
+  tls_enabled: false
+  debug: false
+
+config:
+  save_directory: "/data/blob_storage"
+  topic:
+    version: "1.0"
+    topic_family: "blob"
+    enterprise: "mfi"
+    site: null
+    area: null
+    device: null
