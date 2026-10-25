@@ -101,8 +101,9 @@ Configurations** to change your entries, or **Retry Deployment** to try again.
 
 ## Build the app locally
 
-Install Python and Node.js, then build on the operating system you want to run
-the app on. From the repository root:
+Install [Python](https://www.python.org/downloads/) (3.13 is used in our builds)
+and [Node.js 24](https://nodejs.org/en/download), then build on the operating
+system you want to run the app on. From the repository root:
 
 ```sh
 cd setup-wizard
@@ -119,3 +120,61 @@ On Windows, use `python` instead of `python3`, and activate the environment with
 
 The build command packages both the backend and the app. Find the finished
 installer in `setup-wizard/ui/dist/`.
+
+### Build from source on Linux
+
+These commands are for an Ubuntu 22.04 or 24.04 desktop on an Intel/AMD 64-bit
+computer. Install Node.js 24 first using the link above, then install the build
+tools:
+
+```sh
+sudo apt-get update
+sudo apt-get install -y python3 python3-venv python3-pip build-essential binutils libarchive-tools
+```
+
+Download or clone this repository and open a terminal in its root folder. Build
+the Linux AppImage:
+
+```sh
+cd setup-wizard
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r backend/requirements.txt pyinstaller
+cd ui
+npm ci
+npm run electron:build -- --linux --x64 --publish never
+```
+
+Make the generated file executable and open it from the same terminal:
+
+```sh
+chmod +x dist/*.AppImage
+./dist/*.AppImage
+```
+
+Docker is needed when you start the DDB services from the wizard. It does not
+need to be running to build the app.
+
+## Download installers from GitHub Actions
+
+The [Build Setup Wizard workflow](../.github/workflows/build-setup-wizard.yml)
+builds these packages:
+
+| Download name | Package | Computer |
+| --- | --- | --- |
+| `setup-wizard-linux-x64` | `.AppImage` | Linux, Intel/AMD 64-bit |
+| `setup-wizard-win-x64` | `.exe` | Windows, Intel/AMD 64-bit |
+| `setup-wizard-mac-arm64` | `.dmg` | Mac, Apple Silicon |
+| `setup-wizard-mac-x64` | `.dmg` | Mac, Intel |
+
+It runs when wizard files change in a pull request or are pushed to `main`.
+Once the workflow is on the default branch, you can also start it manually:
+
+1. Open the repository on GitHub and go to **Actions → Build Setup Wizard**.
+2. Click **Run workflow**, choose the branch to build, and confirm.
+3. When the build finishes, open that run and find **Artifacts**.
+4. Download the package for your computer and extract the downloaded ZIP to find
+   the installer. You must be signed in to GitHub to download artifacts.
+
+Downloads are kept for 14 days. These builds are unsigned and the macOS builds
+are not notarized, so your operating system may ask for permission to open them.
