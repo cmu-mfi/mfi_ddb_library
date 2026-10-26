@@ -2008,6 +2008,9 @@ dependencies = [
     { name = "protobuf", version = "6.33.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
     { name = "pydantic", version = "2.10.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "pydantic", version = "2.13.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
+    { name = "pymodbus", version = "3.6.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
+    { name = "pymodbus", version = "3.8.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.9.*'" },
+    { name = "pymodbus", version = "3.16.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "pyyaml" },
     { name = "requests", version = "2.32.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.9'" },
     { name = "requests", version = "2.32.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.9.*'" },
@@ -2045,6 +2048,7 @@ requires-dist = [
     { name = "ping3", specifier = ">=4.0.8" },
     { name = "protobuf", specifier = ">=5.29.5" },
     { name = "pydantic", specifier = ">=2.10.6" },
+    { name = "pymodbus", specifier = ">=3.6.9" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "requests", specifier = ">=2.32.4" },
     { name = "rospkg", specifier = ">=1.6.0" },
@@ -3110,6 +3114,45 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/ac/ad/5565071e937d8e752842ac241463944c9eb14c87e2d269f2658a5bd05e98/pydantic_core-2.46.4-pp311-pypy311_pp73-musllinux_1_1_armv7l.whl", hash = "sha256:d396ec2b979760aaf3218e76c24e65bd0aca24983298653b3a9d7a45f9e47b30", size = 2310000, upload-time = "2026-05-06T13:37:56.694Z" },
     { url = "https://files.pythonhosted.org/packages/4f/c3/66883a5cec183e7fba4d024b4cbbe61851a63750ef606b0afecc46d1f2bf/pydantic_core-2.46.4-pp311-pypy311_pp73-musllinux_1_1_x86_64.whl", hash = "sha256:86e1a4418c6cd97d60c95c71164158eaf7324fae7b0923264016baa993eba6fc", size = 2361286, upload-time = "2026-05-06T13:40:05.667Z" },
     { url = "https://files.pythonhosted.org/packages/4b/2d/69abac8f838090bbecd5df894befb2c2619e7996a98ddb949db9f3b93225/pydantic_core-2.46.4-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:d51026d73fcfd93610abc7b27789c26b313920fcfb20e27462d74a7f8b06e983", size = 2193071, upload-time = "2026-05-06T13:38:08.682Z" },
+]
+
+[[package]]
+name = "pymodbus"
+version = "3.6.9"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version < '3.9'",
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b4/a4/5322c8e3be3bb2db7ab3eb7c2160fd2ec325083d7e60a76cd9cc896dd7bd/pymodbus-3.6.9.tar.gz", hash = "sha256:f4223b72c20cd00a2cf25f6ddb31ecb2c0587309111a55283b2f4a1ac115e4cc", size = 193922, upload-time = "2024-06-27T10:24:31.267Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a2/1e/579762ad921bb7c0dd5108ae00cedd07b7baa150083d210bcd2b1aeb4262/pymodbus-3.6.9-py3-none-any.whl", hash = "sha256:91dea79f157ca2d26c137190de76dce5a6c99c0ea514d2d1bf3980acbbdaf29c", size = 186547, upload-time = "2024-06-27T10:24:29.018Z" },
+]
+
+[[package]]
+name = "pymodbus"
+version = "3.8.6"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version == '3.9.*'",
+]
+sdist = { url = "https://files.pythonhosted.org/packages/47/3a/a6958507d6f9c0c50f11cd299b056161c10f3cef7c227b44bc183a7e7854/pymodbus-3.8.6.tar.gz", hash = "sha256:7689b56cc3ad05a594e1486e772abb9d9646c01737935df492db04455680baf6", size = 162341, upload-time = "2025-02-10T11:53:24.596Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/84/23/8f30f094b4a00428bd3c28dd3b6a2b3715164ab85520673e197bd4bba2e7/pymodbus-3.8.6-py3-none-any.whl", hash = "sha256:b82373295fb98c9a9bf9338235240a8b2e97bcc49c0d833168cade7ba2fa90e6", size = 164366, upload-time = "2025-02-10T11:53:22.384Z" },
+]
+
+[[package]]
+name = "pymodbus"
+version = "3.16.1"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.11' and sys_platform == 'win32'",
+    "python_full_version >= '3.11' and sys_platform == 'emscripten'",
+    "python_full_version >= '3.11' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.10.*'",
+]
+sdist = { url = "https://files.pythonhosted.org/packages/65/ca/2552fdc467e87a04654af2b6cd994a29653cf767e371792810e15f4715f6/pymodbus-3.16.1.tar.gz", hash = "sha256:19e571826dff37860afc31c845c1fd2fb72acffca02a233506b32d94fa022c33", size = 168950, upload-time = "2026-10-11T17:38:47.372Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ee/b4/c6ccb9186b576abbbbffe865544184014fcc0563dfdff00749ca234ca0f8/pymodbus-3.16.1-py3-none-any.whl", hash = "sha256:bb433f7417280bdea1190d95495aa6fb8e1fa8e0d720c436922b270bc378024c", size = 167870, upload-time = "2026-10-11T17:38:45.39Z" },
 ]
 
 [[package]]

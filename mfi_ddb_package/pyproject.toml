@@ -24,6 +24,7 @@ dependencies = [
     "ping3>=4.0.8",
     "protobuf>=5.29.5",
     "pydantic>=2.10.6",
+    "pymodbus>=3.6.9",
     "pyyaml>=6.0.2",
     "requests>=2.32.4",
     "rospkg>=1.6.0",
