@@ -94,8 +94,8 @@ jobs:
       - name: Run tests for KvDataAdapter
         run: uv run pytest tests/data_adapters/test_kv_adapter.py -v --tb=short
 
-      - name: Run tests for ModbusDataAdapter
-        run: uv run pytest tests/data_adapters/test_modbus_adapter.py -v --tb=short
+      - name: Run tests for ModbusTcpDataAdapter
+        run: uv run pytest tests/data_adapters/test_modbus_tcp_adapter.py -v --tb=short
 
 
   # JOB 3: Run ROS2 tests

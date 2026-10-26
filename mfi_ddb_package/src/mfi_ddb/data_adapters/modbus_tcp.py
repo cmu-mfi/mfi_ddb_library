@@ -326,8 +326,8 @@ def _get_framer(name: str):
     return FramerType.RTU if name == "rtu" else FramerType.SOCKET
 
 
-class ModbusDataAdapter(BaseDataAdapter):
-    NAME = "Modbus"
+class ModbusTcpDataAdapter(BaseDataAdapter):
+    NAME = "ModbusTCP"
 
     CONFIG_HELP = {
         "trial_id": "Trial ID for the system. No spaces or special characters allowed.",
@@ -447,7 +447,7 @@ class ModbusDataAdapter(BaseDataAdapter):
 
     def __init__(self, config: dict):
         try:
-            config = ModbusDataAdapter.SCHEMA(**config).model_dump()
+            config = ModbusTcpDataAdapter.SCHEMA(**config).model_dump()
         except Exception as e:
             raise ConfigError(f"Invalid configuration: {e}") from None
 
@@ -517,7 +517,7 @@ class ModbusDataAdapter(BaseDataAdapter):
             self.attributes[component_id].update(values)
 
         print(
-            f"ModbusDataAdapter initialized: {len(self.component_ids)} components, "
+            f"ModbusTcpDataAdapter initialized: {len(self.component_ids)} components, "
             f"{len(data_points)} registers in {len(self._data_blocks)} read requests"
         )
 

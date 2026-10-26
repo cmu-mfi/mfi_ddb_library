@@ -89,7 +89,7 @@ A web application providing a REST API interface for managing data adapters on a
 | ROS/ROS Files | ROS robot data |
 | gRPC | gRPC service data |
 | Key-Value | Key-value store data |
-| Modbus | Poll registers from Modbus TCP devices (PLCs, controllers, meters) |
+| ModbusTCP | Poll registers from Modbus TCP devices (PLCs, controllers, meters), incl. RTU framing over TCP |
 
 ### 3. Database Nodes (`mfi_ddb_database_nodes`)
 Compatible database storage nodes:

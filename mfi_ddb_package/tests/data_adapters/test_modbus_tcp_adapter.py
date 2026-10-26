@@ -6,9 +6,9 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-import mfi_ddb.data_adapters.modbus as modbus
-from mfi_ddb.data_adapters.modbus import (
-    ModbusDataAdapter,
+import mfi_ddb.data_adapters.modbus_tcp as modbus
+from mfi_ddb.data_adapters.modbus_tcp import (
+    ModbusTcpDataAdapter,
     _Point,
     decode_registers,
     parse_address,
@@ -17,7 +17,7 @@ from mfi_ddb.data_adapters.modbus import (
 from mfi_ddb.utils.exceptions import ConfigError
 
 CONFIG_DIR = Path(__file__).resolve().parents[2] / "examples" / "configs" / "data_adapters"
-GENERIC = yaml.safe_load((CONFIG_DIR / "modbus.yaml").read_text(encoding="utf-8"))
+GENERIC = yaml.safe_load((CONFIG_DIR / "modbustcp.yaml").read_text(encoding="utf-8"))
 
 GENERIC_VALUES = {
     "serial_number": "SN-12345",
@@ -253,7 +253,7 @@ def plc_adapter(fake_client, **modbus_overrides):
     fake_client(PLC, PLC_VALUES)
     config = copy.deepcopy(PLC)
     config["modbus"].update(modbus_overrides)
-    return ModbusDataAdapter(config)
+    return ModbusTcpDataAdapter(config)
 
 
 # ADDRESSES, DECODING, READ PLANNING
@@ -330,9 +330,9 @@ def test_plan_read_blocks():
 
 
 def test_example_configs_are_valid():
-    for config in (PLC, GENERIC, ModbusDataAdapter.CONFIG_EXAMPLE):
-        ModbusDataAdapter.SCHEMA.model_validate(config)
-    assert ModbusDataAdapter.CONFIG_EXAMPLE == GENERIC
+    for config in (PLC, GENERIC, ModbusTcpDataAdapter.CONFIG_EXAMPLE):
+        ModbusTcpDataAdapter.SCHEMA.model_validate(config)
+    assert ModbusTcpDataAdapter.CONFIG_EXAMPLE == GENERIC
 
 
 INVALID_REGISTERS = [
@@ -356,7 +356,7 @@ def test_schema_rejects_invalid_register(register, location):
     else:
         config["attribute_registers"] = [register]
     with pytest.raises(ValidationError, match="Register 'x'"):
-        ModbusDataAdapter.SCHEMA.model_validate(config)
+        ModbusTcpDataAdapter.SCHEMA.model_validate(config)
 
 
 @pytest.mark.parametrize("register", INVALID_REGISTERS)
@@ -365,7 +365,7 @@ def test_invalid_register_rejected(fake_client, register):
     config = copy.deepcopy(GENERIC)
     config["components"][0]["registers"] = [register]
     with pytest.raises(ConfigError):
-        ModbusDataAdapter(config)
+        ModbusTcpDataAdapter(config)
 
 
 def test_duplicates_and_missing_keys_rejected(fake_client):
@@ -373,18 +373,18 @@ def test_duplicates_and_missing_keys_rejected(fake_client):
     config = copy.deepcopy(GENERIC)
     config["components"][0]["registers"].append(dict(config["components"][0]["registers"][0]))
     with pytest.raises(ConfigError):
-        ModbusDataAdapter(config)
+        ModbusTcpDataAdapter(config)
 
     config = copy.deepcopy(GENERIC)
     config["components"][1]["component_id"] = config["components"][0]["component_id"]
     with pytest.raises(ConfigError):
-        ModbusDataAdapter(config)
+        ModbusTcpDataAdapter(config)
 
     for key in ("trial_id", "modbus", "components"):
         config = copy.deepcopy(GENERIC)
         del config[key]
         with pytest.raises(ConfigError):
-            ModbusDataAdapter(config)
+            ModbusTcpDataAdapter(config)
 
 
 # ADAPTER BEHAVIOR
@@ -422,7 +422,7 @@ def test_data_and_attributes(fake_client):
 
 def test_generic_example(fake_client):
     fake_client(GENERIC, GENERIC_VALUES)
-    adapter = ModbusDataAdapter(copy.deepcopy(GENERIC))
+    adapter = ModbusTcpDataAdapter(copy.deepcopy(GENERIC))
     adapter.get_data()
 
     assert adapter.data["machine-a/spindle"] == {
@@ -444,7 +444,7 @@ def test_generic_example(fake_client):
 
 def test_unit_id_keyword_detected_from_client(fake_client):
     fake_client(GENERIC, GENERIC_VALUES, FakeRenamedKwargClient)
-    adapter = ModbusDataAdapter(copy.deepcopy(GENERIC))
+    adapter = ModbusTcpDataAdapter(copy.deepcopy(GENERIC))
     adapter.get_data()
     assert adapter._unit_id_kwarg == "unit"
     assert adapter.data["machine-a/power_meter"] == {"power": 12.25, "energy_total": 123456789}
@@ -480,7 +480,7 @@ def test_unreachable_server(fake_client):
     fake_client(PLC, PLC_VALUES)
     FakeModbusTcpClient.reachable = False
     with pytest.raises(ConnectionError):
-        ModbusDataAdapter(copy.deepcopy(PLC))
+        ModbusTcpDataAdapter(copy.deepcopy(PLC))
 
 
 def test_connection_lost_and_restored(fake_client):

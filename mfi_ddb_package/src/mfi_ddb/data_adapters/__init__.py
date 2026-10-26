@@ -2,7 +2,7 @@ from .base import BaseDataAdapter as BaseDataAdapter
 from .grpc import GrpcDataAdapter as GrpcDataAdapter
 from .key_value import KvDataAdapter as KvDataAdapter
 from .local_files import LocalFilesDataAdapter as LocalFilesDataAdapter
-from .modbus import ModbusDataAdapter as ModbusDataAdapter
+from .modbus_tcp import ModbusTcpDataAdapter as ModbusTcpDataAdapter
 from .mqtt import MqttDataAdapter as MqttDataAdapter
 from .mtconnect import MTconnectDataAdapter as MTconnectDataAdapter
 from .ros import RosDataAdapter as RosDataAdapter
