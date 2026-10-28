@@ -20,7 +20,7 @@ or Node.js, or download this project's source code.
 
 ## Download and open the app
 
-Download the MFI DDB Setup Wizard package shared with you for your operating system.
+Download the MFI DDB Setup Wizard package shared with you for your operating system. [Release and Download links to be updated]
 
 | Operating system | Package | How to open it |
 | --- | --- | --- |
