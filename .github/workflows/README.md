@@ -46,6 +46,7 @@ This repository uses GitHub Actions for continuous integration and automation. B
 | 7 | [docker-release.yml](./docker-release.yml)            | Triggerable    | Standalone Docker image build and push                |
 | 8 | [release.yml](./release.yml)                      | Triggerable    | Full release pipeline: PyPI → Docker → GitHub release |
 | 9 | [ros2.yaml](./ros2.yaml)                       | Reusable       | ROS2 tests (referenced by ci-checks.yml via `workflow_call`) |
+| 10 | [build-setup-wizard.yml](./build-setup-wizard.yml) | Triggerable | Builds Setup Wizard DMG, AppImage, and EXE installers; uploads them as artifacts |
 
 
 ## Notes
