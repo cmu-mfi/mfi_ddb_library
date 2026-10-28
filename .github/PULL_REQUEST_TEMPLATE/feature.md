@@ -30,3 +30,13 @@
 > If you had more time and resources, how would you improve the current implementation? Provide at least 1 suggestion for improvement or future work.
 
 * ...
+
+---
+
+### Checklist
+
+- [ ] Review related existing open issues and tag them below. Write _"None"_, if not applicable.
+  - ...
+- [ ] Review if the feature needs a CI workflow.
+  - If yes, and not provided, please write your ideas in [Potential improvement](#potential-improvement) section.
+  - If no, check this box off, and enjoy!
