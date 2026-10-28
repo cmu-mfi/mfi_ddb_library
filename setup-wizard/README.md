@@ -4,6 +4,8 @@ The Setup Wizard helps you choose Digital Data Backbone (DDB) services, enter
 their settings, and start them using Docker. You can also download a copy of your
 settings from the app.
 
+![MFI DDB Setup Wizard demo](ui/public/ddb%20setup%20wizard.gif)
+
 ## Before you start
 
 - Install [Docker with Docker Compose](https://docs.docker.com/get-started/get-docker/)
