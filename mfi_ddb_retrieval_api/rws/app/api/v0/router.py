@@ -6,41 +6,51 @@ Configuration Router for MFI DDB Retrieval API
 
 import datetime
 import logging
+import os
+import re
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Literal, Optional
 
 from dateutil import parser
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.schema import schema
-from app.services.pg_mds import MdsReader
 from app.services.dws_agent import DwsAgent
+from app.services.pg_mds import MdsReader
 
 logger = logging.getLogger(__name__)
 
 # FastAPI router
 router = APIRouter()
 
+
 # psql initialization
 def get_metadata_reader(request: Request):
     """Dependency to get metadata_reader from app state."""
     return request.app.state.metadata_reader
 
+
 # dws initialization
 dws_agent = None  # Placeholder for DWS agent initialization
 
 
-def _parse_time_value(value: Optional[str], field_name: str) -> Optional[datetime.datetime]:
+def _parse_time_value(
+    value: Optional[str], field_name: str
+) -> Optional[datetime.datetime]:
     if value is None:
         return None
     try:
-        time_iso = parser.parse(value).isoformat()        
+        time_iso = parser.parse(value).isoformat()
         return datetime.datetime.fromisoformat(time_iso)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid {field_name}: {value}")
 
 
-def _build_trial_payload(trial_row: Dict[str, Any], request: schema.Type2Request) -> Dict[str, Any]:
+def _build_trial_payload(
+    trial_row: dict[str, Any],
+    request: schema.Type2Request | schema.Type4Request,
+    bytes: bool = False,
+) -> dict[str, Any]:
     start_ts = _parse_time_value(request.time_start, "time_start")
     end_ts = _parse_time_value(request.time_end, "time_end")
 
@@ -70,27 +80,33 @@ def _build_trial_payload(trial_row: Dict[str, Any], request: schema.Type2Request
         "data_format": request.data_format,
         "retrieved_at": datetime.datetime.now().isoformat() + "Z",
     }
-    
-    # TODO: USE THE METADATA TO GET DATA USING DWS AGENT
+
+    # USE THE METADATA TO GET DATA USING DWS AGENT
     data_topics = trial_row.get("data_topics", [])
     try:
-        data = DwsAgent.get_data(data_topics, start_value, end_value)
-        logger.info(f"Retrieved data for trial {trial_row.get('uuid')}: {data}")    
+        data = DwsAgent.get_data(data_topics, start_value, end_value, bytes)
+        logger.info(f"Retrieved data for trial {trial_row.get('uuid')}: {data}")
     except Exception as e:
-        logger.error(f"Error retrieving data for trial {trial_row.get('trial_name')}: {e}")
+        logger.error(
+            f"Error retrieving data for trial {trial_row.get('trial_name')}: {e}"
+        )
         data = {}
-    
+
     return {
         "metadata": metadata,
         "data": data,  # Actual data retrieved using DWS agent
     }
 
 
-def _validate_time_range(start: Optional[datetime.datetime], end: Optional[datetime.datetime]):
+def _validate_time_range(
+    start: Optional[datetime.datetime], end: Optional[datetime.datetime]
+):
     if start is None or end is None:
         return
     if end < start:
-        raise HTTPException(status_code=400, detail="time_end must be equal to or after time_start")
+        raise HTTPException(
+            status_code=400, detail="time_end must be equal to or after time_start"
+        )
 
 
 @router.get(
@@ -101,7 +117,7 @@ def _validate_time_range(start: Optional[datetime.datetime], end: Optional[datet
 )
 async def list_endpoints():
     """
-    List all available endpoints.
+    list all available endpoints.
     """
 
     endpoints = [
@@ -124,13 +140,15 @@ async def list_endpoints():
         {
             "endpoint": "/type4",
             "description": "Download files/bytes data. (NOT IMPLEMENTED YET)",
-        }
+        },
     ]
 
     return schema.Type0Response(
         status="success",
         message="Available endpoints returned.",
-        endpoints=[schema.Type0Response.EndpointInfo(**endpoint) for endpoint in endpoints],
+        endpoints=[
+            schema.Type0Response.EndpointInfo(**endpoint) for endpoint in endpoints
+        ],
     )
 
 
@@ -140,7 +158,10 @@ async def list_endpoints():
     summary="Type 1: Search Trials",
     response_model=schema.Type1Response,
 )
-async def search_trials(request: schema.Type1Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
+async def search_trials(
+    request: schema.Type1Request,
+    metadata_reader: MdsReader = Depends(get_metadata_reader),
+):
     """
     Search for trials based on provided criteria.
 
@@ -164,12 +185,12 @@ async def search_trials(request: schema.Type1Request, metadata_reader: MdsReader
         project_name=request.project_name,
         search_terms=request.search_terms,
     )
-    
+
     for trial in trials:
         for key, value in trial.items():
             if isinstance(value, datetime.datetime):
                 trial[key] = value.isoformat()
-    
+
     return schema.Type1Response(
         status="success",
         message=f"Found {len(trials)} trial(s).",
@@ -183,14 +204,19 @@ async def search_trials(request: schema.Type1Request, metadata_reader: MdsReader
     summary="Type 2: Get Trial Data",
     response_model=schema.Type2Response,
 )
-async def get_trial_details(request: schema.Type2Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
+async def get_trial_details(
+    request: schema.Type2Request,
+    metadata_reader: MdsReader = Depends(get_metadata_reader),
+):
     """
     Retrieve detailed data for a specific trial.
 
     - **request**: A JSON object containing the trial UUID and other optional parameters for data retrieval.
     """
 
-    trial = metadata_reader.get_trial_by_uuid(request.trial_uuid, request.user_id, request.user_domain)
+    trial = metadata_reader.get_trial_by_uuid(
+        request.trial_uuid, request.user_id, request.user_domain
+    )
     if not trial:
         raise HTTPException(status_code=404, detail="Trial not found")
 
@@ -208,7 +234,10 @@ async def get_trial_details(request: schema.Type2Request, metadata_reader: MdsRe
     summary="Type 3: Search Trials and Get Data",
     response_model=schema.Type3Response,
 )
-async def search_trials_and_get_data(request: schema.Type3Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
+async def search_trials_and_get_data(
+    request: schema.Type3Request,
+    metadata_reader: MdsReader = Depends(get_metadata_reader),
+):
     """
     Search for trials based on provided criteria and retrieve detailed data for matching trials.
 
@@ -234,20 +263,73 @@ async def search_trials_and_get_data(request: schema.Type3Request, metadata_read
     )
 
     if len(trials) == 1:
-        data = _build_trial_payload(trials[0], request) # type: ignore
+        data = _build_trial_payload(trials[0], request)  # type: ignore
         return schema.Type2Response(
             status="success",
             message="Unique trial found and data retrieved.",
             data=data,
         )
-        
+
     for trial in trials:
         for key, value in trial.items():
             if isinstance(value, datetime.datetime):
                 trial[key] = value.isoformat()
-                
+
     return schema.Type1Response(
         status="success",
         message=f"Found {len(trials)} trial(s).",
         trials=[schema.Type1Response.TrialInfo(**trial) for trial in trials],
     )
+
+
+@router.post(
+    "/type4",
+    description=Path("./app/docs/type4.md").read_text(),
+    summary="Type 4: Download file/bytes data",
+    response_model=schema.Type4Response,
+)
+async def get_file_value(
+    request: schema.Type4Request,
+    metadata_reader: MdsReader = Depends(get_metadata_reader),
+):
+    """
+    Retrieve detailed data for a specific trial.
+
+    - **request**: A JSON object containing the trial UUID and other optional parameters for data retrieval.
+    """
+
+    # TODO: Memory and CPU usage check. Wait till enough memory and CPU is available.
+    ...
+
+    trial = metadata_reader.get_trial_by_uuid(
+        request.trial_uuid, request.user_id, request.user_domain
+    )
+    if not trial:
+        raise HTTPException(status_code=404, detail="Trial not found")
+
+    dataset = _build_trial_payload(trial, request, bytes=True)
+
+    # Check number of files. If more than one, send .zip, otherwise the file as is.
+    filepaths: list[str] = []
+    metadata = dataset["metadata"]
+    metadata["files"] = {}
+    data: dict[str, list[dict[Literal["timestamp", "value"], Any]]] = dataset["data"]
+    for topic, topic_data in data.items():
+        metadata["files"][topic] = []
+        for timestamp in topic_data:
+            filepaths.append(timestamp["value"])
+            filename = re.split(r'[/\\]', timestamp["value"])[-1]
+            metadata["files"]["timestamp"] = timestamp["timestamp"]
+            metadata["files"]["filename"] = filename
+        
+    filepath_to_send = ""
+    if len(filepaths)>1:
+        #TODO: zip them all
+        ...
+    elif len(filepaths) == 1:
+        filepath_to_send = filepaths[0]
+    else:
+        raise HTTPException(status_code=404, detail="No files found for the request.")
+
+    filename = re.split(r'[/\\]', filepath_to_send)[-1]
+    return schema.Type4Response(path=filepath_to_send, filename=filename, metadata=metadata)
