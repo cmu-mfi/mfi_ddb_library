@@ -1,5 +1,7 @@
 import copy
+import hashlib
 import logging
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Literal, Optional, Union
@@ -114,6 +116,11 @@ class __DwsAgent:
                     unique_data_points.append(dp)
 
             # CONVERT TO KEY VALUE PAIRS
+            # When bytes=True, file values are saved to a temporary directory
+            # created lazily for this call; cleanup is the caller's
+            # responsibility (see the RWS type4 endpoint).
+            temp_dir: Optional[Path] = None
+            file_count = 0
             for dp in unique_data_points:
                 value = None
                 value_field = dp.WhichOneof("value")
@@ -127,35 +134,44 @@ class __DwsAgent:
                     value = MessageToDict(dp.json_value)
                 elif value_field == "file_value":
                     if not bytes:
-                        value = dp.file_value.filename 
+                        value = dp.file_value.filename
                     else:
-                        #TODO: save file in temporary files and share the filepath back
-                        ...
-                        filepath = ...
-                        
-                        value = filepath
-                    logger.warning(
-                        f"File value found for topic {dp.topic} at timestamp {dp.timestamp.seconds}. Returning filename '{value}' instead of file content."
-                    )
+                        if temp_dir is None:
+                            temp_dir = Path(tempfile.mkdtemp(prefix="rws_files_"))
+
+                        content = dp.file_value.content
+                        sha256_expected = dp.file_value.sha256 or None
+                        if sha256_expected:
+                            sha256_actual = hashlib.sha256(content).hexdigest()
+                            if sha256_actual != sha256_expected:
+                                logger.warning(
+                                    f"SHA256 mismatch for file '{dp.file_value.filename}' "
+                                    f"on topic {dp.topic} at timestamp {dp.timestamp.seconds}: "
+                                    f"expected {sha256_expected}, got {sha256_actual}"
+                                )
+
+                        # All files of one call live flat in the same temp dir;
+                        # an index prefix keeps same-named files from colliding.
+                        # The original filename is returned alongside via the
+                        # "filename" key.
+                        filepath = temp_dir / f"{file_count:04d}_{Path(dp.file_value.filename).name}"
+                        filepath.write_bytes(content)
+                        value = str(filepath)
+                        file_count += 1
+
+                entry = {
+                    "timestamp": datetime.fromtimestamp(
+                        dp.timestamp.seconds
+                    ).isoformat(),
+                    "value": value,
+                }
+                if value_field == "file_value" and bytes:
+                    entry["filename"] = dp.file_value.filename
 
                 if dp.topic in result:
-                    result[dp.topic].append(
-                        {
-                            "timestamp": datetime.fromtimestamp(
-                                dp.timestamp.seconds
-                            ).isoformat(),
-                            "value": value,
-                        }
-                    )
+                    result[dp.topic].append(entry)
                 else:
-                    result[dp.topic] = [
-                        {
-                            "timestamp": datetime.fromtimestamp(
-                                dp.timestamp.seconds
-                            ).isoformat(),
-                            "value": value,
-                        }
-                    ]
+                    result[dp.topic] = [entry]
         return result
 
     def _call_dws_server(

@@ -4,15 +4,19 @@ Configuration Router for MFI DDB Retrieval API
 ...
 """
 
+import asyncio
 import datetime
 import logging
 import os
-import re
+import shutil
+import time
+import zipfile
 from pathlib import Path
 from typing import Any, Literal, Optional
 
+import psutil
 from dateutil import parser
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 
 from app.schema import schema
 from app.services.dws_agent import DwsAgent
@@ -23,15 +27,22 @@ logger = logging.getLogger(__name__)
 # FastAPI router
 router = APIRouter()
 
+# Docs are read at import time; resolve relative to this file so the service
+# works regardless of the working directory it is started from.
+DOCS_DIR = Path(__file__).resolve().parents[2] / "docs"
+
+# Resource guard defaults for file downloads (type4). These are intentionally
+# hardcoded for now; moving them to a configuration file is planned.
+MIN_AVAILABLE_MEMORY_MB = 256
+MAX_CPU_PERCENT = 90.0
+RESOURCE_WAIT_TIMEOUT_S = 5.0
+RESOURCE_POLL_INTERVAL_S = 0.5
+
 
 # psql initialization
 def get_metadata_reader(request: Request):
     """Dependency to get metadata_reader from app state."""
     return request.app.state.metadata_reader
-
-
-# dws initialization
-dws_agent = None  # Placeholder for DWS agent initialization
 
 
 def _parse_time_value(
@@ -109,9 +120,43 @@ def _validate_time_range(
         )
 
 
+async def _check_system_resources() -> None:
+    """
+    Wait until enough memory and CPU are available to serve a file download.
+
+    File downloads (type4) can pull large file contents from the DWS servers,
+    so we refuse to start when the system is already under heavy load. If
+    resources stay below the limits for longer than RESOURCE_WAIT_TIMEOUT_S
+    seconds, a 503 is raised and the client is asked to retry later.
+    """
+    # cpu_percent(interval=None) is non-blocking but returns 0.0 on the first
+    # call (no baseline yet); it becomes meaningful once the wait loop runs.
+    cpu_percent = psutil.cpu_percent(interval=None)
+    deadline = time.monotonic() + RESOURCE_WAIT_TIMEOUT_S
+    while True:
+        available_mb = psutil.virtual_memory().available / (1024 * 1024)
+        if available_mb >= MIN_AVAILABLE_MEMORY_MB and cpu_percent < MAX_CPU_PERCENT:
+            return
+
+        if time.monotonic() >= deadline:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Not enough system resources to serve the file download. "
+                    f"Available memory: {available_mb:.0f} MB "
+                    f"(minimum {MIN_AVAILABLE_MEMORY_MB} MB), "
+                    f"CPU utilization: {cpu_percent:.1f}% "
+                    f"(maximum {MAX_CPU_PERCENT}%). Please retry later."
+                ),
+            )
+
+        await asyncio.sleep(RESOURCE_POLL_INTERVAL_S)
+        cpu_percent = psutil.cpu_percent(interval=None)
+
+
 @router.get(
     "/type0",
-    description=Path("./app/docs/type0.md").read_text(),
+    description=(DOCS_DIR / "type0.md").read_text(),
     summary="Type 0: Get Endpoints Info",
     response_model=schema.Type0Response,
 )
@@ -139,7 +184,7 @@ async def list_endpoints():
         },
         {
             "endpoint": "/type4",
-            "description": "Download files/bytes data. (NOT IMPLEMENTED YET)",
+            "description": "Download file/bytes data for a trial.",
         },
     ]
 
@@ -154,7 +199,7 @@ async def list_endpoints():
 
 @router.post(
     "/type1",
-    description=Path("./app/docs/type1.md").read_text(),
+    description=(DOCS_DIR / "type1.md").read_text(),
     summary="Type 1: Search Trials",
     response_model=schema.Type1Response,
 )
@@ -200,7 +245,7 @@ async def search_trials(
 
 @router.post(
     "/type2",
-    description=Path("./app/docs/type2.md").read_text(),
+    description=(DOCS_DIR / "type2.md").read_text(),
     summary="Type 2: Get Trial Data",
     response_model=schema.Type2Response,
 )
@@ -230,7 +275,7 @@ async def get_trial_details(
 
 @router.post(
     "/type3",
-    description=Path("./app/docs/type3.md").read_text(),
+    description=(DOCS_DIR / "type3.md").read_text(),
     summary="Type 3: Search Trials and Get Data",
     response_model=schema.Type3Response,
 )
@@ -284,22 +329,30 @@ async def search_trials_and_get_data(
 
 @router.post(
     "/type4",
-    description=Path("./app/docs/type4.md").read_text(),
+    description=(DOCS_DIR / "type4.md").read_text(),
     summary="Type 4: Download file/bytes data",
-    response_model=schema.Type4Response,
+    # Type4Response subclasses FileResponse (a Starlette Response) and cannot
+    # be a pydantic response_model; the file is returned directly.
+    response_model=None,
 )
 async def get_file_value(
     request: schema.Type4Request,
+    background_tasks: BackgroundTasks,
     metadata_reader: MdsReader = Depends(get_metadata_reader),
 ):
     """
-    Retrieve detailed data for a specific trial.
+    Download file/bytes data for a specific trial.
 
     - **request**: A JSON object containing the trial UUID and other optional parameters for data retrieval.
+
+    Returns a single file for download, or a `.zip` archive if the trial
+    contains multiple files. File metadata is returned in the
+    `X-File-Metadata` response header (JSON encoded).
     """
 
-    # TODO: Memory and CPU usage check. Wait till enough memory and CPU is available.
-    ...
+    # Wait (within limits) until enough memory and CPU are available before
+    # pulling potentially large file contents from the DWS servers.
+    await _check_system_resources()
 
     trial = metadata_reader.get_trial_by_uuid(
         request.trial_uuid, request.user_id, request.user_domain
@@ -309,27 +362,69 @@ async def get_file_value(
 
     dataset = _build_trial_payload(trial, request, bytes=True)
 
-    # Check number of files. If more than one, send .zip, otherwise the file as is.
-    filepaths: list[str] = []
     metadata = dataset["metadata"]
-    metadata["files"] = {}
-    data: dict[str, list[dict[Literal["timestamp", "value"], Any]]] = dataset["data"]
+    data: dict[str, list[dict[Literal["timestamp", "value", "filename"], Any]]] = (
+        dataset["data"]
+    )
+
+    # Collect all files; each DWS file datapoint yields one downloaded file.
+    files: list[dict[str, Any]] = []
     for topic, topic_data in data.items():
-        metadata["files"][topic] = []
-        for timestamp in topic_data:
-            filepaths.append(timestamp["value"])
-            filename = re.split(r'[/\\]', timestamp["value"])[-1]
-            metadata["files"]["timestamp"] = timestamp["timestamp"]
-            metadata["files"]["filename"] = filename
-        
-    filepath_to_send = ""
-    if len(filepaths)>1:
-        #TODO: zip them all
-        ...
-    elif len(filepaths) == 1:
-        filepath_to_send = filepaths[0]
-    else:
+        for entry in topic_data:
+            filepath = entry["value"]
+            if not filepath:
+                continue
+            files.append(
+                {
+                    "topic": topic,
+                    "timestamp": entry["timestamp"],
+                    "filename": entry.get("filename") or Path(filepath).name,
+                    "filepath": filepath,
+                }
+            )
+
+    if not files:
         raise HTTPException(status_code=404, detail="No files found for the request.")
 
-    filename = re.split(r'[/\\]', filepath_to_send)[-1]
-    return schema.Type4Response(path=filepath_to_send, filename=filename, metadata=metadata)
+    # Expose the file list (without local filepaths) in the response metadata.
+    metadata["files"] = [
+        {"topic": f["topic"], "timestamp": f["timestamp"], "filename": f["filename"]}
+        for f in files
+    ]
+
+    # All files of one request share the same temporary directory created by
+    # the DWS agent, so derive it from the filepaths. It is removed in a
+    # background task once the response has been sent.
+    temp_dir = Path(
+        os.path.commonpath([str(Path(f["filepath"]).parent) for f in files])
+    )
+
+    if len(files) == 1:
+        filepath_to_send = files[0]["filepath"]
+        filename_to_send = files[0]["filename"]
+    else:
+        # Bundle all files in a flat zip archive. Name collisions between
+        # same-named files are resolved by appending a per-file counter
+        # before the extension.
+        zip_name = f"{trial.get('trial_name') or request.trial_uuid}.zip"
+        zip_path = temp_dir / zip_name
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            name_counts: dict[str, int] = {}
+            for f in files:
+                arcname = f["filename"]
+                count = name_counts.get(arcname, 0)
+                name_counts[arcname] = count + 1
+                if count > 0:
+                    stem = Path(arcname).stem
+                    suffix = Path(arcname).suffix
+                    arcname = f"{stem}_{count}{suffix}"
+                zf.write(f["filepath"], arcname=arcname)
+
+        filepath_to_send = str(zip_path)
+        filename_to_send = zip_name
+
+    background_tasks.add_task(shutil.rmtree, temp_dir, True)
+
+    return schema.Type4Response(
+        path=filepath_to_send, filename=filename_to_send, metadata=metadata
+    )
