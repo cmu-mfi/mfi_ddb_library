@@ -5,6 +5,7 @@ from .local_files import LocalFilesDataAdapter as LocalFilesDataAdapter
 from .modbus_tcp import ModbusTcpDataAdapter as ModbusTcpDataAdapter
 from .mqtt import MqttDataAdapter as MqttDataAdapter
 from .mtconnect import MTconnectDataAdapter as MTconnectDataAdapter
+from .opcua import OpcuaDataAdapter as OpcuaDataAdapter
 from .ros import RosDataAdapter as RosDataAdapter
 from .ros2 import Ros2DataAdapter as Ros2DataAdapter
 from .ros_files import RosFilesDataAdapter as RosFilesDataAdapter

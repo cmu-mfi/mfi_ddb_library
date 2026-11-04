@@ -26,6 +26,36 @@ Data Adapters are the objects that represent the data that needs to be streamed.
 * [gRPC](src/mfi_ddb/data_adapters/grpc.py)
 * [key_value](src/mfi_ddb/data_adapters/key_value.py)
 * [ModbusTCP](src/mfi_ddb/data_adapters/modbus_tcp.py)
+* [OPC UA](src/mfi_ddb/data_adapters/opcua.py) - see [OPC UA auto-discovery](#opc-ua-auto-discovery)
+
+## OPC UA auto-discovery
+
+The OPC UA adapter only needs the server endpoint. With `nodes` left empty it browses the
+address space from the Objects folder and subscribes to every variable it finds:
+
+```yaml
+trial_id: trial_001
+opcua:
+  endpoint: opc.tcp://192.168.1.10:4840
+```
+
+* Each object directly under the browse root becomes a component (`discovery.component_depth`
+  sets how many levels form the `component_id`); variables below it are keyed by browse path,
+  e.g. `Motor/RPM`.
+* Properties (`HasProperty`, e.g. serial number, model) go into the component attributes
+  instead of the streamed data.
+* The OPC UA standard namespace (`ns=0`, e.g. the `Server` object) is skipped. Use
+  `discovery.root`, `namespaces`, `include`/`exclude` regexes, `max_depth` and `max_nodes`
+  to narrow it down on large servers.
+* To review or curate what gets streamed, generate an explicit `nodes` list first:
+
+  ```bash
+  python -m mfi_ddb.scripts.opcua_discover --endpoint opc.tcp://192.168.1.10:4840 -o opcua.yaml
+  ```
+
+Example configs: [`opcua.yaml`](../../../examples/configs/data_adapters/opcua.yaml),
+[`opcua_explicit_nodes.yaml`](../../../examples/configs/data_adapters/opcua_explicit_nodes.yaml),
+[`opcua_help.yaml`](../../../examples/configs/data_adapters/opcua_help.yaml).
 
 ## New Data Adapter Checklist
 
