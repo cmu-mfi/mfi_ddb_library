@@ -1,0 +1,33 @@
+adapter_name: (optional) Name of the adapter instance
+trial_id: Trial ID for the system. No spaces or special characters allowed.
+opcua:
+  endpoint: OPC UA server endpoint URL, e.g. opc.tcp://192.168.1.10:4840
+  username: (optional) Username for authentication
+  password: (optional) Password for authentication
+  security_string: '(optional) ''Policy,Mode,client_cert,client_key[,server_cert]''
+    e.g. ''Basic256Sha256,SignAndEncrypt,cert.der,key.pem'' (default: no security)'
+  timeout: '(optional) Request timeout in seconds (default: 5)'
+  publishing_interval: '(optional) Subscription publishing interval in ms (default:
+    500)'
+  sampling_interval: '(optional) Server sampling interval in ms (default: publishing_interval)'
+  health_check_interval: '(optional) Seconds between connection checks; the adapter
+    reconnects and resubscribes if the server is lost. 0 disables (default: 5)'
+  load_custom_types: '(optional) Load server-specific structure definitions so they
+    can be decoded (default: true)'
+nodes: (optional) Explicit nodes. Each entry needs 'component_id' and exactly one
+  of 'node_id' (one variable, optional 'key') or 'browse_root' (all variables under
+  an object). Optional 'trial_id'. Leave empty to auto-discover the whole server.
+discovery:
+  root: '(optional) Node to auto-discover from (default: i=85, the Objects folder)'
+  component_depth: '(optional) Object levels below root that form the component_id,
+    e.g. 1 -> ''MachineA'', 2 -> ''MachineA/Spindle'' (default: 1)'
+  max_depth: '(optional) Max object levels to browse (default: 10)'
+  max_nodes: '(optional) Max variables to subscribe to (default: 1000)'
+  namespaces: '(optional) Namespace indexes or URIs to auto-discover (default: all
+    except 0)'
+  include: (optional) Regexes; only variables whose path matches are kept
+  exclude: (optional) Regexes; matching paths (and object subtrees) are skipped
+  properties_as_attributes: '(optional) Put HasProperty variables (serial number,
+    model, ...) in attributes instead of streamed data (default: true)'
+attributes: (optional) Static metadata added to every component
+max_array_length: '(optional) Arrays longer than this are skipped (default: 16)'

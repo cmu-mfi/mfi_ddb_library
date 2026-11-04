@@ -10,6 +10,7 @@ maintainers = [
 ]
 license = "BSD-3-Clause"
 dependencies = [
+    "asyncua>=1.0.6",
     "cmake>=4.0.3",
     "grpcio>=1.70.0",
     "grpcio-tools>=1.70.0",
