@@ -1,0 +1,59 @@
+# MFI DDB Metadata Form (profile: mfa)
+#   docker compose --profile mfa --profile mqtt-broker up -d
+#   UI: http://localhost:3002   API: http://localhost:8002/docs
+# Forms are configured in mfi_ddb_metadata_form/config/form-config.yaml (mounted live).
+services:
+  metadata-form-backend:
+    platform: linux/amd64
+    build:
+      context: ../../mfi_ddb_metadata_form
+      dockerfile: backend/Dockerfile
+      target: runtime
+      tags:
+        - cmumfi/mfi-ddb-metadata-form-backend:${VERSION:-latest}
+        - cmumfi/mfi-ddb-metadata-form-backend:latest
+    container_name: mfi-metadata-form-backend
+    image: cmumfi/mfi-ddb-metadata-form-backend:${VERSION:-latest}
+    profiles:
+      - "mfa"
+    ports:
+      - "8002:8000"
+    environment:
+      MQTT_BROKER_ADDRESS: ${MQTT_BROKER_ADDRESS:-mfi-mqtt-broker}   # pipeline broker service
+      MQTT_BROKER_PORT: ${MQTT_BROKER_PORT:-1883}
+      MQTT_USERNAME: ${MQTT_USERNAME:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      MQTT_ENTERPRISE: ${MQTT_ENTERPRISE:-CMU}
+      MQTT_SITE: ${MQTT_SITE:-Mill-19}
+      FORM_USER_ID: ${FORM_USER_ID:-metadata-form}
+      FORM_USER_DOMAIN: ${FORM_USER_DOMAIN:-MFI}
+      FORM_DRY_RUN: ${FORM_DRY_RUN:-false}
+      FORM_ADMIN_TOKEN: ${FORM_ADMIN_TOKEN:-}
+    volumes:
+      - ../../mfi_ddb_metadata_form/config:/app/config:ro
+      - ./.data/metadata_form:/app/data
+    networks:
+      - mfi_network
+    restart: always
+
+  metadata-form-frontend:
+    platform: linux/amd64
+    build:
+      context: ../../mfi_ddb_metadata_form/frontend
+      dockerfile: Dockerfile
+      tags:
+        - cmumfi/mfi-ddb-metadata-form-frontend:${VERSION:-latest}
+        - cmumfi/mfi-ddb-metadata-form-frontend:latest
+    container_name: mfi-metadata-form-frontend
+    image: cmumfi/mfi-ddb-metadata-form-frontend:${VERSION:-latest}
+    profiles:
+      - "mfa"
+    ports:
+      - "3002:80"
+    environment:
+      BACKEND_URL: http://mfi-metadata-form-backend:8000
+    depends_on:
+      - metadata-form-backend
+    networks:
+      - mfi_network
+    restart: always

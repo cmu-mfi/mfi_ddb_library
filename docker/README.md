@@ -127,6 +127,11 @@ The following sections organize the services by their Docker profiles for easier
     - `data-adapter-backend` — Data adapter FastAPI backend
     - `data-adapter-frontend` — Data adapter frontend (Nginx)
 
+* **Profile: `mfa` — Metadata Form App**
+
+    - `metadata-form-backend` — Publishes form submissions through the mfi_ddb KV adapter (FastAPI)
+    - `metadata-form-frontend` — Configurable metadata forms (Nginx); configured in `mfi_ddb_metadata_form/config/form-config.yaml`
+
 * **Profile: `mqtt-broker` — Shared Infrastructure**
 
     - `mqtt-broker` — EMQX MQTT broker with WebSocket and dashboard UI
@@ -200,6 +205,8 @@ Each service directory contains configuration files that need to be edited befor
 | 8000 | RWS API |
 | 8001 | Data Adapter Backend |
 | 3001 | Data Adapter Frontend |
+| 8002 | Metadata Form Backend |
+| 3002 | Metadata Form Frontend |
 | 3005 | Grafana dashboard |
 
 ## Volumes

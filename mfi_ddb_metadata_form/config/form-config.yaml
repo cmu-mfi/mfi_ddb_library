@@ -1,0 +1,294 @@
+# =============================================================================
+# MFI DDB Metadata Form - configuration
+# =============================================================================
+# This one file controls the whole app: which forms exist, what fields they
+# have, and where submissions are published.
+#
+# * Edits are picked up automatically on the next page load (the file is
+#   mounted into the backend container) - no rebuild or restart needed.
+# * If an edit is invalid, the app keeps the last good version and shows the
+#   error in the UI and in `docker logs mfi-metadata-form-backend`.
+# * Any string can use environment variables: ${VAR} or ${VAR:-default}.
+#   Put secrets (e.g. MQTT_PASSWORD) in a .env file next to compose.yaml.
+#
+# Every submission is published through the mfi_ddb KeyValue data adapter
+# (KvDataAdapter + Streamer, topic family "kv") to:
+#     mfi-v1.0-kv/<enterprise>/<site>/<msg_type>/data
+# and is validated against the library's kv.json schema before it is sent.
+# =============================================================================
+
+app:
+  title: MFI DDB Metadata Form
+  subtitle: Register projects, users and trial tags in the MFI data backbone.
+
+# KV adapter instance settings (see mfi_ddb KvDataAdapter).
+adapter:
+  adapter_name: metadata_form
+  # trial_id used for the adapter session when the payload has no trial_id.
+  trial_id: mfi-ddb-metadata
+
+publish:
+  # true = validate and record submissions but never connect to the broker.
+  # Handy while designing forms.
+  dry_run: ${FORM_DRY_RUN:-false}
+  connect_timeout_seconds: 10
+  # Seconds to wait after publishing before disconnecting (lets MQTT flush).
+  settle_seconds: 1
+  publish_timeout_seconds: 60
+
+history:
+  enabled: true      # keep a local log of submissions (shown in the UI)
+  max_entries: 500
+
+# Form builder: lets people create 'data' forms in the browser by listing the
+# keys; whoever fills in the form supplies the values. Builder forms are
+# stored in the backend's data volume (data/custom_forms.json), not here.
+builder:
+  enabled: true
+  # If set, the builder asks for this token before creating/editing/deleting.
+  admin_token: ${FORM_ADMIN_TOKEN:-}
+
+# mfi_ddb Streamer configuration (same format as the data adapter app).
+# topic_family is always forced to "kv".
+streamer:
+  user:
+    user_id: ${FORM_USER_ID:-metadata-form}
+    domain: ${FORM_USER_DOMAIN:-MFI}
+    email: ${FORM_USER_EMAIL:-}
+    name: ${FORM_USER_NAME:-Metadata Form}
+  mqtt:
+    broker_address: ${MQTT_BROKER_ADDRESS:-localhost}
+    broker_port: ${MQTT_BROKER_PORT:-1883}
+    username: ${MQTT_USERNAME:-}
+    password: ${MQTT_PASSWORD:-}
+    tls_enabled: false
+    enterprise: ${MQTT_ENTERPRISE:-CMU}
+    site: ${MQTT_SITE:-Mill-19}
+
+# =============================================================================
+# FORMS
+# =============================================================================
+# Each form produces one KV payload of the given msg_type:
+#   project | user | tp-tag | data
+# schema_version and msg_type are added automatically.
+#
+# Field options
+#   name         (required) key written into the payload
+#   label        text shown in the UI (defaults to name)
+#   type         text | textarea | email | number | integer | select |
+#                multiselect | checkbox | date | datetime | list | json
+#   required     true/false
+#   default      initial value; for type datetime, "now" = time the form opens
+#   placeholder  greyed-out hint inside the input
+#   help         hint text under the input
+#   options      for select/multiselect: list of values, or {value, label}
+#   pattern      regex the value must match, e.g. "^[a-z0-9-]+$"
+#   min / max    for number/integer
+#   hidden       true = not shown; `default` is always sent
+#   auto         value filled by the server at submit time:
+#                  now               current UTC time (ISO 8601)
+#                  uuid              random id
+#                  trial_id          adapter.trial_id above
+#                  streamer.<path>   e.g. streamer.user.user_id
+#                  env.<VAR>         an environment variable
+#   editable     with auto: show the auto value but let the user change it
+#   fields       for type list: the fields of each item
+#   min_items / max_items / item_label   for type list
+#
+# Payloads may carry extra keys beyond kv.json (additionalProperties is
+# allowed), so add whatever fields your site needs.
+# Set `enabled: false` to hide a form without deleting it.
+# =============================================================================
+
+forms:
+  # ---------------------------------------------------------------------------
+  - id: project
+    msg_type: project
+    title: New project
+    description: Create a project and assign who can access its data.
+    submit_label: Create project
+    fields:
+      - name: project_id
+        label: Project ID
+        required: true
+        placeholder: p-550
+        pattern: "^[A-Za-z0-9._-]+$"
+        help: Short unique id. Letters, digits, '.', '_' or '-'.
+      - name: project_name
+        label: Project name
+        placeholder: Apollo Mission
+      - name: description
+        label: Description
+        type: textarea
+      - name: user_roles
+        label: Members
+        type: list
+        item_label: member
+        help: People with access to the project and their role.
+        fields:
+          - name: user_id
+            label: User ID
+            required: true
+          - name: domain
+            label: Domain
+            required: true
+            default: ANDREW
+          - name: role
+            label: Role
+            type: select
+            default: operator
+            options: [admin, operator, maintainer, researcher]
+      - name: created_by_user_id
+        label: Created by
+        auto: streamer.user.user_id
+        editable: true
+        required: true
+      - name: created_by_domain
+        label: Created by (domain)
+        auto: streamer.user.domain
+        editable: true
+        required: true
+      - name: timestamp
+        auto: now
+
+  # ---------------------------------------------------------------------------
+  - id: user
+    msg_type: user
+    title: New user
+    description: Register a person so their data can be attributed to them.
+    submit_label: Register user
+    fields:
+      - name: user_id
+        label: User ID
+        required: true
+        placeholder: jdoe
+      - name: domain
+        label: Domain
+        required: true
+        default: ANDREW
+      - name: name
+        label: Full name
+        placeholder: Jane Doe
+      - name: email
+        label: Email
+        type: email
+        placeholder: jdoe@andrew.cmu.edu
+      - name: created_by_user_id
+        label: Created by
+        auto: streamer.user.user_id
+        editable: true
+        required: true
+      - name: created_by_domain
+        label: Created by (domain)
+        auto: streamer.user.domain
+        editable: true
+        required: true
+      - name: timestamp
+        auto: now
+
+  # ---------------------------------------------------------------------------
+  - id: trial-tag
+    msg_type: tp-tag
+    title: Tag a trial
+    description: Mark a time window of collected data as a trial that belongs to a project.
+    submit_label: Tag trial
+    fields:
+      - name: trial_id
+        label: Trial ID
+        required: true
+        placeholder: booster-a1
+      - name: project_id
+        label: Project ID
+        required: true
+        placeholder: p-550
+      - name: time_start
+        label: Start
+        type: datetime
+        required: true
+      - name: time_end
+        label: End
+        type: datetime
+        required: true
+        default: now
+      - name: trial_user_id
+        label: Operator user ID
+        required: true
+      - name: trial_user_domain
+        label: Operator domain
+        required: true
+        default: ANDREW
+      - name: notes
+        label: Notes
+        type: textarea
+      - name: created_by_user_id
+        label: Created by
+        auto: streamer.user.user_id
+        editable: true
+        required: true
+      - name: created_by_domain
+        label: Created by (domain)
+        auto: streamer.user.domain
+        editable: true
+        required: true
+      - name: timestamp
+        auto: now
+
+  # ---------------------------------------------------------------------------
+  # Sample data form: sends a msg_type "data" payload for a trial, like the
+  # KvDataAdapter example ({payload: "...", value: 42}).
+  - id: data
+    msg_type: data
+    enabled: false        # hidden for now; set to true to bring it back
+    title: Send data
+    description: Publish a key-value data payload for a trial.
+    submit_label: Send data
+    fields:
+      - name: trial_id
+        label: Trial ID
+        required: true
+        placeholder: booster-a1
+        help: The KV adapter only sends 'data' payloads that have a trial_id.
+      - name: payload
+        label: Payload
+        required: true
+        placeholder: Custom data here
+      - name: value
+        label: Value
+        type: number
+        placeholder: "42"
+      - name: timestamp
+        auto: now
+
+  # ---------------------------------------------------------------------------
+  # Example of a fully custom form: free-form key-values of msg_type "data"
+  # attached to a trial. Enable and adapt it to your needs.
+  - id: trial-note
+    msg_type: data
+    enabled: false
+    title: Trial note
+    description: Attach observations to a trial.
+    fields:
+      - name: trial_id
+        label: Trial ID
+        required: true
+      - name: material
+        label: Material
+        type: select
+        options: [Aluminium 6061, Steel 1018, Ti-6Al-4V, Other]
+      - name: temperature_c
+        label: Ambient temperature (°C)
+        type: number
+        min: -40
+        max: 80
+      - name: passed_qc
+        label: Passed QC
+        type: checkbox
+        default: false
+      - name: note
+        label: Note
+        type: textarea
+        required: true
+      - name: author
+        auto: streamer.user.user_id
+      - name: timestamp
+        auto: now

@@ -10,6 +10,7 @@ include:
   - path: metadata-rws/compose.metadata-rws.yaml
   - path: blob/compose.blob.yaml
   - path: data-adapter-app/compose.data-adapter-app.yaml
+  - path: metadata-form/compose.metadata-form.yaml
   - path: aveva/compose.aveva.yaml
   - path: utilities/grafana/compose.grafana.yaml
   - path: utilities/mock-publisher/compose.mockpub.yaml

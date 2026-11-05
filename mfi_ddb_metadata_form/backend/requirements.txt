@@ -1,0 +1,7 @@
+fastapi>=0.115.0
+mfi_ddb>=1.2.1
+paho_mqtt>=2.1.0
+jsonschema>=4.23.0
+pydantic>=2.10.6
+PyYAML>=6.0.2
+uvicorn>=0.30.0

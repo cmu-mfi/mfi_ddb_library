@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-gray-100 text-gray-900 antialiased;
+  }
+}
+
+@utility input {
+  @apply w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm
+    placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20
+    disabled:bg-gray-50 disabled:text-gray-500;
+}
+
+@utility input-error {
+  @apply border-red-500 focus:border-red-500 focus:ring-red-500/20;
+}
+
+@utility btn {
+  @apply inline-flex cursor-pointer items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium
+    transition-all disabled:cursor-not-allowed disabled:opacity-60;
+}
+
+@utility btn-primary {
+  @apply btn border border-blue-600 bg-blue-600 text-white hover:bg-blue-700;
+}
+
+@utility btn-secondary {
+  @apply btn border border-gray-300 bg-white text-gray-700 hover:bg-gray-50;
+}

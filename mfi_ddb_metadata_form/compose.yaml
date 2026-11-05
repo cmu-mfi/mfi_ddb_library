@@ -1,0 +1,62 @@
+# MFI DDB Metadata Form - standalone
+#
+#   cd mfi_ddb_metadata_form
+#   cp .env.example .env        # optional: broker address, credentials, ...
+#   docker compose up -d --build
+#
+#   UI:  http://localhost:3002
+#   API: http://localhost:8002/docs
+#
+# Forms and publishing are configured in ./config/form-config.yaml
+# (mounted live - edit and reload the page, no rebuild needed).
+# To run it as part of the full pipeline instead, see docker/metadata-form/.
+
+name: mfi-metadata-form
+
+services:
+  metadata-form-backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: runtime
+    image: cmumfi/mfi-ddb-metadata-form-backend:${VERSION:-latest}
+    container_name: mfi-metadata-form-backend
+    ports:
+      - "8002:8000"
+    environment:
+      # Defaults reach a broker running on the host (e.g. `--profile mqtt-broker`).
+      MQTT_BROKER_ADDRESS: ${MQTT_BROKER_ADDRESS:-host.docker.internal}
+      MQTT_BROKER_PORT: ${MQTT_BROKER_PORT:-1883}
+      MQTT_USERNAME: ${MQTT_USERNAME:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      MQTT_ENTERPRISE: ${MQTT_ENTERPRISE:-CMU}
+      MQTT_SITE: ${MQTT_SITE:-Mill-19}
+      FORM_USER_ID: ${FORM_USER_ID:-metadata-form}
+      FORM_USER_DOMAIN: ${FORM_USER_DOMAIN:-MFI}
+      FORM_USER_EMAIL: ${FORM_USER_EMAIL:-}
+      FORM_USER_NAME: ${FORM_USER_NAME:-Metadata Form}
+      FORM_DRY_RUN: ${FORM_DRY_RUN:-false}
+      FORM_ADMIN_TOKEN: ${FORM_ADMIN_TOKEN:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"         # makes the host reachable on Linux too
+    volumes:
+      - ./config:/app/config:ro
+      - metadata_form_data:/app/data
+    restart: unless-stopped
+
+  metadata-form-frontend:
+    build:
+      context: ./frontend
+    image: cmumfi/mfi-ddb-metadata-form-frontend:${VERSION:-latest}
+    container_name: mfi-metadata-form-frontend
+    ports:
+      - "3002:80"
+    environment:
+      BACKEND_URL: http://mfi-metadata-form-backend:8000
+    depends_on:
+      - metadata-form-backend
+    restart: unless-stopped
+
+volumes:
+  metadata_form_data:
