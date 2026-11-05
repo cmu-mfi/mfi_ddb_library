@@ -10,6 +10,9 @@ Endpoints (nginx exposes them under /api):
   POST /forms/{form_id}/preview   build + validate the payload, do not publish
   POST /forms/{form_id}/submit    build + validate + publish through the KV adapter
   GET  /submissions               recent submissions (if history is enabled)
+  GET  /users                     registered users (metadata store) for 'user' fields
+  POST /forms/{form_id}/entries   search previous entries of a form (via RWS type1)
+  POST /labels                    printable label PDF for entries (label_maker_main templates)
   GET/POST/PUT/DELETE /builder/forms[/{id}]   forms created in the browser
   GET/PUT/DELETE /settings        MQTT target + per-form site (Settings page)
   POST /settings/test             try connecting to the MQTT broker
@@ -32,7 +35,7 @@ from contextlib import asynccontextmanager  # noqa: E402
 
 from fastapi import FastAPI, Query  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-from fastapi.responses import JSONResponse  # noqa: E402
+from fastapi.responses import JSONResponse, Response  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 from starlette.concurrency import run_in_threadpool  # noqa: E402
 
@@ -43,10 +46,13 @@ from pydantic import ValidationError  # noqa: E402
 
 from app.config import ConfigManager, FormConfig, default_site, form_site, public_view  # noqa: E402
 from app.custom_forms import BuilderForm, CustomFormStore  # noqa: E402
+from app.entries import EntriesError, EntriesQuery, search_entries  # noqa: E402
 from app.history import History  # noqa: E402
-from app.payload import SubmissionError, build_payload, lint_config  # noqa: E402
+from app.labels import LabelError, LabelRequest, check_templates, labels_view, render_labels  # noqa: E402
+from app.payload import Revision, SubmissionError, build_payload, lint_config  # noqa: E402
 from app.publisher import PublishError, check_broker, publish, topic_for  # noqa: E402
 from app.settings import MqttSettings, Settings, SettingsStore, SettingsUpdate, apply_settings  # noqa: E402
+from app.users import UserDirectoryError, directory as user_directory  # noqa: E402
 
 logger = logging.getLogger("metadata_form")
 
@@ -114,6 +120,9 @@ app.add_middleware(
 
 class SubmitBody(BaseModel):
     values: Dict[str, Any] = {}
+    # Update of an existing entry: {entry_id, version, trial_uuid} of the version it replaces.
+    # Validated in _prepare so errors come back in the app's usual format.
+    revises: Optional[Dict[str, Any]] = None
 
 
 def _error(status: int, message: str, errors: Optional[list] = None, **extra) -> JSONResponse:
@@ -149,7 +158,22 @@ async def health() -> dict:
         "config_error": config_manager.error,
         "config_warnings": lint_config(cfg) if cfg else [],
         "dry_run": cfg.publish.dry_run if cfg else None,
+        "users_error": user_directory.error,
+        "labels_error": check_templates(cfg.labels) if cfg else None,
     }
+
+
+@app.get("/users")
+async def users(refresh: bool = Query(False)):
+    """Registered users (metadata store ddb_user) for the 'user' field dropdowns."""
+    cfg = config_manager.get()
+    if cfg is None:
+        return _error(503, "Form configuration is not available.")
+    try:
+        found = await run_in_threadpool(user_directory.list, cfg.users, refresh)
+    except UserDirectoryError as err:
+        return _error(503, str(err))
+    return {"ok": True, "users": found}
 
 
 @app.get("/config")
@@ -159,6 +183,7 @@ async def get_config():
     except RuntimeError as err:
         return _error(503, f"Form configuration is not available: {err}")
     view = public_view(cfg)
+    view["labels"] = labels_view(cfg)
     view["config_error"] = config_manager.error
     view["config_warnings"] = lint_config(cfg)
     return view
@@ -169,8 +194,14 @@ def _prepare(form_id: str, body: SubmitBody):
     form = cfg.get_form(form_id)
     if form is None:
         return cfg, None, None, _error(404, f"Unknown form '{form_id}'")
+    revision = None
+    if body.revises is not None:
+        try:
+            revision = Revision(**body.revises)
+        except ValidationError as err:
+            return cfg, form, None, _error(422, "Invalid entry to update.", _validation_errors(err))
     try:
-        payload = build_payload(form, body.values, cfg)
+        payload = build_payload(form, body.values, cfg, revision=revision)
     except SubmissionError as err:
         return cfg, form, None, _error(422, "Please fix the highlighted fields.", err.errors)
     return cfg, form, payload, None
@@ -179,7 +210,7 @@ def _prepare(form_id: str, body: SubmitBody):
 @app.post("/forms/{form_id}/preview")
 async def preview(form_id: str, body: SubmitBody):
     try:
-        cfg, form, payload, error = _prepare(form_id, body)
+        cfg, form, payload, error = await run_in_threadpool(_prepare, form_id, body)
     except RuntimeError as err:
         return _error(503, f"Form configuration is not available: {err}")
     if error:
@@ -190,7 +221,7 @@ async def preview(form_id: str, body: SubmitBody):
 @app.post("/forms/{form_id}/submit")
 async def submit(form_id: str, body: SubmitBody):
     try:
-        cfg, form, payload, error = _prepare(form_id, body)
+        cfg, form, payload, error = await run_in_threadpool(_prepare, form_id, body)
     except RuntimeError as err:
         return _error(503, f"Form configuration is not available: {err}")
     if error:
@@ -235,6 +266,63 @@ async def submissions(limit: int = Query(25, ge=1, le=200)):
     if cfg is not None and not cfg.history.enabled:
         return []
     return history.recent(limit)
+
+
+@app.post("/labels")
+async def print_labels(data: Dict[str, Any] = Body(...)):
+    """PDF with one label per entry (label_maker_main templates), for printing from the browser."""
+    try:
+        cfg = _require_config()
+    except RuntimeError as err:
+        return _error(503, f"Form configuration is not available: {err}")
+    try:
+        request = LabelRequest(**data)
+    except ValidationError as err:
+        return _error(422, "Invalid label request.", _validation_errors(err))
+
+    def render() -> bytes:
+        try:
+            users = user_directory.lookup(cfg.users)  # owner names; best effort
+        except UserDirectoryError:
+            users = {}
+        return render_labels(cfg, request, users)
+
+    try:
+        pdf = await run_in_threadpool(render)
+    except LabelError as err:
+        return _error(err.status, str(err))
+    except Exception as err:
+        logger.exception("Label rendering failed for form=%s", request.form_id)
+        return _error(500, f"Could not create the labels: {err}")
+    filename = f"{request.form_id}-labels.pdf"
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
+
+
+@app.post("/forms/{form_id}/entries")
+async def form_entries(form_id: str, data: Dict[str, Any] = Body(default={})):
+    """Previous entries of a form, found through the retrieval API (RWS type1)."""
+    try:
+        cfg = _require_config()
+    except RuntimeError as err:
+        return _error(503, f"Form configuration is not available: {err}")
+    if not cfg.entries.enabled:
+        return _error(403, "Searching entries is disabled in the configuration.")
+    form = cfg.get_form(form_id)
+    if form is None:
+        return _error(404, f"Unknown form '{form_id}'")
+    try:
+        query = EntriesQuery(**data)
+    except ValidationError as err:
+        return _error(422, "Please fix the search filters.", _validation_errors(err))
+    try:
+        return await run_in_threadpool(search_entries, cfg, form, query)
+    except EntriesError as err:
+        logger.warning("Entries search failed for form=%s: %s", form_id, err)
+        return _error(err.status, str(err))
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,59 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  display: flex;
+  justify-content: left;
+  align-items: left;
+  min-height: 100vh;
+  font-family: Arial, sans-serif;
+}
+
+.card {
+  width: 2.3125in;
+  height: 4in;
+  background: #ffffff;
+  padding-top: 0.5in;
+  padding-left: 0.1in;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25in;
+}
+
+.card-title {
+  text-align: left;
+  font-weight: bold;
+  font-size: 20pt;
+  letter-spacing: 0.04em;
+  color: #111111;
+  padding-bottom: 0.06in;
+}
+
+.property-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05in;
+  text-align: left;
+}
+
+.property-list li {
+  font-size: 10pt;
+  color: #111111;
+  padding: 0.01in 0.01in;
+  border-left: 3px solid #111111;
+  background: #ffffff;
+}
+
+.property-list li .label {
+  font-weight: bold;
+  color: #111111;
+}
+
+.property-list li .value {
+  color: #111111;
+  margin-left: 0.08in;
+}

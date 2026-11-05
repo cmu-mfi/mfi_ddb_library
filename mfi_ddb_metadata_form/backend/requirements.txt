@@ -4,4 +4,8 @@ paho_mqtt>=2.1.0
 jsonschema>=4.23.0
 pydantic>=2.10.6
 PyYAML>=6.0.2
+psycopg2_binary>=2.9.12
+# label printing (same versions as label_maker_main)
+blabel==0.1.7
+weasyprint==69.0
 uvicorn>=0.30.0

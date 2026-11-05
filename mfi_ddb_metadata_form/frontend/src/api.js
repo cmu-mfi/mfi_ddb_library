@@ -19,17 +19,56 @@ async function request(path, options = {}) {
 export const fetchConfig = () => request("/config");
 export const fetchHealth = () => request("/health");
 export const fetchSubmissions = (limit = 20) => request(`/submissions?limit=${limit}`);
+export const fetchUsers = (refresh = false) => request(`/users${refresh ? "?refresh=true" : ""}`);
 
-function post(path, values) {
+function post(path, values, revises) {
   return request(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ values }),
+    body: JSON.stringify(revises ? { values, revises } : { values }),
   });
 }
 
-export const previewForm = (formId, values) => post(`/forms/${encodeURIComponent(formId)}/preview`, values);
-export const submitForm = (formId, values) => post(`/forms/${encodeURIComponent(formId)}/submit`, values);
+// `revises` ({entry_id, version, trial_uuid}) saves the values as the next version of that entry.
+export const previewForm = (formId, values, revises) =>
+  post(`/forms/${encodeURIComponent(formId)}/preview`, values, revises);
+export const submitForm = (formId, values, revises) =>
+  post(`/forms/${encodeURIComponent(formId)}/submit`, values, revises);
+/** Label PDF for entries -> {ok: true, blob} or {ok: false, message}. */
+export async function printLabels(formId, size, entries) {
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}/labels`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        form_id: formId,
+        size,
+        entries: entries.map((e) => ({
+          entry_id: e.entry_id,
+          version: e.version,
+          trial_id: e.trial_id,
+          values: e.values,
+        })),
+      }),
+    });
+  } catch (error) {
+    return { ok: false, message: `Cannot reach the server: ${error.message}` };
+  }
+  if (response.ok) return { ok: true, blob: await response.blob() };
+  try {
+    return { ok: false, message: (await response.json()).message };
+  } catch {
+    return { ok: false, message: `Label printing failed (${response.status})` };
+  }
+}
+
+export const searchEntries = (formId, query) =>
+  request(`/forms/${encodeURIComponent(formId)}/entries`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(query),
+  });
 
 // ---- form builder ----------------------------------------------------------
 

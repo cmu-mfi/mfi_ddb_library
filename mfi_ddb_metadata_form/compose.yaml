@@ -37,11 +37,21 @@ services:
       FORM_USER_NAME: ${FORM_USER_NAME:-Metadata Form}
       FORM_DRY_RUN: ${FORM_DRY_RUN:-false}
       FORM_ADMIN_TOKEN: ${FORM_ADMIN_TOKEN:-}
+      # 'user' field dropdowns: the metadata store DB published on the host (port 5430)
+      MDS_PG_HOST: ${MDS_PG_HOST:-host.docker.internal}
+      MDS_PG_PORT: ${MDS_PG_PORT:-5430}
+      MDS_PG_DATABASE: ${MDS_PG_DATABASE:-mds}
+      MDS_PG_USER: ${MDS_PG_USER:-mfi}
+      MDS_PG_PASSWORD: ${MDS_PG_PASSWORD:-mfiddb}
+      # 'Entries' page: the retrieval API published on the host (port 8000)
+      RWS_URL: ${RWS_URL:-http://host.docker.internal:8000/mfi-ddb}
+      ENTRIES_SHOW_ALL: ${ENTRIES_SHOW_ALL:-true}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     extra_hosts:
       - "host.docker.internal:host-gateway"         # makes the host reachable on Linux too
     volumes:
       - ./config:/app/config:ro
+      - ../label_maker_main:/app/labels:ro            # label templates (Print on the Entries page)
       - metadata_form_data:/app/data
     restart: unless-stopped
 

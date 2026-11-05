@@ -14,11 +14,16 @@ export function toLocalInput(date) {
 /** Fields the user fills in (auto fields that aren't editable are server-side only). */
 export const isUserField = (field) => !field.auto || field.editable;
 
+/** Section headings group fields on screen but hold no value. */
+export const isSection = (field) => field.type === "section";
+const hasValue = (field) => isUserField(field) && !isSection(field);
+
 function initialValue(field) {
   if (field.type === "list") {
     const rows = Math.max(field.min_items || 0, 0);
     return Array.from({ length: rows }, () => initialValues(field.fields || []));
   }
+  if (field.type === "user") return null; // always picked by the person filling in the form
   if (field.type === "checkbox") return Boolean(field.default);
   if (field.type === "multiselect") return Array.isArray(field.default) ? field.default : [];
   if (field.type === "datetime") {
@@ -38,7 +43,7 @@ function initialValue(field) {
 export function initialValues(fields) {
   const values = {};
   for (const field of fields) {
-    if (isUserField(field)) values[field.name] = initialValue(field);
+    if (hasValue(field)) values[field.name] = initialValue(field);
   }
   return values;
 }
@@ -47,7 +52,7 @@ export function initialValues(fields) {
 export function toSubmitValues(fields, values) {
   const out = {};
   for (const field of fields) {
-    if (!isUserField(field)) continue;
+    if (!hasValue(field)) continue;
     const value = values[field.name];
     if (field.type === "datetime") {
       out[field.name] = value ? new Date(value).toISOString() : "";
@@ -58,6 +63,42 @@ export function toSubmitValues(fields, values) {
     }
   }
   return out;
+}
+
+/**
+ * A saved payload -> form state, so an entry can be edited and saved as a new version
+ * (inverse of toSubmitValues). "Created by" is left empty on purpose: whoever saves
+ * the new version picks themselves. Server-filled fields (timestamp, ...) regenerate.
+ */
+export function valuesFromPayload(fields, payload = {}) {
+  const values = initialValues(fields);
+  for (const field of fields) {
+    if (!hasValue(field)) continue;
+    if (field.type === "user") {
+      const userId = payload[field.user_id_key];
+      values[field.name] =
+        field.name === "created_by" || !userId ? null : { user_id: userId, domain: payload[field.domain_key] ?? "" };
+      continue;
+    }
+    const v = payload[field.name];
+    if (v === undefined || v === null) continue;
+    if (field.type === "list") {
+      values[field.name] = Array.isArray(v) ? v.map((item) => valuesFromPayload(field.fields || [], item)) : [];
+    } else if (field.type === "datetime") {
+      values[field.name] = toLocalInput(new Date(v));
+    } else if (field.type === "checkbox") {
+      values[field.name] = Boolean(v);
+    } else if (field.type === "multiselect") {
+      values[field.name] = Array.isArray(v) ? v : [v];
+    } else if (field.type === "json") {
+      values[field.name] = typeof v === "string" ? v : JSON.stringify(v, null, 2);
+    } else if (field.type === "select") {
+      values[field.name] = String(v);
+    } else {
+      values[field.name] = v;
+    }
+  }
+  return values;
 }
 
 /** [{field, message}] -> {"path": "message"} plus messages without a field. */

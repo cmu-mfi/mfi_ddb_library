@@ -65,18 +65,76 @@ streamer:
     enterprise: ${MQTT_ENTERPRISE:-CMU}
     site: ${MQTT_SITE:-Mill-19}   # default site; each form can set its own (see "site" below)
 
+# Fields of type `user` are dropdowns of the people registered in the MFI DDB
+# metadata store (table ddb_user, read-only). In the docker pipeline this is the
+# mfi-metadata-store-db container (profile "retrieval").
+users:
+  database:
+    host: ${MDS_PG_HOST:-localhost}
+    port: ${MDS_PG_PORT:-5430}
+    dbname: ${MDS_PG_DATABASE:-mds}
+    user: ${MDS_PG_USER:-mfi}
+    password: ${MDS_PG_PASSWORD:-mfiddb}
+  cache_seconds: 15            # how long the user list is reused before re-reading
+  connect_timeout_seconds: 5
+
+# "Entries" page: search previous submissions of a form through the retrieval
+# API (RWS type1, profile "retrieval"). Entries are found by their hidden
+# form_id; filters on the form's fields are applied on top.
+entries:
+  enabled: true
+  rws_url: ${RWS_URL:-http://localhost:8000/mfi-ddb}
+  # true  = everyone sees all entries of a form (for now)
+  # false = a person only sees their own entries (RWS access control)
+  show_all: ${ENTRIES_SHOW_ALL:-true}
+  timeout_seconds: 15
+  max_results: 500
+
+# Printable labels (Entries page -> Print), rendered with the label maker in
+# label_maker_main/ (blabel templates, mounted at /app/labels). The big title is
+# the short entry ID (unique, same for every version of an entry); owner_displ is
+# the Created-by user's name ("D. Sinclair"). Map template variables to payload
+# keys per form - only forms listed here get a Print button.
+labels:
+  enabled: true
+  template_dir: ${LABEL_TEMPLATE_DIR:-/app/labels}
+  sizes:
+    # page_size = PDF page = label stock size (one label per page)
+    S: {template: label_template_S.html, stylesheet: styleS.css, page_size: 2.3125in 4in}
+    L: {template: label_template_L.html, stylesheet: styleL.css, page_size: 4in 6in}
+  forms:
+    powder-library:
+      alloy: alloy
+      vendor: vendor
+      production: production_method
+      D10: d10
+      D50: d50
+      D90: d90
+      date_received: date_received
+      recycling_steps: recycling_steps
+
 # =============================================================================
 # FORMS
 # =============================================================================
 # Each form produces one KV payload of the given msg_type:
 #   project | user | tp-tag | data
-# schema_version and msg_type are added automatically.
+# schema_version, msg_type and form_id (this form's id, hidden from the user)
+# are added automatically. Search for a form's entries with RWS type1, e.g.
+# "search_terms": ["powder-library"].
 #
 # Field options
 #   name         (required) key written into the payload
 #   label        text shown in the UI (defaults to name)
 #   type         text | textarea | email | number | integer | select |
-#                multiselect | checkbox | date | datetime | list | json
+#                multiselect | checkbox | date | datetime | list | json | user |
+#                section
+#                section = a heading (label = title, help = description) that
+#                groups the fields below it; it sends no data.
+#                user = required pick from the metadata-store users (see
+#                "users" above); no default. It writes two payload keys,
+#                <name>_user_id and <name>_domain, unless overridden with
+#                user_id_key / domain_key. Every form should have a required
+#                user field (e.g. created_by); the app warns if one is missing.
 #   required     true/false
 #   default      initial value; for type datetime, "now" = time the form opens
 #   placeholder  greyed-out hint inside the input
@@ -133,27 +191,20 @@ forms:
         item_label: member
         help: People with access to the project and their role.
         fields:
-          - name: user_id
-            label: User ID
+          - name: user
+            label: User
+            type: user
             required: true
-          - name: domain
-            label: Domain
-            required: true
-            default: ANDREW
+            user_id_key: user_id
+            domain_key: domain
           - name: role
             label: Role
             type: select
             default: operator
             options: [admin, operator, maintainer, researcher]
-      - name: created_by_user_id
+      - name: created_by
         label: Created by
-        auto: streamer.user.user_id
-        editable: true
-        required: true
-      - name: created_by_domain
-        label: Created by (domain)
-        auto: streamer.user.domain
-        editable: true
+        type: user
         required: true
       - name: timestamp
         auto: now
@@ -181,15 +232,9 @@ forms:
         label: Email
         type: email
         placeholder: jdoe@andrew.cmu.edu
-      - name: created_by_user_id
+      - name: created_by
         label: Created by
-        auto: streamer.user.user_id
-        editable: true
-        required: true
-      - name: created_by_domain
-        label: Created by (domain)
-        auto: streamer.user.domain
-        editable: true
+        type: user
         required: true
       - name: timestamp
         auto: now
@@ -219,25 +264,18 @@ forms:
         type: datetime
         required: true
         default: now
-      - name: trial_user_id
-        label: Operator user ID
+      - name: trial_user
+        label: Operator
+        type: user
         required: true
-      - name: trial_user_domain
-        label: Operator domain
-        required: true
-        default: ANDREW
+        user_id_key: trial_user_id
+        domain_key: trial_user_domain
       - name: notes
         label: Notes
         type: textarea
-      - name: created_by_user_id
+      - name: created_by
         label: Created by
-        auto: streamer.user.user_id
-        editable: true
-        required: true
-      - name: created_by_domain
-        label: Created by (domain)
-        auto: streamer.user.domain
-        editable: true
+        type: user
         required: true
       - name: timestamp
         auto: now
@@ -265,6 +303,10 @@ forms:
         label: Value
         type: number
         placeholder: "42"
+      - name: created_by
+        label: Created by
+        type: user
+        required: true
       - name: timestamp
         auto: now
 
@@ -297,7 +339,9 @@ forms:
         label: Note
         type: textarea
         required: true
-      - name: author
-        auto: streamer.user.user_id
+      - name: created_by
+        label: Created by
+        type: user
+        required: true
       - name: timestamp
         auto: now

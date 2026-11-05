@@ -20,10 +20,17 @@ import copy
 import functools
 import json
 import re
+import uuid
 from datetime import date, datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.config import FieldDef, FormConfig, FormDef, resolve_auto
+from app.users import UserDirectoryError, UserKey, directory
+
+# Returns {(user_id, domain): user} for the registered users; may raise UserDirectoryError.
+UserLookup = Callable[[], Dict[UserKey, dict]]
 
 SCHEMA_VERSION = "mfi-v1.0"
 
@@ -83,12 +90,20 @@ def lint_config(cfg: FormConfig) -> List[str]:
     for form in cfg.forms:
         if not form.enabled:
             continue
-        provided = {f.name for f in form.fields if not f.hidden or f.default is not None}
+        provided = {
+            k for f in form.fields if not f.hidden or f.default is not None for k in f.payload_keys
+        }
         guaranteed = {
-            f.name
+            k
             for f in form.fields
             if f.required or (f.auto and not f.editable) or (f.hidden and f.default is not None)
+            for k in f.payload_keys
         }
+        if not form.has_required_user:
+            warnings.append(
+                f"form '{form.id}': add a required field of type 'user' (e.g. created_by) so "
+                "every submission names a registered user"
+            )
         required, any_of = kv_requirements(form.msg_type)
         for key in sorted(required - provided):
             warnings.append(
@@ -168,7 +183,24 @@ def _parse_datetime(value: Any) -> str:
     return parsed.isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def _coerce(field: FieldDef, raw: Any, cfg: FormConfig, path: str, errors: List[dict]) -> Any:
+def _split_user(raw: Any) -> Optional[UserKey]:
+    """{"user_id", "domain"} (or "user_id@domain") -> (user_id, domain); None if blank."""
+    if isinstance(raw, dict):
+        user_id, domain = raw.get("user_id"), raw.get("domain")
+    elif isinstance(raw, str) and "@" in raw:
+        user_id, domain = raw.rsplit("@", 1)
+    else:
+        user_id, domain = raw, None
+    user_id = "" if user_id is None else str(user_id).strip()
+    domain = "" if domain is None else str(domain).strip()
+    if not user_id and not domain:
+        return None
+    return user_id, domain
+
+
+def _coerce(
+    field: FieldDef, raw: Any, cfg: FormConfig, path: str, errors: List[dict], users: "UserLookup"
+) -> Any:
     label = field.display_label
 
     def fail(message: str):
@@ -233,6 +265,18 @@ def _coerce(field: FieldDef, raw: Any, cfg: FormConfig, path: str, errors: List[
         if t == "datetime":
             return _parse_datetime(raw)
 
+        if t == "user":
+            key = _split_user(raw)
+            if key is None or not all(key):
+                return fail(f"{label}: pick a user from the list")
+            try:
+                known = users()
+            except UserDirectoryError as err:
+                return fail(str(err))
+            if key not in known:
+                return fail(f"{label}: '{key[0]}' ({key[1]}) is not a registered user")
+            return {"user_id": key[0], "domain": key[1]}
+
         if t == "json":
             if isinstance(raw, str):
                 return json.loads(raw)
@@ -246,9 +290,9 @@ def _coerce(field: FieldDef, raw: Any, cfg: FormConfig, path: str, errors: List[
                 if not isinstance(item, dict):
                     errors.append({"field": f"{path}.{index}", "message": f"{label}: invalid item"})
                     continue
-                if all(_is_empty(item.get(sub.name)) for sub in field.fields or []):
+                if all(_blank(sub, item.get(sub.name)) for sub in field.fields or [] if sub.type != "section"):
                     continue  # ignore completely blank rows
-                built = _build_fields(field.fields or [], item, cfg, f"{path}.{index}.", errors)
+                built = _build_fields(field.fields or [], item, cfg, f"{path}.{index}.", errors, users)
                 items.append(built)
             if field.min_items and len(items) < field.min_items:
                 return fail(f"{label} needs at least {field.min_items} item(s)")
@@ -262,11 +306,24 @@ def _coerce(field: FieldDef, raw: Any, cfg: FormConfig, path: str, errors: List[
     return fail(f"{label}: unsupported field type '{t}'")
 
 
+def _blank(field: FieldDef, raw: Any) -> bool:
+    if field.type == "user":
+        return _split_user(raw) is None
+    return _is_empty(raw)
+
+
 def _build_fields(
-    fields: List[FieldDef], values: Dict[str, Any], cfg: FormConfig, prefix: str, errors: List[dict]
+    fields: List[FieldDef],
+    values: Dict[str, Any],
+    cfg: FormConfig,
+    prefix: str,
+    errors: List[dict],
+    users: UserLookup,
 ) -> dict:
     out: dict = {}
     for field in fields:
+        if field.type == "section":
+            continue  # a heading only - nothing to send
         path = f"{prefix}{field.name}"
         if field.auto and not field.editable:
             value: Any = resolve_auto(field.auto, cfg)
@@ -277,12 +334,12 @@ def _build_fields(
             if field.name not in values and field.default is not None:
                 # omitted entirely (e.g. API caller) -> configured default
                 raw = resolve_auto("now", cfg) if field.default == "now" else copy.deepcopy(field.default)
-            if _is_empty(raw) and field.auto:
+            if _blank(field, raw) and field.auto:
                 value = resolve_auto(field.auto, cfg)
-            elif _is_empty(raw):
+            elif _blank(field, raw):
                 value = None
             else:
-                value = _coerce(field, raw, cfg, path, errors)
+                value = _coerce(field, raw, cfg, path, errors, users)
                 if value is _MISSING:
                     continue
 
@@ -291,18 +348,80 @@ def _build_fields(
                 hint = " (auto value is empty - check the configuration)" if field.auto else ""
                 errors.append({"field": path, "message": f"{field.display_label} is required{hint}"})
             continue
-        out[field.name] = value
+        if field.type == "user":
+            out[field.user_id_key] = value["user_id"]
+            out[field.domain_key] = value["domain"]
+        else:
+            out[field.name] = value
     return out
 
 
-def build_payload(form: FormDef, values: Optional[dict], cfg: FormConfig) -> dict:
-    """Build and validate the KV payload; raises SubmissionError with field errors."""
+class Revision(BaseModel):
+    """The entry version an update replaces (sent by the Entries page's Update button)."""
+
+    model_config = ConfigDict(extra="forbid")
+    entry_id: str = Field(..., min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_\-]+$")
+    version: int = Field(..., ge=1)
+    trial_uuid: str = Field(..., min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_\-]+$")
+
+
+def version_keys(revision: Optional[Revision]) -> dict:
+    """Hidden keys linking the versions of one entry.
+
+    entry_id       stable across all versions of an entry
+    entry_version  1 for a new entry, previous + 1 for an update
+    supersedes     trial uuid of the version this one replaces (updates only)
+    """
+    if revision is None:
+        return {"entry_id": str(uuid.uuid4()), "entry_version": 1}
+    return {
+        "entry_id": revision.entry_id,
+        "entry_version": revision.version + 1,
+        "supersedes": revision.trial_uuid,
+    }
+
+
+def build_payload(
+    form: FormDef,
+    values: Optional[dict],
+    cfg: FormConfig,
+    users: Optional[UserLookup] = None,
+    revision: Optional[Revision] = None,
+) -> dict:
+    """Build and validate the KV payload; raises SubmissionError with field errors.
+
+    `users` returns the registered users for 'user' fields (default: the
+    metadata store). It is called at most once per submission.
+    `revision` makes this payload the next version of an existing entry.
+    """
     errors: List[dict] = []
-    body = _build_fields(form.fields, values or {}, cfg, "", errors)
+    source = users or (lambda: directory.lookup(cfg.users))
+    cache: dict = {}
+
+    def lookup() -> Dict[UserKey, dict]:
+        if "users" not in cache:
+            try:
+                cache["users"] = source()
+            except UserDirectoryError as err:
+                cache["users"] = err
+        if isinstance(cache["users"], Exception):
+            raise cache["users"]
+        return cache["users"]
+
+    body = _build_fields(form.fields, values or {}, cfg, "", errors, lookup)
     if errors:
         raise SubmissionError(errors)
 
-    payload = {"schema_version": SCHEMA_VERSION, "msg_type": form.msg_type, **body}
+    # form_id and the version keys are never shown to the person filling in the
+    # form; form_id tags every entry with the form it came from so it can be
+    # found later (e.g. RWS type1 search_terms: ["powder-library"]).
+    payload = {
+        "schema_version": SCHEMA_VERSION,
+        "msg_type": form.msg_type,
+        "form_id": form.id,
+        **version_keys(revision),
+        **body,
+    }
     errors = schema_errors(payload)
     if errors:
         raise SubmissionError(errors)

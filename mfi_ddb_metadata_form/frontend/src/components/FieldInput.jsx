@@ -1,5 +1,53 @@
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, RefreshCw, Trash2 } from "lucide-react";
 import { initialValues, isUserField } from "../lib/form";
+import { useUsers, userKey, userLabel } from "../lib/users";
+
+function UserSelect({ field, id, value, onChange, error, common, cls }) {
+  const { status, users, error: loadError, reload } = useUsers();
+  const selected = userKey(value);
+  const known = users.some((u) => userKey(u) === selected);
+  return (
+    <div className="flex gap-2">
+      <select
+        {...common}
+        className={`${cls} min-w-0 flex-1`}
+        value={selected}
+        disabled={status === "loading" && users.length === 0}
+        onChange={(e) => {
+          const pick = users.find((u) => userKey(u) === e.target.value);
+          onChange(pick ? { user_id: pick.user_id, domain: pick.domain } : null);
+        }}
+      >
+        <option value="">
+          {status === "loading" && users.length === 0
+            ? "Loading users…"
+            : loadError && users.length === 0
+            ? "Users unavailable"
+            : "Select a user…"}
+        </option>
+        {selected && !known && (
+          <option value={selected}>
+            {value.user_id} · {value.domain} (not found)
+          </option>
+        )}
+        {users.map((u) => (
+          <option key={userKey(u)} value={userKey(u)}>
+            {userLabel(u)}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        className="rounded-md border border-gray-300 px-2 text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+        title={loadError ? `${loadError} — retry` : "Reload users from the metadata store"}
+        aria-label={`Reload users for ${field.label}`}
+        onClick={reload}
+      >
+        <RefreshCw size={14} className={status === "loading" ? "animate-spin" : ""} />
+      </button>
+    </div>
+  );
+}
 
 function Label({ field, htmlFor }) {
   return (
@@ -10,8 +58,21 @@ function Label({ field, htmlFor }) {
   );
 }
 
+function UserLoadError() {
+  const { error } = useUsers();
+  return error ? <p className="mt-1 text-xs text-amber-700">{error}</p> : null;
+}
+
 function Hint({ field, error }) {
   if (error) return <p className="mt-1 text-xs text-red-600">{error}</p>;
+  if (field.type === "user") {
+    return (
+      <>
+        <UserLoadError />
+        {field.help && <p className="mt-1 text-xs text-gray-500">{field.help}</p>}
+      </>
+    );
+  }
   if (field.help) return <p className="mt-1 text-xs text-gray-500">{field.help}</p>;
   return null;
 }
@@ -21,6 +82,8 @@ function Control({ field, id, value, onChange, error }) {
   const common = { id, name: id, placeholder: field.placeholder || undefined, "aria-invalid": Boolean(error) };
 
   switch (field.type) {
+    case "user":
+      return <UserSelect field={field} id={id} value={value} onChange={onChange} error={error} common={common} cls={cls} />;
     case "textarea":
       return <textarea {...common} rows={3} className={cls} value={value ?? ""} onChange={(e) => onChange(e.target.value)} />;
     case "json":
@@ -168,6 +231,14 @@ function ListField({ field, path, value, onChange, errors }) {
 }
 
 export default function FieldInput({ field, path, value, onChange, errors, compact = false }) {
+  if (field.type === "section") {
+    return (
+      <div className="col-span-full mt-2 border-b border-gray-200 pb-1.5 first:mt-0">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-700">{field.label}</h3>
+        {field.help && <p className="mt-0.5 text-xs text-gray-500">{field.help}</p>}
+      </div>
+    );
+  }
   if (field.type === "list") {
     return <ListField field={field} path={path} value={value} onChange={onChange} errors={errors} />;
   }

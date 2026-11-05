@@ -29,8 +29,18 @@ services:
       FORM_USER_DOMAIN: ${FORM_USER_DOMAIN:-ANDREW}
       FORM_DRY_RUN: ${FORM_DRY_RUN:-false}
       FORM_ADMIN_TOKEN: ${FORM_ADMIN_TOKEN:-}
+      # 'user' field dropdowns: users from the metadata store (profile: retrieval)
+      MDS_PG_HOST: ${MDS_PG_HOST:-mfi-metadata-store-db}
+      MDS_PG_PORT: ${MDS_PG_PORT:-5432}
+      MDS_PG_DATABASE: ${MDS_PG_DATABASE:-mds}
+      MDS_PG_USER: ${MDS_PG_USER:-mfi}
+      MDS_PG_PASSWORD: ${MDS_PG_PASSWORD:-mfiddb}
+      # 'Entries' page: retrieval API (profile: retrieval)
+      RWS_URL: ${RWS_URL:-http://mfi-rws-app:8000/mfi-ddb}
+      ENTRIES_SHOW_ALL: ${ENTRIES_SHOW_ALL:-true}
     volumes:
       - ../../mfi_ddb_metadata_form/config:/app/config:ro
+      - ../../label_maker_main:/app/labels:ro          # label templates (Print on the Entries page)
       - ./.data/metadata_form:/app/data
     networks:
       - mfi_network

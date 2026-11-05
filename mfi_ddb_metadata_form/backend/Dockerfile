@@ -15,8 +15,10 @@ FROM python:3.12-slim AS base
 
 WORKDIR /app
 
+# libpango/harfbuzz + fonts: WeasyPrint (label printing); Liberation Sans stands in for Arial
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt ./
@@ -33,7 +35,7 @@ ENV FORM_CONFIG_PATH=/app/config/form-config.yaml \
 # ---------------------------------------------------------------------------
 FROM base AS test
 
-RUN pip install --no-cache-dir pytest httpx
+RUN pip install --no-cache-dir pytest httpx pypdf
 COPY backend/tests ./tests
 COPY backend/pytest.ini ./
 CMD ["python", "-m", "pytest", "-v", "-p", "no:cacheprovider"]

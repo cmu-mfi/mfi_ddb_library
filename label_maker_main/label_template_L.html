@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ file_id }}</title>
+</head>
+<body>
+  <div class="card">
+    <div class="card-title">{{ file_id }}</div>
+    <ul class="property-list">
+      <li><span class="label">Alloy:</span><span class="value">{{ alloy }}</span></li>
+      <li><span class="label">Production:</span><span class="value">{{ vendor }} | {{ production }}</span></li>
+      <li><span class="label">Owner:</span><span class="value">{{ owner_displ }}</span></li>
+      <li><span class="label">Size Range:</span><span class="value">{{ D10 }} - {{ D90 }} um</span></li>
+      <li><span class="label">Date Received:</span><span class="value">{{ date_received }}</span></li>
+      <li><span class="label">Recycled:</span><span class="value">{{ recycling_steps  }}</span></li>
+      <li><span class="label">Labeled date:</span><span class="value">{{ label_tools.now() }}</span></li>
+    </ul>
+  </div>
+</body>
+</html>

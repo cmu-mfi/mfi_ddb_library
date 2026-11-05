@@ -7,7 +7,8 @@ the data volume (FORM_CUSTOM_FORMS, default data/custom_forms.json) - the YAML
 config file is never modified - and merged with the YAML forms at runtime.
 
 Every builder form is converted to a regular FormDef:
-    trial_id (required)  +  the user's keys  +  timestamp (auto: now)
+    trial_id (required)  +  created_by (required user, picked from the
+    metadata store)  +  the user's keys  +  timestamp (auto: now)
 and published exactly like a YAML-defined form.
 """
 
@@ -25,9 +26,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.config import FieldDef, FormDef, check_topic_segment
 
 BUILDER_TYPES = Literal[
-    "text", "textarea", "number", "integer", "checkbox", "select", "date", "datetime"
+    "text", "textarea", "number", "integer", "checkbox", "select", "date", "datetime",
+    "section",  # a heading grouping the keys below it (label = title, help = description)
 ]
-RESERVED_KEYS = {"schema_version", "msg_type", "trial_id", "timestamp"}
+RESERVED_KEYS = {
+    "schema_version", "msg_type", "form_id", "entry_id", "entry_version", "supersedes",
+    "trial_id", "timestamp",
+    "created_by", "created_by_user_id", "created_by_domain",
+}
 _KEY_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_\-]*$")
 
 
@@ -68,6 +74,11 @@ class BuilderKey(BaseModel):
 
     @model_validator(mode="after")
     def _check(self):
+        if self.type == "section":
+            if not (self.label or "").strip():
+                raise ValueError("a section needs a title")
+            self.required, self.options, self.default, self.min, self.max = False, [], None, None, None
+            return self
         if self.type == "select" and not self.options:
             raise ValueError(f"key '{self.name}': a dropdown needs at least one choice")
         if self.min is not None and self.max is not None and self.min > self.max:
@@ -77,6 +88,13 @@ class BuilderKey(BaseModel):
         return self
 
     def to_field(self) -> FieldDef:
+        if self.type == "section":
+            return FieldDef(
+                name=self.name,
+                label=(self.label or "").strip(),
+                type="section",
+                help=(self.help or "").strip() or None,
+            )
         default = self.default
         if self.type == "checkbox":
             default = str(default).lower() in ("true", "1", "yes", "on") if default else False
@@ -104,6 +122,24 @@ class BuilderForm(BaseModel):
     submit_label: Optional[str] = None
     site: Optional[str] = Field(None, description="Site to publish under (default: the app default).")
     keys: List[BuilderKey] = Field(..., min_length=1)
+
+    @field_validator("keys", mode="before")
+    @classmethod
+    def _name_sections(cls, value):
+        """Sections are headings, not data: give unnamed ones an internal name (_section_N)."""
+        if not isinstance(value, list):
+            return value
+        taken = {k.get("name") for k in value if isinstance(k, dict)}
+        out, n = [], 0
+        for key in value:
+            if isinstance(key, dict) and key.get("type") == "section" and not (key.get("name") or "").strip():
+                n += 1
+                while f"_section_{n}" in taken:
+                    n += 1
+                key = {**key, "name": f"_section_{n}"}
+                taken.add(key["name"])
+            out.append(key)
+        return out
 
     @field_validator("site", mode="before")
     @classmethod
@@ -136,6 +172,13 @@ class BuilderForm(BaseModel):
                     label="Trial ID",
                     required=True,
                     help="Data is attached to this trial.",
+                ),
+                FieldDef(
+                    name="created_by",
+                    label="Created by",
+                    type="user",
+                    required=True,
+                    help="Registered user submitting this data.",
                 ),
                 *[k.to_field() for k in self.keys],
                 FieldDef(name="timestamp", auto="now"),

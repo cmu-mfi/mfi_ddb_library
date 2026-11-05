@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, ClipboardList, Loader2, Radio, Settings as SettingsIcon, Wrench } from "lucide-react";
+import { AlertTriangle, ClipboardList, Loader2, Radio, Search, Settings as SettingsIcon, Wrench } from "lucide-react";
+import Entries from "./components/Entries";
 import FormBuilder from "./components/FormBuilder";
 import MetadataForm from "./components/MetadataForm";
 import Settings from "./components/Settings";
 import SubmissionHistory from "./components/SubmissionHistory";
 import { fetchConfig, fetchHealth, fetchSubmissions } from "./api";
+import { valuesFromPayload } from "./lib/form";
 import logoMfi from "./images/logo_mfi.png";
 
 const serverStatusCls = {
@@ -20,6 +22,8 @@ export default function App() {
   const [view, setView] = useState("forms"); // "forms" | "builder" | "settings"
   const [serverStatus, setServerStatus] = useState("checking");
   const [history, setHistory] = useState([]);
+  // Entry being updated: {formId, trialId, values, revises: {entry_id, version, trial_uuid}}
+  const [editing, setEditing] = useState(null);
 
   const loadConfig = useCallback(async () => {
     const res = await fetchConfig();
@@ -62,6 +66,31 @@ export default function App() {
   }, [config?.app?.title]);
 
   const activeForm = config?.forms.find((f) => f.id === activeId);
+  // "Update" / "Copy" on the Entries page: open the form pre-filled with that entry.
+  // update -> saves the next version of the entry; copy -> saves a brand-new entry.
+  const startUpdate = (formId, entry, mode = "update") => {
+    const form = config?.forms.find((f) => f.id === formId);
+    if (!form) return;
+    const values = valuesFromPayload(form.fields, entry.values);
+    if (mode === "copy" && "trial_id" in values) values.trial_id = ""; // a new entry needs its own trial ID
+    setEditing({
+      formId,
+      mode,
+      trialId: entry.trial_id,
+      values,
+      revises:
+        mode === "update" ? { entry_id: entry.entry_id, version: entry.version, trial_uuid: entry.uuid } : null,
+    });
+    setActiveId(formId);
+    setView("forms");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const selectForm = (id) => {
+    setActiveId(id);
+    setEditing((prev) => (prev && prev.formId !== id ? null : prev));
+  };
+
   const openForm = async (id) => {
     await loadConfig();
     setActiveId(id);
@@ -119,6 +148,7 @@ export default function App() {
                 <h1 className="text-3xl font-semibold text-gray-800">{config.app.title}</h1>
                 <div className="flex gap-1 rounded-lg bg-gray-200 p-1">
                   {viewBtn("forms", "Fill in forms", ClipboardList)}
+                  {config.entries?.enabled && viewBtn("entries", "Entries", Search)}
                   {config.builder?.enabled && viewBtn("builder", "Form builder", Wrench)}
                   {viewBtn("settings", "Settings", SettingsIcon)}
                 </div>
@@ -158,7 +188,15 @@ export default function App() {
               </div>
             )}
 
-            {view === "settings" ? (
+            {view === "entries" ? (
+              <Entries
+                forms={config.forms}
+                initialFormId={activeId}
+                showAll={config.entries.show_all}
+                onUpdate={startUpdate}
+                labels={config.labels}
+              />
+            ) : view === "settings" ? (
               <div className="rounded-lg bg-white p-6 shadow">
                 <Settings onChanged={loadConfig} />
               </div>
@@ -183,7 +221,7 @@ export default function App() {
                       type="button"
                       role="tab"
                       aria-selected={f.id === activeId}
-                      onClick={() => setActiveId(f.id)}
+                      onClick={() => selectForm(f.id)}
                       className={`-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
                         f.id === activeId
                           ? "border-blue-600 text-blue-700"
@@ -195,7 +233,16 @@ export default function App() {
                   ))}
                 </nav>
               )}
-              <div className="p-6">{activeForm && <MetadataForm form={activeForm} onSubmitted={loadHistory} />}</div>
+              <div className="p-6">
+                {activeForm && (
+                  <MetadataForm
+                    form={activeForm}
+                    onSubmitted={loadHistory}
+                    editing={editing?.formId === activeForm.id ? editing : null}
+                    onEditDone={() => setEditing(null)}
+                  />
+                )}
+              </div>
             </div>
 
             {config.history_enabled && <SubmissionHistory items={history} onRefresh={loadHistory} />}

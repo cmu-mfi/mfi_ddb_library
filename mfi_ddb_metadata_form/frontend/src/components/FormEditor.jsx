@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowDown, ArrowUp, Lock, Loader2, Plus, Save, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Heading, Lock, Loader2, Plus, Save, Trash2, X } from "lucide-react";
 
 export const KEY_TYPES = [
   { value: "text", label: "Text", example: "abc" },
@@ -154,19 +154,8 @@ function KeyRow({ row, index, count, update, move, remove, error }) {
             />
             Required
           </label>
-          <div className="mb-1 flex gap-0.5">
-            <button type="button" aria-label="Move up" disabled={index === 0} onClick={() => move(-1)}
-              className="rounded p-1.5 text-gray-500 hover:bg-gray-200 disabled:opacity-30">
-              <ArrowUp size={16} />
-            </button>
-            <button type="button" aria-label="Move down" disabled={index === count - 1} onClick={() => move(1)}
-              className="rounded p-1.5 text-gray-500 hover:bg-gray-200 disabled:opacity-30">
-              <ArrowDown size={16} />
-            </button>
-            <button type="button" aria-label="Remove key" onClick={remove}
-              className="rounded p-1.5 text-gray-500 hover:bg-red-100 hover:text-red-600">
-              <Trash2 size={16} />
-            </button>
+          <div className="mb-1">
+            <MoveRemove index={index} count={count} move={move} remove={remove} what="key" />
           </div>
         </div>
 
@@ -194,6 +183,54 @@ function KeyRow({ row, index, count, update, move, remove, error }) {
         </label>
       </div>
       {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+function MoveRemove({ index, count, move, remove, what }) {
+  return (
+    <div className="flex gap-0.5">
+      <button type="button" aria-label="Move up" disabled={index === 0} onClick={() => move(-1)}
+        className="rounded p-1.5 text-gray-500 hover:bg-gray-200 disabled:opacity-30">
+        <ArrowUp size={16} />
+      </button>
+      <button type="button" aria-label="Move down" disabled={index === count - 1} onClick={() => move(1)}
+        className="rounded p-1.5 text-gray-500 hover:bg-gray-200 disabled:opacity-30">
+        <ArrowDown size={16} />
+      </button>
+      <button type="button" aria-label={`Remove ${what}`} onClick={remove}
+        className="rounded p-1.5 text-gray-500 hover:bg-red-100 hover:text-red-600">
+        <Trash2 size={16} />
+      </button>
+    </div>
+  );
+}
+
+/** A heading that groups the keys below it (until the next section). Sends no data. */
+function SectionRow({ row, index, count, update, move, remove, error }) {
+  return (
+    <div className={`rounded-md border-l-4 p-4 ${error ? "border-red-400 bg-red-50/40" : "border-blue-500 bg-blue-50/60"}`}>
+      <div className="flex flex-wrap items-start gap-3">
+        <Heading size={18} className="mt-7 shrink-0 text-blue-600" />
+        <label className="block min-w-[12rem] flex-1">
+          <span className="mb-1 block text-xs font-medium text-gray-600">Section title</span>
+          <input
+            className={`input font-medium ${error ? "input-error" : ""}`}
+            value={row.label}
+            placeholder="Particle size"
+            onChange={(e) => update({ label: e.target.value })}
+          />
+        </label>
+        <label className="block min-w-[12rem] flex-[2]">
+          <span className="mb-1 block text-xs font-medium text-gray-600">Description (optional)</span>
+          <input className="input" value={row.help} onChange={(e) => update({ help: e.target.value })} />
+        </label>
+        <div className="mt-6">
+          <MoveRemove index={index} count={count} move={move} remove={remove} what="section" />
+        </div>
+      </div>
+      <p className="mt-2 text-xs text-gray-500">Groups the keys below it on the form. It sends no data.</p>
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
     </div>
   );
 }
@@ -228,7 +265,10 @@ function toRequest(state) {
     description: state.description,
     submit_label: state.submit_label,
     site: state.site.trim() || null,
-    keys: state.rows.map((r) => ({
+    keys: state.rows.map((r) =>
+      r.type === "section"
+        ? { name: r.name.trim() || null, label: r.label, type: "section", help: r.help }
+        : {
       name: r.name.trim(),
       label: r.label,
       type: r.type,
@@ -238,7 +278,8 @@ function toRequest(state) {
       help: r.help,
       min: num(r.min),
       max: num(r.max),
-    })),
+          }
+    ),
   };
 }
 
@@ -322,26 +363,44 @@ export default function FormEditor({ initial, defaultSite, onSave, onCancel }) {
       <h3 className="mb-1 mt-6 text-base font-semibold text-gray-800">Keys</h3>
       <p className="mb-3 text-sm text-gray-500">
         Each key becomes a field in the form. People filling in the form enter the values, which are sent as a{" "}
-        <code className="text-xs">data</code> payload.
+        <code className="text-xs">data</code> payload. Add sections to group keys under headings.
       </p>
 
       <div className="space-y-3">
+        <LockedRow label="Form ID" keyName="form_id" note="hidden; this form's id, used to find its entries" />
         <LockedRow label="Trial ID" keyName="trial_id" note="always included and required" />
-        {state.rows.map((row, i) => (
-          <KeyRow
-            key={row._id}
-            row={row}
-            index={i}
-            count={state.rows.length}
-            update={(patch) => updateRow(i, patch)}
-            move={(d) => moveRow(i, d)}
-            remove={() => setRows((rows) => rows.filter((_, j) => j !== i))}
-            error={errors.rows[i]}
-          />
-        ))}
-        <button type="button" className="btn-secondary" onClick={() => setRows((rows) => [...rows, newRow()])}>
-          <Plus size={16} /> Add key
-        </button>
+        <LockedRow
+          label="Created by"
+          keyName="created_by_user_id / created_by_domain"
+          note="required; picked from the registered users"
+        />
+        {state.rows.map((row, i) => {
+          const Row = row.type === "section" ? SectionRow : KeyRow;
+          return (
+            <Row
+              key={row._id}
+              row={row}
+              index={i}
+              count={state.rows.length}
+              update={(patch) => updateRow(i, patch)}
+              move={(d) => moveRow(i, d)}
+              remove={() => setRows((rows) => rows.filter((_, j) => j !== i))}
+              error={errors.rows[i]}
+            />
+          );
+        })}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="btn-secondary" onClick={() => setRows((rows) => [...rows, newRow()])}>
+            <Plus size={16} /> Add key
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setRows((rows) => [...rows, newRow({ type: "section" })])}
+          >
+            <Heading size={16} /> Add section
+          </button>
+        </div>
         <LockedRow label="Timestamp" keyName="timestamp" note="filled in automatically when sent" />
       </div>
 

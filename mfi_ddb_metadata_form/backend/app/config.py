@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_CONFIG_PATH = "/app/config/form-config.yaml"
 
 MSG_TYPES = ("project", "user", "tp-tag", "data")
-RESERVED_FIELD_NAMES = {"schema_version", "msg_type"}
+RESERVED_FIELD_NAMES = {"schema_version", "msg_type", "form_id", "entry_id", "entry_version", "supersedes"}
 FIELD_TYPES = Literal[
     "text",
     "textarea",
@@ -54,6 +54,8 @@ FIELD_TYPES = Literal[
     "datetime",
     "list",
     "json",
+    "user",
+    "section",  # heading that groups the fields below it; never part of the payload
 ]
 AUTO_KEYWORDS = {"now", "uuid", "trial_id"}
 AUTO_PREFIXES = ("streamer.", "env.")
@@ -112,6 +114,12 @@ class FieldDef(BaseModel):
     min_items: int = 0
     max_items: Optional[int] = None
     item_label: Optional[str] = Field(None, description="Name of one list item, e.g. 'role'.")
+    user_id_key: Optional[str] = Field(
+        None, description="For type user: payload key for the user id (default <name>_user_id)."
+    )
+    domain_key: Optional[str] = Field(
+        None, description="For type user: payload key for the domain (default <name>_domain)."
+    )
 
     @field_validator("options", mode="before")
     @classmethod
@@ -141,6 +149,7 @@ class FieldDef(BaseModel):
             if not self.fields:
                 raise ValueError(f"field '{self.name}': type 'list' needs 'fields'")
             _check_unique([f.name for f in self.fields], f"sub-field of '{self.name}'")
+            _check_unique([k for f in self.fields for k in f.payload_keys], f"payload key of '{self.name}'")
         elif self.fields:
             raise ValueError(f"field '{self.name}': 'fields' is only valid for type 'list'")
         if self.auto is not None and not (
@@ -155,11 +164,43 @@ class FieldDef(BaseModel):
                 re.compile(self.pattern)
             except re.error as err:
                 raise ValueError(f"field '{self.name}': invalid pattern: {err}") from None
+        if self.type == "section":
+            for attr in ("required", "default", "auto", "hidden", "options"):
+                if getattr(self, attr):
+                    raise ValueError(f"section '{self.name}' is only a heading and cannot have '{attr}'")
+        if self.type == "user":
+            # A user is always picked from the metadata store - no default/auto/hidden value.
+            for attr in ("default", "auto", "hidden", "options"):
+                if getattr(self, attr):
+                    raise ValueError(
+                        f"field '{self.name}': type 'user' is picked from the metadata store "
+                        f"users and cannot have '{attr}'"
+                    )
+            self.user_id_key = self.user_id_key or f"{self.name}_user_id"
+            self.domain_key = self.domain_key or f"{self.name}_domain"
+            for key in (self.user_id_key, self.domain_key):
+                if not _NAME_PATTERN.match(key) or key in RESERVED_FIELD_NAMES:
+                    raise ValueError(f"field '{self.name}': invalid payload key '{key}'")
+            if self.user_id_key == self.domain_key:
+                raise ValueError(f"field '{self.name}': user_id_key and domain_key must differ")
+        elif self.user_id_key or self.domain_key:
+            raise ValueError(
+                f"field '{self.name}': 'user_id_key'/'domain_key' are only valid for type 'user'"
+            )
         return self
 
     @property
     def display_label(self) -> str:
         return self.label or self.name
+
+    @property
+    def payload_keys(self) -> List[str]:
+        """Keys this field writes into the payload (a user field writes two, a section none)."""
+        if self.type == "section":
+            return []
+        if self.type == "user":
+            return [self.user_id_key, self.domain_key]
+        return [self.name]
 
 
 FieldDef.model_rebuild()
@@ -188,7 +229,12 @@ class FormDef(BaseModel):
             raise ValueError(f"form id '{self.id}' must be lowercase letters, digits, '_' or '-'")
         self.site = check_topic_segment(self.site, f"site of form '{self.id}'")
         _check_unique([f.name for f in self.fields], f"field in form '{self.id}'")
+        _check_unique([k for f in self.fields for k in f.payload_keys], f"payload key in form '{self.id}'")
         return self
+
+    @property
+    def has_required_user(self) -> bool:
+        return any(f.type == "user" and f.required for f in self.fields)
 
 
 class AppSection(BaseModel):
@@ -230,6 +276,63 @@ class BuilderSection(BaseModel):
     )
 
 
+class UsersDatabase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    host: str = "localhost"
+    port: int = Field(5430, ge=1, le=65535)
+    dbname: str = "mds"
+    user: str = "mfi"
+    password: str = ""
+
+
+class UsersSection(BaseModel):
+    """Where 'user' fields get their dropdown: the metadata store's ddb_user table."""
+
+    model_config = ConfigDict(extra="forbid")
+    database: UsersDatabase = UsersDatabase()
+    cache_seconds: float = Field(15, ge=0, le=3600)
+    connect_timeout_seconds: float = Field(5, gt=0, le=60)
+
+
+class EntriesSection(BaseModel):
+    """Searching previous entries through the retrieval API (RWS)."""
+
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = True
+    rws_url: str = Field("http://localhost:8000/mfi-ddb", description="RWS base URL (…/type1 is appended).")
+    show_all: bool = Field(
+        True, description="true = everyone sees all entries; false = only the viewer's own (RWS access)."
+    )
+    timeout_seconds: float = Field(15, gt=0, le=120)
+    max_results: int = Field(500, ge=1, le=5000)
+
+
+class LabelSize(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    template: str = Field(..., description="Jinja/blabel HTML template file in template_dir.")
+    stylesheet: Optional[str] = Field(None, description="CSS file in template_dir.")
+    page_size: Optional[str] = Field(
+        None, description="PDF page size = label size, CSS @page syntax, e.g. '2.3125in 4in'."
+    )
+
+
+class LabelsSection(BaseModel):
+    """Printable labels (label_maker_main templates rendered with blabel)."""
+
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = True
+    template_dir: str = "/app/labels"
+    sizes: dict[str, LabelSize] = Field(
+        default_factory=lambda: {
+            "S": LabelSize(template="label_template_S.html", stylesheet="styleS.css", page_size="2.3125in 4in"),
+            "L": LabelSize(template="label_template_L.html", stylesheet="styleL.css", page_size="4in 6in"),
+        }
+    )
+    # form id -> {template variable: payload key}; only these forms get a Print button
+    forms: dict[str, dict[str, str]] = Field(default_factory=dict)
+    max_labels: int = Field(200, ge=1, le=1000)
+
+
 class FormConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -238,6 +341,9 @@ class FormConfig(BaseModel):
     publish: PublishSection = PublishSection()
     history: HistorySection = HistorySection()
     builder: BuilderSection = BuilderSection()
+    users: UsersSection = UsersSection()
+    entries: EntriesSection = EntriesSection()
+    labels: LabelsSection = LabelsSection()
     streamer: dict = Field(..., description="mfi_ddb Streamer config (user, mqtt, project).")
     forms: List[FormDef] = Field(..., min_length=1)
 
@@ -424,6 +530,9 @@ def _public_field(field: FieldDef, cfg: FormConfig) -> dict:
         "max_items": field.max_items,
         "item_label": field.item_label,
     }
+    if field.type == "user":
+        data["user_id_key"] = field.user_id_key
+        data["domain_key"] = field.domain_key
     if field.auto and field.auto not in ("now", "uuid"):
         data["auto_value"] = resolve_auto(field.auto, cfg)
     if field.fields:
@@ -445,6 +554,7 @@ def public_view(cfg: FormConfig) -> dict:
         },
         "user": {k: user.get(k, "") for k in ("user_id", "domain", "name")},
         "history_enabled": cfg.history.enabled,
+        "entries": {"enabled": cfg.entries.enabled, "show_all": cfg.entries.show_all},
         "builder": {
             "enabled": cfg.builder.enabled,
             "requires_token": bool(cfg.builder.admin_token),
