@@ -19,14 +19,14 @@ services:
     ports:
       - "8002:8000"
     environment:
-      MQTT_BROKER_ADDRESS: ${MQTT_BROKER_ADDRESS:-mfi-mqtt-broker}   # pipeline broker service
+      MQTT_BROKER_ADDRESS: ${MQTT_BROKER_ADDRESS:-mqtt-broker}   # pipeline broker service (also editable on the Settings page)
       MQTT_BROKER_PORT: ${MQTT_BROKER_PORT:-1883}
       MQTT_USERNAME: ${MQTT_USERNAME:-}
       MQTT_PASSWORD: ${MQTT_PASSWORD:-}
       MQTT_ENTERPRISE: ${MQTT_ENTERPRISE:-CMU}
       MQTT_SITE: ${MQTT_SITE:-Mill-19}
       FORM_USER_ID: ${FORM_USER_ID:-metadata-form}
-      FORM_USER_DOMAIN: ${FORM_USER_DOMAIN:-MFI}
+      FORM_USER_DOMAIN: ${FORM_USER_DOMAIN:-ANDREW}
       FORM_DRY_RUN: ${FORM_DRY_RUN:-false}
       FORM_ADMIN_TOKEN: ${FORM_ADMIN_TOKEN:-}
     volumes:

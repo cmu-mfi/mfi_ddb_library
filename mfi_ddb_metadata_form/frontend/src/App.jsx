@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, ClipboardList, Loader2, Radio, Wrench } from "lucide-react";
+import { AlertTriangle, ClipboardList, Loader2, Radio, Settings as SettingsIcon, Wrench } from "lucide-react";
 import FormBuilder from "./components/FormBuilder";
 import MetadataForm from "./components/MetadataForm";
+import Settings from "./components/Settings";
 import SubmissionHistory from "./components/SubmissionHistory";
 import { fetchConfig, fetchHealth, fetchSubmissions } from "./api";
 import logoMfi from "./images/logo_mfi.png";
@@ -16,7 +17,7 @@ export default function App() {
   const [config, setConfig] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [activeId, setActiveId] = useState(null);
-  const [view, setView] = useState("forms"); // "forms" | "builder"
+  const [view, setView] = useState("forms"); // "forms" | "builder" | "settings"
   const [serverStatus, setServerStatus] = useState("checking");
   const [history, setHistory] = useState([]);
 
@@ -116,19 +117,25 @@ export default function App() {
             <div>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <h1 className="text-3xl font-semibold text-gray-800">{config.app.title}</h1>
-                {config.builder?.enabled && (
-                  <div className="flex gap-1 rounded-lg bg-gray-200 p-1">
-                    {viewBtn("forms", "Fill in forms", ClipboardList)}
-                    {viewBtn("builder", "Form builder", Wrench)}
-                  </div>
-                )}
+                <div className="flex gap-1 rounded-lg bg-gray-200 p-1">
+                  {viewBtn("forms", "Fill in forms", ClipboardList)}
+                  {config.builder?.enabled && viewBtn("builder", "Form builder", Wrench)}
+                  {viewBtn("settings", "Settings", SettingsIcon)}
+                </div>
               </div>
               {config.app.subtitle && <p className="mt-1 text-gray-600">{config.app.subtitle}</p>}
               <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
                 <Radio size={14} />
                 Publishing via KV adapter to <code className="text-gray-700">{config.target.broker}</code>
                 <span>·</span>
-                <code className="break-all text-gray-700">{config.target.topic_prefix}/…</code>
+                <code className="break-all text-gray-700">
+                  {(view === "forms" && activeForm?.topic_prefix) || config.target.topic_prefix}/…
+                </code>
+                {view === "forms" && activeForm?.site && (
+                  <span className="rounded-full bg-blue-50 px-2 py-0.5 font-medium text-blue-800">
+                    Site: {activeForm.site}
+                  </span>
+                )}
                 {config.dry_run && (
                   <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800">
                     Dry run – nothing is published
@@ -151,10 +158,15 @@ export default function App() {
               </div>
             )}
 
-            {view === "builder" ? (
+            {view === "settings" ? (
+              <div className="rounded-lg bg-white p-6 shadow">
+                <Settings onChanged={loadConfig} />
+              </div>
+            ) : view === "builder" ? (
               <div className="rounded-lg bg-white p-6 shadow">
                 <FormBuilder
                   builder={config.builder}
+                  defaultSite={config.target.default_site}
                   yamlForms={config.forms.filter((f) => f.source !== "ui")}
                   onChanged={loadConfig}
                   onOpenForm={openForm}

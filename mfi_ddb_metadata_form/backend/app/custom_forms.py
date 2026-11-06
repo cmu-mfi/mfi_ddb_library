@@ -22,7 +22,7 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.config import FieldDef, FormDef
+from app.config import FieldDef, FormDef, check_topic_segment
 
 BUILDER_TYPES = Literal[
     "text", "textarea", "number", "integer", "checkbox", "select", "date", "datetime"
@@ -102,7 +102,15 @@ class BuilderForm(BaseModel):
     title: str = Field(..., min_length=1, max_length=80)
     description: Optional[str] = None
     submit_label: Optional[str] = None
+    site: Optional[str] = Field(None, description="Site to publish under (default: the app default).")
     keys: List[BuilderKey] = Field(..., min_length=1)
+
+    @field_validator("site", mode="before")
+    @classmethod
+    def _site(cls, value):
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return None
+        return check_topic_segment(value, "site")
 
     @model_validator(mode="after")
     def _check(self):
@@ -120,6 +128,7 @@ class BuilderForm(BaseModel):
             title=self.title,
             description=(self.description or "").strip() or None,
             submit_label=(self.submit_label or "").strip() or "Send data",
+            site=self.site,
             source="ui",
             fields=[
                 FieldDef(

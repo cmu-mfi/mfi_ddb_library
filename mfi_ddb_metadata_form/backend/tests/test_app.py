@@ -252,6 +252,7 @@ def client(tmp_path, raw_config, monkeypatch):
     monkeypatch.setenv("FORM_CONFIG_PATH", str(path))
     monkeypatch.setenv("FORM_HISTORY_DB", str(tmp_path / "history.db"))
     monkeypatch.setenv("FORM_CUSTOM_FORMS", str(tmp_path / "custom_forms.json"))
+    monkeypatch.setenv("FORM_SETTINGS", str(tmp_path / "settings.json"))
 
     import importlib
 
@@ -360,6 +361,7 @@ def test_builder_admin_token(tmp_path, raw_config, monkeypatch):
     monkeypatch.setenv("FORM_CONFIG_PATH", str(path))
     monkeypatch.setenv("FORM_HISTORY_DB", str(tmp_path / "history.db"))
     monkeypatch.setenv("FORM_CUSTOM_FORMS", str(tmp_path / "custom_forms.json"))
+    monkeypatch.setenv("FORM_SETTINGS", str(tmp_path / "settings.json"))
 
     import importlib
 
@@ -371,3 +373,141 @@ def test_builder_admin_token(tmp_path, raw_config, monkeypatch):
         assert c.post("/builder/forms", json=MACHINE_FORM).status_code == 401
         ok = c.post("/builder/forms", json=MACHINE_FORM, headers={"X-Admin-Token": "s3cret"})
         assert ok.status_code == 200
+
+
+# --------------------------------------------------------------------------- per-form site
+
+
+def test_form_site_defaults_and_override(raw_config):
+    cfg = parse_config(raw_config)
+    project = cfg.get_form("project")
+    assert config_module.form_site(cfg, project) == "Mill-19"
+
+    raw_config["forms"][0]["site"] = "SC-Nanofab"
+    cfg = parse_config(raw_config)
+    project = cfg.get_form("project")
+    assert config_module.form_site(cfg, project) == "SC-Nanofab"
+    assert publisher.topic_for(cfg, "project", "SC-Nanofab") == "mfi-v1.0-kv/CMU/SC-Nanofab/project/data"
+    # the default site is untouched for the other forms
+    assert config_module.form_site(cfg, cfg.get_form("user")) == "Mill-19"
+
+
+def test_form_site_must_be_a_topic_level(raw_config):
+    raw_config["forms"][0]["site"] = "bad/site"
+    with pytest.raises(Exception, match="must not contain"):
+        parse_config(raw_config)
+
+
+def test_publish_uses_form_site(cfg, monkeypatch):
+    import mfi_ddb
+
+    seen = {}
+
+    class FakeStreamer:
+        def __init__(self, config, adapter, stream_on_update=False):
+            seen["site"] = config["mqtt"]["site"]
+
+        def disconnect(self):
+            pass
+
+    monkeypatch.setattr(mfi_ddb, "Streamer", FakeStreamer)
+    monkeypatch.setattr(publisher, "check_broker", lambda cfg, timeout=None: None)
+    cfg.publish.settle_seconds = 0
+    payload = build_payload(cfg.get_form("user"), {"user_id": "u1", "domain": "ANDREW"}, cfg)
+
+    result = publisher.publish(payload, cfg, "SC-Nanofab")
+    assert seen["site"] == "SC-Nanofab"
+    assert result["topic"] == "mfi-v1.0-kv/CMU/SC-Nanofab/user/data"
+    assert cfg.streamer["mqtt"]["site"] == "Mill-19"  # shared config not mutated
+
+
+# --------------------------------------------------------------------------- settings page
+
+
+def test_settings_roundtrip(client):
+    view = client.get("/settings").json()
+    assert view["overridden"] == []
+    assert view["mqtt"]["has_password"] is False
+    assert {f["id"] for f in view["forms"]} == {"project", "user", "trial-tag"}
+
+    saved = client.put("/settings", json={
+        "mqtt": {"broker_address": "broker.example", "broker_port": 1884,
+                 "enterprise": "CMU-Test", "username": "bob", "password": "s3cret"},
+        "form_sites": {"project": "SC-Nanofab"},
+    })
+    assert saved.status_code == 200, saved.text
+    body = saved.json()
+    assert body["mqtt"]["broker_address"] == "broker.example"
+    assert body["mqtt"]["has_password"] is True
+    assert "s3cret" not in saved.text  # password is write-only
+
+    config_view = client.get("/config").json()
+    forms = {f["id"]: f for f in config_view["forms"]}
+    assert forms["project"]["topic_prefix"] == "mfi-v1.0-kv/CMU-Test/SC-Nanofab"
+    assert forms["user"]["topic_prefix"] == "mfi-v1.0-kv/CMU-Test/Mill-19"
+    assert config_view["target"]["broker"] == "broker.example:1884"
+    assert "s3cret" not in str(config_view)
+
+    # preview / submit use the form's site
+    preview = client.post("/forms/project/preview", json={"values": {"project_id": "p1"}}).json()
+    assert preview["topic"] == "mfi-v1.0-kv/CMU-Test/SC-Nanofab/project/data"
+
+    # omitting the password keeps it; clearing a site falls back to the default
+    again = client.put("/settings", json={"mqtt": {"broker_port": 1885}, "form_sites": {"project": ""}}).json()
+    assert again["mqtt"]["has_password"] is True and again["mqtt"]["broker_port"] == 1885
+    assert {f["id"]: f["site"] for f in again["forms"]}["project"] == "Mill-19"
+
+    reset = client.delete("/settings").json()
+    assert reset["overridden"] == [] and reset["mqtt"]["has_password"] is False
+
+
+def test_settings_validation(client):
+    bad = client.put("/settings", json={"mqtt": {"enterprise": "a/b", "broker_port": 70000}})
+    assert bad.status_code == 422
+    assert client.put("/settings", json={"form_sites": {"user": "x#y"}}).status_code == 422
+    assert client.put("/settings", json={"mqtt": {"nope": 1}}).status_code == 422
+
+
+def test_settings_test_connection_reports_failure(client):
+    res = client.post("/settings/test", json={"mqtt": {"broker_address": "127.0.0.1", "broker_port": 1}})
+    assert res.status_code == 200
+    assert res.json()["ok"] is False and res.json()["target"] == "127.0.0.1:1"
+
+
+def test_builder_form_site(client):
+    form = dict(MACHINE_FORM, site="SC-Nanofab")
+    created = client.post("/builder/forms", json=form).json()
+    assert created["form"]["site"] == "SC-Nanofab"
+    view = {f["id"]: f for f in client.get("/config").json()["forms"]}
+    assert view[created["form"]["id"]]["topic_prefix"] == "mfi-v1.0-kv/CMU/SC-Nanofab"
+    assert client.post("/builder/forms", json=dict(MACHINE_FORM, site="a/b")).status_code == 422
+
+
+# --------------------------------------------------------------------------- session user
+
+
+def test_session_user_matches_created_by(cfg, monkeypatch):
+    import mfi_ddb
+
+    seen = {}
+
+    class FakeStreamer:
+        def __init__(self, config, adapter, stream_on_update=False):
+            seen["user"] = config["user"]
+
+        def disconnect(self):
+            pass
+
+    monkeypatch.setattr(mfi_ddb, "Streamer", FakeStreamer)
+    monkeypatch.setattr(publisher, "check_broker", lambda cfg, timeout=None: None)
+    cfg.publish.settle_seconds = 0
+
+    values = {"user_id": "u1", "domain": "ANDREW",
+              "created_by_user_id": "superadmin", "created_by_domain": "superadmin"}
+    payload = build_payload(cfg.get_form("user"), values, cfg)
+    publisher.publish(payload, cfg)
+    assert seen["user"]["user_id"] == "superadmin" and seen["user"]["domain"] == "superadmin"
+    assert cfg.streamer["user"]["user_id"] == "metadata-form"  # shared config not mutated
+
+    # no created_by in the payload -> the app identity
+    assert publisher.session_user({"msg_type": "data"}, cfg)["user_id"] == "metadata-form"

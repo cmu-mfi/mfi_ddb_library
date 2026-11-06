@@ -216,6 +216,7 @@ export function toEditorState(form) {
     title: form?.title ?? "",
     description: form?.description ?? "",
     submit_label: form?.submit_label ?? "",
+    site: form?.site ?? "",
     rows: form?.keys?.length ? form.keys.map((k) => newRow(k)) : [newRow()],
   };
 }
@@ -226,6 +227,7 @@ function toRequest(state) {
     title: state.title,
     description: state.description,
     submit_label: state.submit_label,
+    site: state.site.trim() || null,
     keys: state.rows.map((r) => ({
       name: r.name.trim(),
       label: r.label,
@@ -240,7 +242,7 @@ function toRequest(state) {
   };
 }
 
-export default function FormEditor({ initial, onSave, onCancel }) {
+export default function FormEditor({ initial, defaultSite, onSave, onCancel }) {
   const [state, setState] = useState(() => toEditorState(initial));
   const [errors, setErrors] = useState({ title: null, rows: {}, general: [] });
   const [saving, setSaving] = useState(false);
@@ -264,6 +266,7 @@ export default function FormEditor({ initial, onSave, onCancel }) {
       const m = /^keys\.(\d+)/.exec(err.field || "");
       if (m) next.rows[m[1]] = next.rows[m[1]] ? `${next.rows[m[1]]}; ${err.message}` : err.message;
       else if (err.field === "title") next.title = err.message;
+      else if (err.field === "site") next.site = err.message;
       else next.general.push(err.message);
     }
     setErrors(next);
@@ -293,7 +296,7 @@ export default function FormEditor({ initial, onSave, onCancel }) {
             onChange={(e) => setState({ ...state, submit_label: e.target.value })}
           />
         </label>
-        <label className="block sm:col-span-2">
+        <label className="block">
           <span className="mb-1 block text-sm font-medium text-gray-700">Description</span>
           <input
             className="input"
@@ -301,6 +304,18 @@ export default function FormEditor({ initial, onSave, onCancel }) {
             placeholder="What is this form for?"
             onChange={(e) => setState({ ...state, description: e.target.value })}
           />
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium text-gray-700">Site</span>
+          <input
+            className={`input ${errors.site ? "input-error" : ""}`}
+            value={state.site}
+            placeholder={defaultSite || ""}
+            onChange={(e) => setState({ ...state, site: e.target.value })}
+          />
+          <span className="mt-1 block text-xs text-gray-500">
+            {errors.site || `Data from this form is published under this site. Empty = ${defaultSite || "the default"}.`}
+          </span>
         </label>
       </div>
 

@@ -64,3 +64,10 @@ export const createBuilderForm = (form) => builderRequest("/builder/forms", "POS
 export const updateBuilderForm = (id, form) =>
   builderRequest(`/builder/forms/${encodeURIComponent(id)}`, "PUT", form);
 export const deleteBuilderForm = (id) => builderRequest(`/builder/forms/${encodeURIComponent(id)}`, "DELETE");
+
+// ---- settings page -----------------------------------------------------------
+
+export const fetchSettings = () => request("/settings");
+export const saveSettings = (body) => builderRequest("/settings", "PUT", body);
+export const resetSettings = () => builderRequest("/settings", "DELETE");
+export const testConnection = (mqtt) => builderRequest("/settings/test", "POST", { mqtt });

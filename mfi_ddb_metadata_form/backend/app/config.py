@@ -63,6 +63,18 @@ _NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_\-]*$")
 _ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_\-]*$")
 
 
+def check_topic_segment(value: Optional[str], what: str) -> Optional[str]:
+    """enterprise / site become MQTT topic levels: no '/', '+' or '#'."""
+    if value is None:
+        return None
+    value = str(value).strip()
+    if not value:
+        raise ValueError(f"{what} must not be empty")
+    if any(c in value for c in "/+#"):
+        raise ValueError(f"{what} '{value}' must not contain '/', '+' or '#'")
+    return value
+
+
 # ---------------------------------------------------------------------------
 # Config models
 # ---------------------------------------------------------------------------
@@ -162,6 +174,10 @@ class FormDef(BaseModel):
     description: Optional[str] = None
     submit_label: str = "Submit"
     enabled: bool = True
+    site: Optional[str] = Field(
+        None,
+        description="Site (topic level) this form publishes under; defaults to streamer.mqtt.site.",
+    )
     fields: List[FieldDef]
     # "config" = defined in the YAML file, "ui" = created with the form builder
     source: Literal["config", "ui"] = Field("config", exclude=True)
@@ -170,6 +186,7 @@ class FormDef(BaseModel):
     def _check(self):
         if not _ID_PATTERN.match(self.id):
             raise ValueError(f"form id '{self.id}' must be lowercase letters, digits, '_' or '-'")
+        self.site = check_topic_segment(self.site, f"site of form '{self.id}'")
         _check_unique([f.name for f in self.fields], f"field in form '{self.id}'")
         return self
 
@@ -363,9 +380,28 @@ def resolve_auto(source: str, cfg: FormConfig) -> Any:
 # ---------------------------------------------------------------------------
 
 
-def topic_prefix(cfg: FormConfig) -> str:
+def default_site(cfg: FormConfig) -> str:
+    return cfg.streamer.get("mqtt", {}).get("site", "")
+
+
+def form_site(cfg: FormConfig, form: Optional[FormDef]) -> str:
+    """The site a form publishes under: its own site, else the default."""
+    if form is not None and form.site:
+        return form.site
+    return default_site(cfg)
+
+
+def streamer_config_for(cfg: FormConfig, site: Optional[str] = None) -> dict:
+    """A copy of the streamer config with the publishing site applied."""
+    streamer = copy.deepcopy(cfg.streamer)
+    if site:
+        streamer.setdefault("mqtt", {})["site"] = site
+    return streamer
+
+
+def topic_prefix(cfg: FormConfig, site: Optional[str] = None) -> str:
     mqtt = cfg.streamer.get("mqtt", {})
-    parts = ["mfi-v1.0-kv", mqtt.get("enterprise", ""), mqtt.get("site", ""), mqtt.get("area", "")]
+    parts = ["mfi-v1.0-kv", mqtt.get("enterprise", ""), site or mqtt.get("site", ""), mqtt.get("area", "")]
     return "/".join(p for p in parts if p)
 
 
@@ -403,6 +439,8 @@ def public_view(cfg: FormConfig) -> dict:
         "dry_run": cfg.publish.dry_run,
         "target": {
             "broker": f"{mqtt.get('broker_address', '')}:{mqtt.get('broker_port', 1883)}",
+            "enterprise": mqtt.get("enterprise", ""),
+            "default_site": default_site(cfg),
             "topic_prefix": topic_prefix(cfg),
         },
         "user": {k: user.get(k, "") for k in ("user_id", "domain", "name")},
@@ -419,6 +457,8 @@ def public_view(cfg: FormConfig) -> dict:
                 "title": form.title,
                 "description": form.description,
                 "submit_label": form.submit_label,
+                "site": form_site(cfg, form),
+                "topic_prefix": topic_prefix(cfg, form_site(cfg, form)),
                 "fields": [_public_field(f, cfg) for f in form.fields if not f.hidden],
             }
             for form in cfg.forms

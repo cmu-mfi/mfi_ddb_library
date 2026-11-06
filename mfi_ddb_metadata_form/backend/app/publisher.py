@@ -26,7 +26,7 @@ import threading
 import time
 from typing import Optional
 
-from app.config import FormConfig, topic_prefix
+from app.config import FormConfig, streamer_config_for, topic_prefix
 
 logger = logging.getLogger(__name__)
 
@@ -37,13 +37,29 @@ class PublishError(Exception):
     pass
 
 
-def topic_for(cfg: FormConfig, msg_type: str) -> str:
-    return f"{topic_prefix(cfg)}/{msg_type}/data"
+def topic_for(cfg: FormConfig, msg_type: str, site: Optional[str] = None) -> str:
+    return f"{topic_prefix(cfg, site)}/{msg_type}/data"
 
 
 def session_trial_id(payload: dict, cfg: FormConfig) -> str:
     trial_id = payload.get("trial_id")
     return str(trial_id) if trial_id else cfg.adapter.trial_id
+
+
+def session_user(payload: dict, cfg: FormConfig) -> dict:
+    """User the adapter session (birth/death trial) is recorded under.
+
+    Matches the submission's created_by_user_id / created_by_domain when the
+    form has them, so the session belongs to whoever is entered as the
+    creator. Otherwise the app's identity (streamer.user) is used.
+    """
+    user = copy.deepcopy(cfg.streamer.get("user", {}))
+    user_id = payload.get("created_by_user_id")
+    domain = payload.get("created_by_domain")
+    if user_id and domain and (user_id, domain) != (user.get("user_id"), user.get("domain")):
+        # name/email in streamer.user describe the app identity, not this user
+        user = {"user_id": str(user_id), "domain": str(domain), "email": "", "name": ""}
+    return user
 
 
 def build_adapter_config(payload: dict, cfg: FormConfig) -> dict:
@@ -91,9 +107,12 @@ def check_broker(cfg: FormConfig, timeout: Optional[float] = None) -> None:
         client.loop_stop()
 
 
-def publish(payload: dict, cfg: FormConfig) -> dict:
-    """Publish one payload. Returns {"status", "topic", "trial_id"}; raises PublishError."""
-    topic = topic_for(cfg, payload["msg_type"])
+def publish(payload: dict, cfg: FormConfig, site: Optional[str] = None) -> dict:
+    """Publish one payload under `site` (default: streamer.mqtt.site).
+
+    Returns {"status", "topic", "trial_id"}; raises PublishError.
+    """
+    topic = topic_for(cfg, payload["msg_type"], site)
     trial_id = session_trial_id(payload, cfg)
 
     if cfg.publish.dry_run:
@@ -120,7 +139,9 @@ def publish(payload: dict, cfg: FormConfig) -> dict:
             )
 
         try:
-            streamer = Streamer(copy.deepcopy(cfg.streamer), adapter, stream_on_update=False)
+            streamer_cfg = streamer_config_for(cfg, site)
+            streamer_cfg["user"] = session_user(payload, cfg)
+            streamer = Streamer(streamer_cfg, adapter, stream_on_update=False)
         except Exception as err:
             raise PublishError(f"Streamer failed to publish: {err}") from None
 

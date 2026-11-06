@@ -53,7 +53,7 @@ builder:
 streamer:
   user:
     user_id: ${FORM_USER_ID:-metadata-form}
-    domain: ${FORM_USER_DOMAIN:-MFI}
+    domain: ${FORM_USER_DOMAIN:-ANDREW}
     email: ${FORM_USER_EMAIL:-}
     name: ${FORM_USER_NAME:-Metadata Form}
   mqtt:
@@ -63,7 +63,7 @@ streamer:
     password: ${MQTT_PASSWORD:-}
     tls_enabled: false
     enterprise: ${MQTT_ENTERPRISE:-CMU}
-    site: ${MQTT_SITE:-Mill-19}
+    site: ${MQTT_SITE:-Mill-19}   # default site; each form can set its own (see "site" below)
 
 # =============================================================================
 # FORMS
@@ -98,12 +98,19 @@ streamer:
 # Payloads may carry extra keys beyond kv.json (additionalProperties is
 # allowed), so add whatever fields your site needs.
 # Set `enabled: false` to hide a form without deleting it.
+#
+# Per-form site: add `site: <name>` to a form to publish it under
+#     mfi-v1.0-kv/<enterprise>/<site>/<msg_type>/data
+# instead of the default streamer.mqtt.site. Sites (and the broker/enterprise)
+# can also be changed on the Settings page in the browser; those overrides are
+# stored in the data volume (data/settings.json) and win over this file.
 # =============================================================================
 
 forms:
   # ---------------------------------------------------------------------------
   - id: project
     msg_type: project
+    # site: Mill-19        # optional: publish this form under its own site
     title: New project
     description: Create a project and assign who can access its data.
     submit_label: Create project
@@ -154,6 +161,7 @@ forms:
   # ---------------------------------------------------------------------------
   - id: user
     msg_type: user
+    # site: Mill-19        # optional: publish this form under its own site
     title: New user
     description: Register a person so their data can be attributed to them.
     submit_label: Register user
@@ -189,6 +197,7 @@ forms:
   # ---------------------------------------------------------------------------
   - id: trial-tag
     msg_type: tp-tag
+    # site: Mill-19        # optional: publish this form under its own site
     title: Tag a trial
     description: Mark a time window of collected data as a trial that belongs to a project.
     submit_label: Tag trial

@@ -12,13 +12,13 @@ import {
 
 const typeLabel = Object.fromEntries(KEY_TYPES.map((t) => [t.value, t.label]));
 
-function TokenBar({ onChange }) {
+export function TokenBar({ onChange, label = "Admin token (needed to create, edit or delete forms)" }) {
   const [value, setValue] = useState(getAdminToken());
   return (
     <div className="mb-5 flex flex-wrap items-end gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
       <label className="block min-w-[14rem] flex-1">
         <span className="mb-1 flex items-center gap-1.5 text-xs font-medium text-amber-900">
-          <KeyRound size={14} /> Admin token (needed to create, edit or delete forms)
+          <KeyRound size={14} /> {label}
         </span>
         <input className="input" type="password" value={value} onChange={(e) => setValue(e.target.value)} />
       </label>
@@ -36,7 +36,7 @@ function TokenBar({ onChange }) {
   );
 }
 
-export default function FormBuilder({ builder, yamlForms, onChanged, onOpenForm }) {
+export default function FormBuilder({ builder, defaultSite, yamlForms, onChanged, onOpenForm }) {
   const [forms, setForms] = useState([]);
   const [editing, setEditing] = useState(null); // null | "new" | form
   const [message, setMessage] = useState(null);
@@ -106,6 +106,7 @@ export default function FormBuilder({ builder, yamlForms, onChanged, onOpenForm 
           <FormEditor
             key={editing === "new" ? "new" : editing.id}
             initial={editing === "new" ? null : editing}
+            defaultSite={defaultSite}
             onSave={handleSave}
             onCancel={() => setEditing(null)}
           />
@@ -132,7 +133,10 @@ export default function FormBuilder({ builder, yamlForms, onChanged, onOpenForm 
               {forms.map((form) => (
                 <li key={form.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                   <div className="min-w-0">
-                    <p className="font-medium text-gray-800">{form.title}</p>
+                    <p className="font-medium text-gray-800">
+                      {form.title}
+                      <span className="ml-2 text-xs font-normal text-gray-500">Site: {form.site || defaultSite}</span>
+                    </p>
                     <p className="mt-0.5 flex flex-wrap gap-1.5 text-xs text-gray-500">
                       {form.keys.map((k) => (
                         <span key={k.name} className="rounded bg-gray-100 px-1.5 py-0.5">

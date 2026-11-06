@@ -11,6 +11,8 @@ Endpoints (nginx exposes them under /api):
   POST /forms/{form_id}/submit    build + validate + publish through the KV adapter
   GET  /submissions               recent submissions (if history is enabled)
   GET/POST/PUT/DELETE /builder/forms[/{id}]   forms created in the browser
+  GET/PUT/DELETE /settings        MQTT target + per-form site (Settings page)
+  POST /settings/test             try connecting to the MQTT broker
 """
 
 import logging
@@ -39,23 +41,24 @@ import secrets  # noqa: E402
 from fastapi import Body, Header  # noqa: E402
 from pydantic import ValidationError  # noqa: E402
 
-from app.config import ConfigManager, FormConfig, public_view  # noqa: E402
+from app.config import ConfigManager, FormConfig, default_site, form_site, public_view  # noqa: E402
 from app.custom_forms import BuilderForm, CustomFormStore  # noqa: E402
 from app.history import History  # noqa: E402
 from app.payload import SubmissionError, build_payload, lint_config  # noqa: E402
-from app.publisher import PublishError, publish, topic_for  # noqa: E402
+from app.publisher import PublishError, check_broker, publish, topic_for  # noqa: E402
+from app.settings import MqttSettings, Settings, SettingsStore, SettingsUpdate, apply_settings  # noqa: E402
 
 logger = logging.getLogger("metadata_form")
 
 config_manager = ConfigManager()
 history = History(Path(os.environ.get("FORM_HISTORY_DB", "data/submissions.db")))
 custom_store = CustomFormStore()
+settings_store = SettingsStore()
 
 
-def current_config() -> Optional[FormConfig]:
-    """YAML config with the browser-built forms appended (YAML ids win on clashes)."""
-    cfg = config_manager.get()
-    if cfg is None or not cfg.builder.enabled:
+def _with_builder_forms(cfg: FormConfig) -> FormConfig:
+    """Append the browser-built forms (YAML ids win on clashes)."""
+    if not cfg.builder.enabled:
         return cfg
     yaml_ids = {f.id for f in cfg.forms}
     custom = []
@@ -69,9 +72,17 @@ def current_config() -> Optional[FormConfig]:
     return cfg.model_copy(update={"forms": [*cfg.forms, *custom]})
 
 
+def current_config() -> Optional[FormConfig]:
+    """YAML config + browser-built forms + settings edited on the Settings page."""
+    cfg = config_manager.get()
+    if cfg is None:
+        return None
+    return apply_settings(_with_builder_forms(cfg), settings_store.get())
+
+
 @asynccontextmanager
 async def lifespan(_app):
-    cfg = config_manager.get()
+    cfg = current_config()
     if cfg is None:
         logger.error("No valid form configuration: %s", config_manager.error)
     else:
@@ -173,7 +184,7 @@ async def preview(form_id: str, body: SubmitBody):
         return _error(503, f"Form configuration is not available: {err}")
     if error:
         return error
-    return {"ok": True, "payload": payload, "topic": topic_for(cfg, form.msg_type)}
+    return {"ok": True, "payload": payload, "topic": topic_for(cfg, form.msg_type, form_site(cfg, form))}
 
 
 @app.post("/forms/{form_id}/submit")
@@ -198,20 +209,20 @@ async def submit(form_id: str, body: SubmitBody):
 
     try:
         result = await asyncio.wait_for(
-            run_in_threadpool(publish, payload, cfg), timeout=cfg.publish.publish_timeout_seconds
+            run_in_threadpool(publish, payload, cfg, form_site(cfg, form)), timeout=cfg.publish.publish_timeout_seconds
         )
     except asyncio.TimeoutError:
         message = f"Publishing timed out after {cfg.publish.publish_timeout_seconds:g}s."
         logger.error("%s form=%s", message, form.id)
-        record("failed", topic_for(cfg, form.msg_type), message)
+        record("failed", topic_for(cfg, form.msg_type, form_site(cfg, form)), message)
         return _error(504, message, payload=payload)
     except PublishError as err:
         logger.error("Publish failed for form=%s: %s", form.id, err)
-        record("failed", topic_for(cfg, form.msg_type), str(err))
+        record("failed", topic_for(cfg, form.msg_type, form_site(cfg, form)), str(err))
         return _error(502, str(err), payload=payload)
     except Exception as err:
         logger.exception("Unexpected publish failure for form=%s", form.id)
-        record("failed", topic_for(cfg, form.msg_type), str(err))
+        record("failed", topic_for(cfg, form.msg_type, form_site(cfg, form)), str(err))
         return _error(500, f"Unexpected error while publishing: {err}", payload=payload)
 
     submission_id = record(result["status"], result["topic"])
@@ -309,3 +320,123 @@ async def builder_delete(form_id: str, x_admin_token: Optional[str] = Header(Non
         return _error(404, f"Form '{form_id}' was not created in the builder.")
     logger.info("Builder: deleted form %s", form_id)
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Settings page: MQTT target and per-form site, stored in the data volume
+# ---------------------------------------------------------------------------
+
+
+def _admin_guard(token: Optional[str]) -> Optional[JSONResponse]:
+    cfg = config_manager.get()
+    if cfg is None:
+        return _error(503, "Form configuration is not available.")
+    expected = cfg.builder.admin_token
+    if expected and not secrets.compare_digest(token or "", expected):
+        return _error(401, "Admin token required to change settings.")
+    return None
+
+
+def _mqtt_view(mqtt: dict) -> dict:
+    return {
+        "broker_address": mqtt.get("broker_address", ""),
+        "broker_port": mqtt.get("broker_port", 1883),
+        "enterprise": mqtt.get("enterprise", ""),
+        "username": mqtt.get("username", "") or "",
+        "has_password": bool(mqtt.get("password")),
+    }
+
+
+def _settings_view() -> dict:
+    yaml_cfg = config_manager.get()
+    if yaml_cfg is None:
+        raise RuntimeError(config_manager.error or "configuration not loaded")
+    stored = settings_store.get()
+    base = _with_builder_forms(yaml_cfg)  # forms without settings overrides
+    effective = apply_settings(base, stored)
+    return {
+        "mqtt": _mqtt_view(effective.streamer.get("mqtt", {})),
+        "defaults": _mqtt_view(yaml_cfg.streamer.get("mqtt", {})),
+        "overridden": sorted(stored.mqtt.model_dump(exclude_none=True)),
+        "default_site": default_site(yaml_cfg),
+        "forms": [
+            {
+                "id": form.id,
+                "title": form.title,
+                "source": form.source,
+                "msg_type": form.msg_type,
+                "enabled": form.enabled,
+                # site from the YAML file / builder (what "Reset" goes back to)
+                "configured_site": form_site(yaml_cfg, form),
+                "override": stored.form_sites.get(form.id),
+                "site": form_site(effective, next(f for f in effective.forms if f.id == form.id)),
+            }
+            for form in base.forms
+            if form.enabled
+        ],
+        "requires_token": bool(yaml_cfg.builder.admin_token),
+    }
+
+
+@app.get("/settings")
+async def get_settings():
+    try:
+        return _settings_view()
+    except RuntimeError as err:
+        return _error(503, f"Form configuration is not available: {err}")
+
+
+@app.put("/settings")
+async def put_settings(
+    data: Dict[str, Any] = Body(...), x_admin_token: Optional[str] = Header(None)
+):
+    if (denied := _admin_guard(x_admin_token)) is not None:
+        return denied
+    try:
+        update = SettingsUpdate(**data)
+        settings_store.update(update)
+    except ValidationError as err:
+        return _error(422, "Please fix the highlighted settings.", _validation_errors(err))
+    except ValueError as err:
+        return _error(422, str(err))
+    view = _settings_view()
+    mqtt = view["mqtt"]
+    logger.info(
+        "Settings: broker %s:%s enterprise=%s, site overrides=%s",
+        mqtt["broker_address"], mqtt["broker_port"], mqtt["enterprise"],
+        {f["id"]: f["override"] for f in view["forms"] if f["override"]},
+    )
+    return {"ok": True, **view}
+
+
+@app.delete("/settings")
+async def reset_settings(x_admin_token: Optional[str] = Header(None)):
+    if (denied := _admin_guard(x_admin_token)) is not None:
+        return denied
+    settings_store.reset()
+    logger.info("Settings: reset to configuration file defaults")
+    return {"ok": True, **_settings_view()}
+
+
+@app.post("/settings/test")
+async def test_connection(
+    data: Dict[str, Any] = Body(default={}), x_admin_token: Optional[str] = Header(None)
+):
+    """Try to connect with the saved settings, or with unsaved values from the page."""
+    if (denied := _admin_guard(x_admin_token)) is not None:
+        return denied
+    cfg = current_config()
+    if cfg is None:
+        return _error(503, "Form configuration is not available.")
+    try:
+        candidate = MqttSettings(**(data.get("mqtt") or {}))
+    except ValidationError as err:
+        return _error(422, "Please fix the highlighted settings.", _validation_errors(err))
+    cfg = apply_settings(cfg, Settings(mqtt=candidate))  # unsaved values on top
+    mqtt = cfg.streamer["mqtt"]
+    target = f"{mqtt['broker_address']}:{mqtt.get('broker_port', 1883)}"
+    try:
+        await run_in_threadpool(check_broker, cfg, min(cfg.publish.connect_timeout_seconds, 10))
+    except PublishError as err:
+        return {"ok": False, "target": target, "message": str(err)}
+    return {"ok": True, "target": target, "message": f"Connected to {target}."}

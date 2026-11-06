@@ -67,6 +67,22 @@ be changed in the YAML. To restrict who can create, edit or delete forms, set
 `FORM_ADMIN_TOKEN` in `.env`; the builder then asks for it. To turn the
 builder off, set `builder.enabled: false` in the config.
 
+## Settings page: broker and site per form
+
+The **Settings** tab lets an admin change, without editing any file:
+
+- **MQTT broker**: address, port, enterprise, and optional username / password,
+  with a **Test connection** button.
+- **Site per form**: each form publishes to
+  `mfi-v1.0-kv/<enterprise>/<site>/<msg_type>/data` under its own site.
+
+Overrides are stored in the data volume (`data/settings.json`, or `FORM_SETTINGS`)
+and win over `form-config.yaml`; empty values and **Reset to defaults** fall back
+to the file. A form's site resolves as: Settings page → the form's `site:` in the
+YAML (or the Site field in the form builder) → `streamer.mqtt.site`.
+The password is write-only and never sent to the browser. If
+`builder.admin_token` is set, saving settings needs that token too.
+
 ## Configuring the forms
 
 Everything lives in [`config/form-config.yaml`](config/form-config.yaml). The
@@ -147,6 +163,14 @@ Submissions are published one at a time. Each outcome (`published`,
 | POST | `/forms/{id}/preview` | `{"values": {...}}` → built payload; nothing is published |
 | POST | `/forms/{id}/submit`  | `{"values": {...}}` → validate and publish |
 | GET  | `/submissions?limit=25` | Recent submissions |
+| GET  | `/settings` | Broker settings, defaults and each form's site (never the password) |
+| PUT  | `/settings` | `{"mqtt": {...}, "form_sites": {"<form id>": "<site>"}}` → save overrides |
+| DELETE | `/settings` | Reset all overrides to the configuration file |
+| POST | `/settings/test` | `{"mqtt": {...}}` (optional, unsaved values) → try connecting |
+| GET  | `/settings` | Broker settings, defaults and the site of each form (password never returned) |
+| PUT  | `/settings` | `{"mqtt": {...}, "form_sites": {"<form id>": "<site>"}}` → save overrides |
+| DELETE | `/settings` | Reset all overrides to the configuration file |
+| POST | `/settings/test` | `{"mqtt": {...}}` (optional, unsaved values) → try connecting to the broker |
 
 Validation errors return `422` with `errors: [{field, message}]`. `field` is
 a dotted path such as `user_roles.0.role`.
