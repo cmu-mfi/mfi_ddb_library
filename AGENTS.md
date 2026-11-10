@@ -2,6 +2,10 @@
 
 Instructions for AI coding agents working in this repository.
 
+This is a monorepo consisting of independent projects/modules in separate root
+directories (`mfi_ddb_package`, `mfi_ddb_data_adapter`,
+`mfi_ddb_database_nodes`, `mfi_ddb_retrieval_api`, `setup-wizard`, `docker`).
+
 **Before writing any code, read [CONTRIBUTING.md](CONTRIBUTING.md).**
 Every rule in it is mandatory and applies to you.
 
