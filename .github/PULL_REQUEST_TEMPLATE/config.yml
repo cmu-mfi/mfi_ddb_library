@@ -9,6 +9,12 @@ pull_request_template:
   - name: 🌟 Enhancement
     description: Template for enhancements or improvements
     filename: enhancement.md
+  - name: 🔌 Data Adapter
+    description: Template for data adapter PRs
+    filename: data_adapters.md
+  - name: 🧹 Chores
+    description: Template for chore PRs (docs, linting, housekeeping)
+    filename: chore.md
   - name: Others
     description: General PR template
     filename: general.md

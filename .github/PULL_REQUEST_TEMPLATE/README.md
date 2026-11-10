@@ -1,6 +1,6 @@
 ## Using the Pull Request Templates
 
-* There are three templates available `bug.md`, `enhancement.md`, and `feature.md`
+* The following templates are available: `bug.md`, `chore.md`, `data_adapters.md`, `enhancement.md`, `feature.md`, and `general.md`
 * Here is the URL template to use when creating a new pull request:
 
 ```
