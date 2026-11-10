@@ -22,8 +22,3 @@
 
 - [ ] This PR contains **no functional changes** (see [CONTRIBUTING.md](../../CONTRIBUTING.md))
 - [ ] Any affected module/submodule `README.md` updates are included in this PR
-
-### Potential improvement
-> If you had more time and resources, how would you improve the current implementation? Provide at least 1 suggestion for improvement or future work.
-
-* ...
