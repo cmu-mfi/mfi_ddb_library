@@ -19,7 +19,9 @@ directories (`mfi_ddb_package`, `mfi_ddb_data_adapter`,
 ## Working on contributions
 
 * **Before writing any code, read [CONTRIBUTING.md](CONTRIBUTING.md).** Every rule in it applies to you. Re-read it before declaring the task complete.
-* **Git Branching**: Always work in a new branch targeting a Pull Request (PR) (`git switch -c <type>/<description>`)
+* **Git Branching**
+    * Always work in a new branch targeting a Pull Request (PR) (`git switch -c <type>/<description>`)
+    * Unless otherwise specified, create all working branches from `dev`.
 * **Planning Checklist**
     * Ask the user which type of PR it is during planning phase (e.g., feature, bug fix, data adapter)
     * Include the corresponding checklist from `.github/PULL_REQUEST_TEMPLATE/` in your task plan.
