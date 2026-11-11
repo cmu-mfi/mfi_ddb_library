@@ -18,7 +18,21 @@ Browser ──► frontend (nginx, :3002) ──/api──► backend (FastAPI, 
 ```
 
 Like `mfi_ddb_data_adapter/data_adapter_app`, it is self-contained: the
-backend installs `mfi_ddb` from PyPI and nothing else in the repo is needed.
+backend installs `mfi_ddb` from PyPI. The one optional dependency is the
+**Retrieval API (RWS)**, used to look up registered users for the "pick a
+person" fields; without it those fields are plain text boxes.
+
+## At a glance
+
+| Feature | Where |
+|---------|-------|
+| Forms for projects, users, trial tags and custom data, validated against the library's `kv.json` and published through `KvDataAdapter` | [Configuring the forms](#configuring-the-forms), [How a submission is published](#how-a-submission-is-published) |
+| Form builder: create forms in the browser (text, numbers, dropdowns, multiple choice, dates, people, sections), with Preview and Duplicate | [Form builder](#creating-forms-in-the-browser-form-builder) |
+| Sections that group fields, collapsible, re-opening when they hold an error | [Form builder](#creating-forms-in-the-browser-form-builder), [Field reference](#field-reference) |
+| "Pick a person" fields backed by the registered users; only registered people can be named; every form has a required **Created by** | [User directory](#user-directory-pick-a-person-fields) |
+| Settings page: broker, enterprise and a site per form, without editing files | [Settings page](#settings-page-broker-and-site-per-form) |
+| Admin token for the builder, settings and reserved platform accounts (until single sign-on) | [Access control](#access-control-until-single-sign-on) |
+| Local history of submissions | [How a submission is published](#how-a-submission-is-published) |
 
 ## Quick start (Docker)
 
@@ -33,17 +47,34 @@ docker compose up -d --build
 
 By default it publishes to an MQTT broker on the host
 (`host.docker.internal:1883`). Set `FORM_DRY_RUN=true` in `.env` to try the
-forms without a broker.
+forms without a broker. To enable the "pick a person" fields, set `RWS_URL` to a
+running Retrieval API (e.g. `http://host.docker.internal:8000`).
 
 ### As part of the full pipeline
 
 The service is also available in `docker/` under the `mfa` profile, on the
-shared `mfi_network`, publishing to the pipeline's broker:
+shared `mfi_network`, publishing to the pipeline's broker. Add the `retrieval`
+profile for the user directory (metadata store + Retrieval API):
 
 ```bash
 cd docker
-docker compose --profile mfa --profile mqtt-broker up -d --build
+docker compose --profile mfa --profile mqtt-broker --profile retrieval up -d --build
 ```
+
+### Environment variables
+
+All optional; set them in `.env` (standalone) or `docker/.env` (pipeline).
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `MQTT_BROKER_ADDRESS` / `MQTT_BROKER_PORT` | `host.docker.internal` (standalone), `mqtt-broker` (pipeline) / `1883` | Broker the KV adapter publishes to |
+| `MQTT_USERNAME` / `MQTT_PASSWORD` | empty | Broker credentials |
+| `MQTT_ENTERPRISE` / `MQTT_SITE` | `CMU` / `M19` | Topic levels; each form can override the site |
+| `FORM_USER_ID` / `FORM_USER_DOMAIN` | `metadata-form` / `ANDREW` | App identity (publisher of last resort) |
+| `FORM_ADMIN_TOKEN` | empty | Token for builder, settings and reserved accounts (see [Access control](#access-control-until-single-sign-on)) |
+| `FORM_DRY_RUN` | `false` | Validate and log, never publish |
+| `RWS_URL` | empty (standalone), `http://mfi-rws-app:8000` (pipeline) | Retrieval API for the user directory; empty = off |
+| `DIRECTORY_USER_ID` / `DIRECTORY_USER_DOMAIN` | `superadmin` / `superadmin` | Identity the app uses for user lookups (until single sign-on) |
 
 ## Creating forms in the browser (form builder)
 
@@ -128,7 +159,8 @@ Any string can reference environment variables as `${VAR}` or
 - name: project_id          # key in the payload (required)
   label: Project ID         # UI label
   type: text                # text | textarea | email | number | integer | select |
-                            # multiselect | checkbox | date | datetime | list | json
+                            # multiselect | checkbox | date | datetime | list | json |
+                            # section (see below)
   required: true
   default: ...              # initial value; datetime: "now"
   placeholder: p-550
@@ -219,14 +251,29 @@ Submissions are published one at a time. Each outcome (`published`,
 | DELETE | `/settings` | Reset all overrides to the configuration file |
 | POST | `/settings/test` | `{"mqtt": {...}}` (optional, unsaved values) → try connecting |
 | GET  | `/directory/users?search=` | Registered users for pickers (via the Retrieval API) |
-| GET  | `/directory/users/{domain}/{user_id}` | Is this user registered? |
-| GET  | `/settings` | Broker settings, defaults and the site of each form (password never returned) |
-| PUT  | `/settings` | `{"mqtt": {...}, "form_sites": {"<form id>": "<site>"}}` → save overrides |
-| DELETE | `/settings` | Reset all overrides to the configuration file |
-| POST | `/settings/test` | `{"mqtt": {...}}` (optional, unsaved values) → try connecting to the broker |
+| GET  | `/directory/users/{domain}/{user_id}` | Is this user registered? (`registered`, `reserved`) |
+| GET/POST/PUT/DELETE | `/builder/forms[/{id}]` | Forms created in the browser |
 
 Validation errors return `422` with `errors: [{field, message}]`. `field` is
-a dotted path such as `user_roles.0.role`.
+a dotted path such as `user_roles.0.role`. A reserved account without the admin
+token returns `403`.
+
+## Access control (until single sign-on)
+
+The app does not log people in yet; it is designed so CMU single sign-on can
+be added in front of it without changing the forms:
+
+- **Admin token** (`FORM_ADMIN_TOKEN`): when set, the form builder, the
+  Settings page and the use of reserved accounts (e.g. `superadmin`) require
+  it. Platform admins enter it once on the Settings tab (kept for the browser
+  session). When empty, the builder and settings are open and reserved
+  accounts cannot be used at all.
+- **Who can be named**: only users registered in the metadata store (through
+  the Retrieval API `/users`), and never a reserved account without the token.
+- **With single sign-on**: a login proxy in front of the apps would provide the
+  user; "Created by" would come from the login, and the token would become a
+  platform-admin role. The Retrieval API already takes the requester from the
+  `X-User-Id` / `X-User-Domain` headers such a proxy sets.
 
 ## Development without Docker
 
@@ -255,6 +302,21 @@ mfi_ddb_metadata_form/
 ├── compose.yaml            standalone stack (backend + frontend)
 ├── .env.example
 ├── config/form-config.yaml the file you edit
-├── backend/                FastAPI app (config, payload builder, KV publisher, history)
-└── frontend/               React + Vite + Tailwind, served by nginx
+├── backend/
+│   ├── app/
+│   │   ├── main.py          API endpoints
+│   │   ├── config.py        YAML config model (forms, fields, directory, ...)
+│   │   ├── payload.py       values -> kv.json-valid payload
+│   │   ├── publisher.py     KvDataAdapter + Streamer publishing
+│   │   ├── directory.py     registered-user lookups (Retrieval API /users)
+│   │   ├── custom_forms.py  form-builder forms
+│   │   ├── settings.py      Settings page overrides
+│   │   └── history.py       submission log (SQLite)
+│   └── tests/
+└── frontend/src/           React + Vite + Tailwind, served by nginx
+    └── components/         MetadataForm, FieldInput, UserPicker, Sections,
+                            FormBuilder, FormEditor, Settings, SubmissionHistory
 ```
+
+Related: the Retrieval API's user endpoints are documented in
+[`mfi_ddb_retrieval_api/rws/README.md`](../mfi_ddb_retrieval_api/rws/README.md#users-registered-user-directory).
