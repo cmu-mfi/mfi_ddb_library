@@ -1,5 +1,13 @@
 import { Plus, Trash2 } from "lucide-react";
 import { initialValues, isUserField } from "../lib/form";
+import UserPicker from "./UserPicker";
+
+/** Values to set when a user is picked: the ID, plus its domain field if any. */
+export function pickedValues(field, user) {
+  const out = { [field.name]: user.user_id };
+  if (field.domain_field) out[field.domain_field] = user.domain;
+  return out;
+}
 
 function Label({ field, htmlFor }) {
   return (
@@ -109,7 +117,7 @@ function Control({ field, id, value, onChange, error }) {
   }
 }
 
-function ListField({ field, path, value, onChange, errors }) {
+function ListField({ field, path, value, onChange, errors, onUserStatus }) {
   const items = value || [];
   const subFields = (field.fields || []).filter(isUserField);
   const itemLabel = field.item_label || "item";
@@ -136,6 +144,11 @@ function ListField({ field, path, value, onChange, errors }) {
                   path={`${path}.${index}.${sub.name}`}
                   value={item[sub.name]}
                   onChange={(v) => update(index, sub.name, v)}
+                  siblings={item}
+                  onPick={(user) =>
+                    onChange(items.map((it, i) => (i === index ? { ...it, ...pickedValues(sub, user) } : it)))
+                  }
+                  onUserStatus={onUserStatus}
                   errors={errors}
                   compact
                 />
@@ -167,16 +180,52 @@ function ListField({ field, path, value, onChange, errors }) {
   );
 }
 
-export default function FieldInput({ field, path, value, onChange, errors, compact = false }) {
+/** Section heading: full width, separated from the fields above it. */
+function SectionHeading({ field }) {
+  return (
+    <div className="mt-3 border-t border-gray-200 pt-5 first:mt-0 first:border-t-0 first:pt-0 sm:col-span-2">
+      <h3 className="text-base font-semibold text-gray-800">{field.label}</h3>
+      {field.help && <p className="mt-0.5 text-sm text-gray-500">{field.help}</p>}
+    </div>
+  );
+}
+
+export default function FieldInput({
+  field,
+  path,
+  value,
+  onChange,
+  errors,
+  compact = false,
+  siblings,
+  onPick,
+  onUserStatus,
+}) {
+  if (field.type === "section") return <SectionHeading field={field} />;
   if (field.type === "list") {
-    return <ListField field={field} path={path} value={value} onChange={onChange} errors={errors} />;
+    return (
+      <ListField field={field} path={path} value={value} onChange={onChange} errors={errors} onUserStatus={onUserStatus} />
+    );
   }
   const id = `f-${path.replace(/\./g, "-")}`;
   const wide = !compact && ["textarea", "json", "multiselect"].includes(field.type);
   return (
     <div className={wide ? "sm:col-span-2" : ""}>
       {field.type !== "checkbox" || !compact ? <Label field={field} htmlFor={id} /> : null}
-      <Control field={field} id={id} value={value} onChange={onChange} error={errors[path]} />
+      {field.lookup === "user" && onPick ? (
+        <UserPicker
+          id={id}
+          value={value}
+          domainValue={field.domain_field ? siblings?.[field.domain_field] : undefined}
+          onChange={onChange}
+          onPick={onPick}
+          onStatus={onUserStatus ? (status) => onUserStatus(path, status) : undefined}
+          error={errors[path]}
+          placeholder={field.placeholder}
+        />
+      ) : (
+        <Control field={field} id={id} value={value} onChange={onChange} error={errors[path]} />
+      )}
       <Hint field={field} error={errors[path]} />
     </div>
   );

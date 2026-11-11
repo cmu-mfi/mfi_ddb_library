@@ -52,14 +52,33 @@ Click **Form builder** at the top right of the page, then **New form**:
 1. Give the form a name.
 2. Add one row per **key**: a label (what people see), the key name (filled
    in from the label automatically), the type of value (text, long text,
-   number, whole number, yes/no, dropdown, date, date & time), whether it's
-   required, and optionally choices, a default, min/max and a hint.
-3. Click **Create form**. It appears as a new tab under **Fill in forms**.
+   email, number, whole number, yes/no, dropdown, multiple choice, date,
+   date & time, person), whether it's required, and optionally choices, a
+   default, min/max and a hint. **Person** is a picker of registered users; it
+   sends the user ID as `<key>` and their domain as `<key>_domain`.
+3. Optionally **Add section**: a heading (and description) that groups the
+   keys after it, up to the next section. Sections are display only, never
+   data. When a form has sections, the automatic "Created by" fields appear
+   under their own **Submitted by** heading. People filling in the form can
+   click a heading to collapse its section; a collapsed section that holds an
+   error (or a warning) opens again automatically.
+4. Use **Duplicate** on a row to copy it, the arrows to reorder, and
+   **Preview** (top of the editor) to try the form exactly as people will see
+   it before saving. Cancel asks before discarding unsaved changes.
+5. Click **Create form**. It appears as a new tab under **Fill in forms**.
+
+To start a new form from an existing one, use **Duplicate** in the form list.
 
 People using the form only enter the **values**. Each submission is sent as a
-`msg_type: data` payload with your keys as top-level keys, plus `trial_id`
-(always required, because the KV adapter drops `data` without one) and an
-automatic `timestamp`.
+`msg_type: data` payload with your keys as top-level keys, plus three things
+every builder form gets automatically:
+
+- `trial_id`: always required, because the KV adapter drops `data` without one;
+- `created_by_user_id` / `created_by_domain`: required, picked from registered
+  users like on the other forms (reserved accounts need the admin token);
+- `timestamp`: filled in when sent.
+
+These names can't be used as keys of your own.
 
 Builder forms are stored by the backend in `data/custom_forms.json` on the
 data volume, separately from the YAML file. Forms defined in the YAML can only
@@ -126,7 +145,39 @@ Any string can reference environment variables as `${VAR}` or
   min_items: 1              # list bounds
   max_items: 10
   item_label: member        # "+ Add member"
+  lookup: user              # pick from registered users (see "User directory")
+  domain_field: created_by_domain   # with lookup: sibling field filled with the user's domain
+
+- type: section             # heading that groups the fields after it; no data
+  label: Machine settings   #   heading (required); `name` is optional
+  help: Shown under the heading
 ```
+
+### User directory ("pick a person" fields)
+
+Fields with `lookup: user` (Created by, project Members, trial Operator in the
+default config) become type-ahead pickers of the users registered in the
+metadata store. Picking a person fills in the user ID **and** its domain, and
+the field shows whether the typed user is registered.
+
+Lookups go through the Retrieval API's `/users` endpoints, configured in the
+`directory` section (`RWS_URL`; empty = off, fields become plain text). Until
+single sign-on, the app looks users up as `DIRECTORY_USER_ID` /
+`DIRECTORY_USER_DOMAIN`, which must be a registered user (default `superadmin`).
+
+**Reserved accounts** (`directory.reserved_users`, default `superadmin/superadmin`)
+are platform accounts, not people: they never appear in the pickers, and a form
+that names one in a user field is refused unless the request carries the admin
+token (`FORM_ADMIN_TOKEN`; platform admins enter it on the Settings tab). With
+no admin token configured, nobody can use them through the form.
+
+Only **registered** users can be named. An unregistered user is an error, like a
+missing required field: the field turns red, **Submit** is disabled, and the
+backend refuses the form (preview and submit) without publishing anything. If
+the user directory is configured but unreachable, forms are refused too, since
+registration can't be confirmed. Register people first with the **New user**
+form. "Created by" has no pre-filled value: people pick themselves (or whoever
+created the record) from the list.
 
 Payloads can carry extra keys beyond what `kv.json` requires, so add whatever
 your site needs. `schema_version` and `msg_type` are added automatically. Set
@@ -167,6 +218,8 @@ Submissions are published one at a time. Each outcome (`published`,
 | PUT  | `/settings` | `{"mqtt": {...}, "form_sites": {"<form id>": "<site>"}}` → save overrides |
 | DELETE | `/settings` | Reset all overrides to the configuration file |
 | POST | `/settings/test` | `{"mqtt": {...}}` (optional, unsaved values) → try connecting |
+| GET  | `/directory/users?search=` | Registered users for pickers (via the Retrieval API) |
+| GET  | `/directory/users/{domain}/{user_id}` | Is this user registered? |
 | GET  | `/settings` | Broker settings, defaults and the site of each form (password never returned) |
 | PUT  | `/settings` | `{"mqtt": {...}, "form_sites": {"<form id>": "<site>"}}` → save overrides |
 | DELETE | `/settings` | Reset all overrides to the configuration file |

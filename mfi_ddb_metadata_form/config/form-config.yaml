@@ -48,6 +48,22 @@ builder:
   # If set, the builder asks for this token before creating/editing/deleting.
   admin_token: ${FORM_ADMIN_TOKEN:-}
 
+# User directory: fields with `lookup: user` become pickers of the users
+# registered in the metadata store, looked up through the Retrieval API (RWS).
+# Unregistered users only produce a warning. Leave rws_url empty to turn it off
+# (the fields become plain text boxes again).
+directory:
+  enabled: true
+  rws_url: ${RWS_URL:-}
+  # Identity used for lookups until single sign-on provides the real user.
+  requester_user_id: ${DIRECTORY_USER_ID:-superadmin}
+  requester_domain: ${DIRECTORY_USER_DOMAIN:-superadmin}
+  timeout_seconds: 5
+  # Platform accounts ("user_id/domain") that are not offered in pickers and
+  # that only platform admins (whoever has the admin token) may put in a form.
+  reserved_users:
+    - superadmin/superadmin
+
 # mfi_ddb Streamer configuration (same format as the data adapter app).
 # topic_family is always forced to "kv".
 streamer:
@@ -63,7 +79,7 @@ streamer:
     password: ${MQTT_PASSWORD:-}
     tls_enabled: false
     enterprise: ${MQTT_ENTERPRISE:-CMU}
-    site: ${MQTT_SITE:-Mill-19}   # default site; each form can set its own (see "site" below)
+    site: ${MQTT_SITE:-M19}   # default site; each form can set its own (see "site" below)
 
 # =============================================================================
 # FORMS
@@ -92,6 +108,9 @@ streamer:
 #                  streamer.<path>   e.g. streamer.user.user_id
 #                  env.<VAR>         an environment variable
 #   editable     with auto: show the auto value but let the user change it
+#   lookup       user = pick from registered users (see `directory` above)
+#   domain_field with lookup: the field next to it that holds the user's
+#                domain; picking a user fills in both
 #   fields       for type list: the fields of each item
 #   min_items / max_items / item_label   for type list
 #
@@ -110,10 +129,9 @@ forms:
   # ---------------------------------------------------------------------------
   - id: project
     msg_type: project
-    # site: Mill-19        # optional: publish this form under its own site
+    # site: M19            # optional: publish this form under its own site
     title: New project
     description: Create a project and assign who can access its data.
-    submit_label: Create project
     fields:
       - name: project_id
         label: Project ID
@@ -136,6 +154,8 @@ forms:
           - name: user_id
             label: User ID
             required: true
+            lookup: user
+            domain_field: domain
           - name: domain
             label: Domain
             required: true
@@ -147,9 +167,9 @@ forms:
             options: [admin, operator, maintainer, researcher]
       - name: created_by_user_id
         label: Created by
-        auto: streamer.user.user_id
-        editable: true
-        required: true
+        required: true                # pick a registered user (no pre-fill)
+        lookup: user
+        domain_field: created_by_domain
       - name: created_by_domain
         label: Created by (domain)
         auto: streamer.user.domain
@@ -161,10 +181,9 @@ forms:
   # ---------------------------------------------------------------------------
   - id: user
     msg_type: user
-    # site: Mill-19        # optional: publish this form under its own site
+    # site: M19            # optional: publish this form under its own site
     title: New user
     description: Register a person so their data can be attributed to them.
-    submit_label: Register user
     fields:
       - name: user_id
         label: User ID
@@ -183,9 +202,9 @@ forms:
         placeholder: jdoe@andrew.cmu.edu
       - name: created_by_user_id
         label: Created by
-        auto: streamer.user.user_id
-        editable: true
-        required: true
+        required: true                # pick a registered user (no pre-fill)
+        lookup: user
+        domain_field: created_by_domain
       - name: created_by_domain
         label: Created by (domain)
         auto: streamer.user.domain
@@ -197,10 +216,9 @@ forms:
   # ---------------------------------------------------------------------------
   - id: trial-tag
     msg_type: tp-tag
-    # site: Mill-19        # optional: publish this form under its own site
+    # site: M19            # optional: publish this form under its own site
     title: Tag a trial
     description: Mark a time window of collected data as a trial that belongs to a project.
-    submit_label: Tag trial
     fields:
       - name: trial_id
         label: Trial ID
@@ -222,6 +240,8 @@ forms:
       - name: trial_user_id
         label: Operator user ID
         required: true
+        lookup: user
+        domain_field: trial_user_domain
       - name: trial_user_domain
         label: Operator domain
         required: true
@@ -231,9 +251,9 @@ forms:
         type: textarea
       - name: created_by_user_id
         label: Created by
-        auto: streamer.user.user_id
-        editable: true
-        required: true
+        required: true                # pick a registered user (no pre-fill)
+        lookup: user
+        domain_field: created_by_domain
       - name: created_by_domain
         label: Created by (domain)
         auto: streamer.user.domain
@@ -250,7 +270,6 @@ forms:
     enabled: false        # hidden for now; set to true to bring it back
     title: Send data
     description: Publish a key-value data payload for a trial.
-    submit_label: Send data
     fields:
       - name: trial_id
         label: Trial ID

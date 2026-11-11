@@ -13,6 +13,7 @@ Endpoints (nginx exposes them under /api):
   GET/POST/PUT/DELETE /builder/forms[/{id}]   forms created in the browser
   GET/PUT/DELETE /settings        MQTT target + per-form site (Settings page)
   POST /settings/test             try connecting to the MQTT broker
+  GET  /directory/users[/{domain}/{user_id}]   registered users (via the Retrieval API)
 """
 
 import logging
@@ -43,6 +44,9 @@ from pydantic import ValidationError  # noqa: E402
 
 from app.config import ConfigManager, FormConfig, default_site, form_site, public_view  # noqa: E402
 from app.custom_forms import BuilderForm, CustomFormStore  # noqa: E402
+from app.directory import DirectoryUnavailable, check_users, reserved_refs  # noqa: E402
+from app.directory import get_user as directory_get_user  # noqa: E402
+from app.directory import search_users as directory_search_users  # noqa: E402
 from app.history import History  # noqa: E402
 from app.payload import SubmissionError, build_payload, lint_config  # noqa: E402
 from app.publisher import PublishError, check_broker, publish, topic_for  # noqa: E402
@@ -176,25 +180,58 @@ def _prepare(form_id: str, body: SubmitBody):
     return cfg, form, payload, None
 
 
+def _is_platform_admin(cfg: FormConfig, token: Optional[str]) -> bool:
+    """Until single sign-on, platform admins are whoever holds the admin token."""
+    expected = cfg.builder.admin_token
+    return bool(expected) and secrets.compare_digest(token or "", expected)
+
+
+def _reserved_guard(cfg: FormConfig, form, payload: dict, token: Optional[str]) -> Optional[JSONResponse]:
+    """Refuse reserved platform accounts (e.g. superadmin) unless a platform admin is asking."""
+    errors = reserved_refs(form, payload, cfg)
+    if not errors or _is_platform_admin(cfg, token):
+        return None
+    if not cfg.builder.admin_token:
+        for e in errors:
+            e["message"] = e["message"].split(" Enter the admin token")[0] + (
+                " No admin token is configured (FORM_ADMIN_TOKEN), so it cannot be used here."
+            )
+    return _error(403, "This uses an account reserved for platform admins.", errors)
+
+
+async def _unregistered_guard(cfg: FormConfig, form, payload: dict) -> Optional[JSONResponse]:
+    """Refuse a form that names people who are not registered, like a missing required field."""
+    errors = await run_in_threadpool(check_users, form, payload, cfg)
+    if not errors:
+        return None
+    return _error(422, "Please fix the highlighted fields.", errors)
+
+
 @app.post("/forms/{form_id}/preview")
-async def preview(form_id: str, body: SubmitBody):
+async def preview(form_id: str, body: SubmitBody, x_admin_token: Optional[str] = Header(None)):
     try:
         cfg, form, payload, error = _prepare(form_id, body)
     except RuntimeError as err:
         return _error(503, f"Form configuration is not available: {err}")
     if error:
         return error
+    if (denied := _reserved_guard(cfg, form, payload, x_admin_token)) is not None:
+        return denied
+    if (unregistered := await _unregistered_guard(cfg, form, payload)) is not None:
+        return unregistered
     return {"ok": True, "payload": payload, "topic": topic_for(cfg, form.msg_type, form_site(cfg, form))}
 
 
 @app.post("/forms/{form_id}/submit")
-async def submit(form_id: str, body: SubmitBody):
+async def submit(form_id: str, body: SubmitBody, x_admin_token: Optional[str] = Header(None)):
     try:
         cfg, form, payload, error = _prepare(form_id, body)
     except RuntimeError as err:
         return _error(503, f"Form configuration is not available: {err}")
     if error:
         return error
+    if (denied := _reserved_guard(cfg, form, payload, x_admin_token)) is not None:
+        return denied
 
     def record(status: str, topic: Optional[str], err: Optional[str] = None) -> Optional[int]:
         if not cfg.history.enabled:
@@ -206,6 +243,10 @@ async def submit(form_id: str, body: SubmitBody):
         except Exception:  # history must never break a submission
             logger.exception("Failed to record submission history")
             return None
+
+    # Only registered users may be named in a form (see app/directory.py).
+    if (unregistered := await _unregistered_guard(cfg, form, payload)) is not None:
+        return unregistered
 
     try:
         result = await asyncio.wait_for(
@@ -227,6 +268,42 @@ async def submit(form_id: str, body: SubmitBody):
 
     submission_id = record(result["status"], result["topic"])
     return {"ok": True, **result, "payload": payload, "submission_id": submission_id}
+
+
+# ---------------------------------------------------------------------------
+# User directory (registered users, via the Retrieval API)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/directory/users")
+async def directory_search(
+    search: Optional[str] = Query(None, max_length=100), limit: int = Query(10, ge=1, le=50)
+):
+    cfg = current_config()
+    if cfg is None or not cfg.directory.active:
+        return {"available": False, "users": [], "message": "User directory is not configured."}
+    try:
+        users = await run_in_threadpool(directory_search_users, cfg, search, limit)
+    except DirectoryUnavailable as err:
+        return {"available": False, "users": [], "message": str(err)}
+    # Reserved platform accounts are never offered as people to pick.
+    users = [u for u in users if not cfg.directory.is_reserved(u.get("user_id"), u.get("domain"))]
+    return {"available": True, "users": users}
+
+
+@app.get("/directory/users/{domain}/{user_id}")
+async def directory_check(domain: str, user_id: str):
+    cfg = current_config()
+    if cfg is None:
+        return {"available": False, "registered": None, "user": None, "reserved": False}
+    reserved = cfg.directory.is_reserved(user_id, domain)
+    if not cfg.directory.active:
+        return {"available": False, "registered": None, "user": None, "reserved": reserved}
+    try:
+        user = await run_in_threadpool(directory_get_user, cfg, user_id, domain)
+    except DirectoryUnavailable as err:
+        return {"available": False, "registered": None, "user": None, "reserved": reserved, "message": str(err)}
+    return {"available": True, "registered": user is not None, "user": user, "reserved": reserved}
 
 
 @app.get("/submissions")

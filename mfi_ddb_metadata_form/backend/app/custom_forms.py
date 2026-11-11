@@ -7,8 +7,11 @@ the data volume (FORM_CUSTOM_FORMS, default data/custom_forms.json) - the YAML
 config file is never modified - and merged with the YAML forms at runtime.
 
 Every builder form is converted to a regular FormDef:
-    trial_id (required)  +  the user's keys  +  timestamp (auto: now)
-and published exactly like a YAML-defined form.
+    trial_id (required)  +  the user's keys
+    +  created_by_user_id / created_by_domain (required, registered-user picker)
+    +  timestamp (auto: now)
+and published exactly like a YAML-defined form. The added fields are part of
+every builder form automatically, so they cannot be used as key names.
 """
 
 from __future__ import annotations
@@ -25,16 +28,56 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.config import FieldDef, FormDef, check_topic_segment
 
 BUILDER_TYPES = Literal[
-    "text", "textarea", "number", "integer", "checkbox", "select", "date", "datetime"
+    "text",
+    "textarea",
+    "email",
+    "number",
+    "integer",
+    "checkbox",
+    "select",
+    "multiselect",  # multiple choice
+    "date",
+    "datetime",
+    "person",  # registered-user picker: <key> = user ID, <key>_domain = domain
+    "section",  # heading + description that groups the keys after it; no data
 ]
-RESERVED_KEYS = {"schema_version", "msg_type", "trial_id", "timestamp"}
+RESERVED_KEYS = {
+    "schema_version",
+    "msg_type",
+    "trial_id",
+    "timestamp",
+    "created_by_user_id",
+    "created_by_domain",
+}
+
+
+def created_by_fields() -> List[FieldDef]:
+    """Who created the record: same fields as the YAML forms (and kv.json's
+    user / project / tp-tag messages). Must be picked from the registered users
+    (no pre-fill), and it is the user the publish session is recorded under."""
+    return [
+        FieldDef(
+            name="created_by_user_id",
+            label="Created by",
+            required=True,
+            lookup="user",
+            domain_field="created_by_domain",
+        ),
+        FieldDef(
+            name="created_by_domain",
+            label="Created by (domain)",
+            auto="streamer.user.domain",
+            editable=True,
+            required=True,
+        ),
+    ]
 _KEY_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_\-]*$")
 
 
 class BuilderKey(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    name: str = Field(..., description="Key written into the payload")
+    name: str = Field("", description="Key written into the payload (not used by sections)")
     label: Optional[str] = None
     type: BUILDER_TYPES = "text"
     required: bool = False
@@ -48,8 +91,8 @@ class BuilderKey(BaseModel):
     @field_validator("name")
     @classmethod
     def _name(cls, value: str) -> str:
-        value = value.strip()
-        if not _KEY_PATTERN.match(value):
+        value = (value or "").strip()
+        if value and not _KEY_PATTERN.match(value):
             raise ValueError(
                 f"key '{value}' must start with a letter or '_' and contain only "
                 "letters, digits, '_' or '-'"
@@ -57,6 +100,18 @@ class BuilderKey(BaseModel):
         if value in RESERVED_KEYS:
             raise ValueError(f"key '{value}' is added automatically; choose another name")
         return value
+
+    @property
+    def is_section(self) -> bool:
+        return self.type == "section"
+
+    def payload_keys(self) -> List[str]:
+        """Keys this row writes into the payload."""
+        if self.is_section:
+            return []
+        if self.type == "person":
+            return [self.name, f"{self.name}_domain"]
+        return [self.name]
 
     @field_validator("options")
     @classmethod
@@ -68,31 +123,65 @@ class BuilderKey(BaseModel):
 
     @model_validator(mode="after")
     def _check(self):
-        if self.type == "select" and not self.options:
-            raise ValueError(f"key '{self.name}': a dropdown needs at least one choice")
+        if self.is_section:
+            if not (self.label or "").strip():
+                raise ValueError("a section needs a heading")
+            self.name = ""
+            return self
+        if not self.name:
+            raise ValueError(f"'{self.label or 'a field'}' needs a key name")
+        if self.type in ("select", "multiselect") and not self.options:
+            kind = "dropdown" if self.type == "select" else "multiple choice"
+            raise ValueError(f"key '{self.name}': a {kind} needs at least one choice")
+        if self.type == "person" and f"{self.name}_domain" in RESERVED_KEYS:
+            raise ValueError(f"key '{self.name}' is added automatically; choose another name")
         if self.min is not None and self.max is not None and self.min > self.max:
             raise ValueError(f"key '{self.name}': min is greater than max")
-        if self.default in ("",):
+        if self.default in ("",) or self.type in ("multiselect", "person"):
             self.default = None
         return self
 
-    def to_field(self) -> FieldDef:
+    def to_fields(self) -> List[FieldDef]:
+        label = (self.label or "").strip() or None
+        help_text = (self.help or "").strip() or None
+        if self.is_section:
+            return [FieldDef(type="section", label=label, help=help_text)]
+        if self.type == "person":
+            return [
+                FieldDef(
+                    name=self.name,
+                    label=label,
+                    required=self.required,
+                    placeholder=(self.placeholder or "").strip() or None,
+                    help=help_text,
+                    lookup="user",
+                    domain_field=f"{self.name}_domain",
+                ),
+                FieldDef(
+                    name=f"{self.name}_domain",
+                    label=f"{label or self.name} (domain)",
+                    required=self.required,
+                ),
+            ]
         default = self.default
         if self.type == "checkbox":
             default = str(default).lower() in ("true", "1", "yes", "on") if default else False
         is_number = self.type in ("number", "integer")
-        return FieldDef(
-            name=self.name,
-            label=(self.label or "").strip() or None,
-            type=self.type,
-            required=self.required,
-            default=default,
-            placeholder=(self.placeholder or "").strip() or None,
-            help=(self.help or "").strip() or None,
-            options=self.options or None if self.type == "select" else None,
-            min=self.min if is_number else None,
-            max=self.max if is_number else None,
-        )
+        has_choices = self.type in ("select", "multiselect")
+        return [
+            FieldDef(
+                name=self.name,
+                label=label,
+                type=self.type,
+                required=self.required,
+                default=default,
+                placeholder=(self.placeholder or "").strip() or None,
+                help=help_text,
+                options=(self.options or None) if has_choices else None,
+                min=self.min if is_number else None,
+                max=self.max if is_number else None,
+            )
+        ]
 
 
 class BuilderForm(BaseModel):
@@ -101,7 +190,6 @@ class BuilderForm(BaseModel):
     id: Optional[str] = None
     title: str = Field(..., min_length=1, max_length=80)
     description: Optional[str] = None
-    submit_label: Optional[str] = None
     site: Optional[str] = Field(None, description="Site to publish under (default: the app default).")
     keys: List[BuilderKey] = Field(..., min_length=1)
 
@@ -114,7 +202,9 @@ class BuilderForm(BaseModel):
 
     @model_validator(mode="after")
     def _check(self):
-        names = [k.name for k in self.keys]
+        names = [n for k in self.keys for n in k.payload_keys()]
+        if not names:
+            raise ValueError("add at least one key (sections alone hold no data)")
         dupes = sorted({n for n in names if names.count(n) > 1})
         if dupes:
             raise ValueError(f"duplicate key(s): {', '.join(dupes)}")
@@ -127,7 +217,6 @@ class BuilderForm(BaseModel):
             msg_type="data",
             title=self.title,
             description=(self.description or "").strip() or None,
-            submit_label=(self.submit_label or "").strip() or "Send data",
             site=self.site,
             source="ui",
             fields=[
@@ -137,7 +226,15 @@ class BuilderForm(BaseModel):
                     required=True,
                     help="Data is attached to this trial.",
                 ),
-                *[k.to_field() for k in self.keys],
+                *[f for k in self.keys for f in k.to_fields()],
+                # With sections, give the automatic "Created by" its own heading
+                # so it doesn't look like part of the user's last section.
+                *(
+                    [FieldDef(type="section", label="Submitted by")]
+                    if any(k.is_section for k in self.keys)
+                    else []
+                ),
+                *created_by_fields(),
                 FieldDef(name="timestamp", auto="now"),
             ],
         )

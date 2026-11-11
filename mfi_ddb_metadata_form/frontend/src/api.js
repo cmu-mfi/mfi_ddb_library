@@ -21,12 +21,19 @@ export const fetchHealth = () => request("/health");
 export const fetchSubmissions = (limit = 20) => request(`/submissions?limit=${limit}`);
 
 function post(path, values) {
-  return request(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ values }),
-  });
+  const headers = { "Content-Type": "application/json" };
+  // Platform admins (admin token) may use reserved accounts such as superadmin.
+  const token = getAdminToken();
+  if (token) headers["X-Admin-Token"] = token;
+  return request(path, { method: "POST", headers, body: JSON.stringify({ values }) });
 }
+
+// ---- user directory (registered users, via the Retrieval API /users) -------
+
+export const searchUsers = (search, limit = 8) =>
+  request(`/directory/users?${new URLSearchParams({ search: search || "", limit: String(limit) })}`);
+export const checkUser = (domain, userId) =>
+  request(`/directory/users/${encodeURIComponent(domain || "-")}/${encodeURIComponent(userId)}`);
 
 export const previewForm = (formId, values) => post(`/forms/${encodeURIComponent(formId)}/preview`, values);
 export const submitForm = (formId, values) => post(`/forms/${encodeURIComponent(formId)}/submit`, values);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ExternalLink, KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
+import { Copy, ExternalLink, KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
 import FormEditor, { KEY_TYPES } from "./FormEditor";
 import {
   createBuilderForm,
@@ -51,7 +51,7 @@ export default function FormBuilder({ builder, defaultSite, yamlForms, onChanged
   }, [load]);
 
   const handleSave = async (body) => {
-    const isNew = editing === "new";
+    const isNew = editing === "new" || !editing.id; // a duplicated form is new too
     const res = isNew ? await createBuilderForm(body) : await updateBuilderForm(editing.id, body);
     if (res.ok) {
       setMessage({ ok: true, text: `${isNew ? "Created" : "Saved"} “${res.data.form.title}”.`, id: res.data.form.id });
@@ -102,9 +102,11 @@ export default function FormBuilder({ builder, defaultSite, yamlForms, onChanged
 
       {editing ? (
         <>
-          <h2 className="mb-4 text-xl font-semibold text-gray-800">{editing === "new" ? "New form" : `Edit “${editing.title}”`}</h2>
+          <h2 className="mb-4 text-xl font-semibold text-gray-800">
+            {editing === "new" ? "New form" : !editing.id ? "New form (from a copy)" : `Edit “${editing.title}”`}
+          </h2>
           <FormEditor
-            key={editing === "new" ? "new" : editing.id}
+            key={editing === "new" ? "new" : editing.id || `copy-${editing.title}`}
             initial={editing === "new" ? null : editing}
             defaultSite={defaultSite}
             onSave={handleSave}
@@ -138,12 +140,18 @@ export default function FormBuilder({ builder, defaultSite, yamlForms, onChanged
                       <span className="ml-2 text-xs font-normal text-gray-500">Site: {form.site || defaultSite}</span>
                     </p>
                     <p className="mt-0.5 flex flex-wrap gap-1.5 text-xs text-gray-500">
-                      {form.keys.map((k) => (
-                        <span key={k.name} className="rounded bg-gray-100 px-1.5 py-0.5">
-                          <code>{k.name}</code> · {typeLabel[k.type] || k.type}
-                          {k.required ? " *" : ""}
-                        </span>
-                      ))}
+                      {form.keys.map((k, i) =>
+                        k.type === "section" ? (
+                          <span key={`s-${i}`} className="rounded bg-blue-50 px-1.5 py-0.5 font-medium text-blue-800">
+                            § {k.label}
+                          </span>
+                        ) : (
+                          <span key={k.name} className="rounded bg-gray-100 px-1.5 py-0.5">
+                            <code>{k.name}</code> · {typeLabel[k.type] || k.type}
+                            {k.required ? " *" : ""}
+                          </span>
+                        ),
+                      )}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -152,6 +160,17 @@ export default function FormBuilder({ builder, defaultSite, yamlForms, onChanged
                     </button>
                     <button type="button" className="btn-secondary px-3 py-1.5" onClick={() => { setMessage(null); setEditing(form); }}>
                       <Pencil size={14} /> Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary px-3 py-1.5"
+                      title="Start a new form from a copy of this one"
+                      onClick={() => {
+                        setMessage(null);
+                        setEditing({ ...form, id: null, title: `${form.title} (copy)` });
+                      }}
+                    >
+                      <Copy size={14} /> Duplicate
                     </button>
                     <button
                       type="button"

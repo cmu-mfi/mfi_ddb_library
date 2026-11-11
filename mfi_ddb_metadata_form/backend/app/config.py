@@ -54,6 +54,7 @@ FIELD_TYPES = Literal[
     "datetime",
     "list",
     "json",
+    "section",  # heading (label) + optional description (help); not sent in the payload
 ]
 AUTO_KEYWORDS = {"now", "uuid", "trial_id"}
 AUTO_PREFIXES = ("streamer.", "env.")
@@ -89,7 +90,7 @@ class OptionDef(BaseModel):
 class FieldDef(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: str = Field(..., description="Key written into the KV payload.")
+    name: str = Field("", description="Key written into the KV payload (optional for sections).")
     label: Optional[str] = Field(None, description="Label shown in the UI (defaults to name).")
     type: FIELD_TYPES = "text"
     required: bool = False
@@ -112,6 +113,12 @@ class FieldDef(BaseModel):
     min_items: int = 0
     max_items: Optional[int] = None
     item_label: Optional[str] = Field(None, description="Name of one list item, e.g. 'role'.")
+    lookup: Optional[Literal["user"]] = Field(
+        None, description="'user': pick from users registered in the metadata store."
+    )
+    domain_field: Optional[str] = Field(
+        None, description="With lookup: user - the sibling field holding that user's domain."
+    )
 
     @field_validator("options", mode="before")
     @classmethod
@@ -128,6 +135,15 @@ class FieldDef(BaseModel):
 
     @model_validator(mode="after")
     def _check(self):
+        if self.type == "section":
+            # Display only: a heading with an optional description (help).
+            if not (self.label or "").strip():
+                raise ValueError("a section needs a 'label' (its heading)")
+            if self.name and not _NAME_PATTERN.match(self.name):
+                raise ValueError(f"section name '{self.name}' may contain only letters, digits, '_' or '-'")
+            return self
+        if not self.name:
+            raise ValueError("every field needs a 'name'")
         if not _NAME_PATTERN.match(self.name):
             raise ValueError(
                 f"field name '{self.name}' must start with a letter/underscore and "
@@ -140,6 +156,8 @@ class FieldDef(BaseModel):
         if self.type == "list":
             if not self.fields:
                 raise ValueError(f"field '{self.name}': type 'list' needs 'fields'")
+            if any(f.type == "section" for f in self.fields):
+                raise ValueError(f"field '{self.name}': sections can't be used inside a list")
             _check_unique([f.name for f in self.fields], f"sub-field of '{self.name}'")
         elif self.fields:
             raise ValueError(f"field '{self.name}': 'fields' is only valid for type 'list'")
@@ -155,6 +173,10 @@ class FieldDef(BaseModel):
                 re.compile(self.pattern)
             except re.error as err:
                 raise ValueError(f"field '{self.name}': invalid pattern: {err}") from None
+        if self.domain_field is not None and self.lookup != "user":
+            raise ValueError(f"field '{self.name}': 'domain_field' only applies with 'lookup: user'")
+        if self.fields:
+            _check_domain_fields(self.fields, f"list '{self.name}'")
         return self
 
     @property
@@ -172,7 +194,6 @@ class FormDef(BaseModel):
     msg_type: Literal["project", "user", "tp-tag", "data"]
     title: str
     description: Optional[str] = None
-    submit_label: str = "Submit"
     enabled: bool = True
     site: Optional[str] = Field(
         None,
@@ -187,7 +208,12 @@ class FormDef(BaseModel):
         if not _ID_PATTERN.match(self.id):
             raise ValueError(f"form id '{self.id}' must be lowercase letters, digits, '_' or '-'")
         self.site = check_topic_segment(self.site, f"site of form '{self.id}'")
+        # Sections don't need a name in the YAML; give each a stable internal one.
+        for i, f in enumerate(self.fields):
+            if f.type == "section" and not f.name:
+                f.name = f"_section_{i}"
         _check_unique([f.name for f in self.fields], f"field in form '{self.id}'")
+        _check_domain_fields(self.fields, f"form '{self.id}'")
         return self
 
 
@@ -230,10 +256,44 @@ class BuilderSection(BaseModel):
     )
 
 
+class DirectorySection(BaseModel):
+    """Where to look up registered users (the Retrieval API's /users endpoints)."""
+
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = True
+    rws_url: str = Field("", description="Retrieval API base URL, e.g. http://mfi-rws-app:8000. Empty = off.")
+    requester_user_id: str = Field(
+        "superadmin", description="Identity the app uses for lookups (until single sign-on)."
+    )
+    requester_domain: str = "superadmin"
+    timeout_seconds: float = Field(5, gt=0, le=60)
+    reserved_users: List[str] = Field(
+        default_factory=lambda: ["superadmin/superadmin"],
+        description="Platform accounts ('user_id/domain') only admins may use in a form; hidden from pickers.",
+    )
+
+    @field_validator("reserved_users")
+    @classmethod
+    def _reserved(cls, value: List[str]) -> List[str]:
+        for item in value:
+            if item.count("/") != 1 or not all(p.strip() for p in item.split("/")):
+                raise ValueError(f"reserved user '{item}' must look like 'user_id/domain'")
+        return [item.strip() for item in value]
+
+    @property
+    def active(self) -> bool:
+        return self.enabled and bool(self.rws_url.strip())
+
+    def is_reserved(self, user_id: Optional[str], domain: Optional[str]) -> bool:
+        key = f"{(user_id or '').strip()}/{(domain or '').strip()}".lower()
+        return any(key == r.lower() for r in self.reserved_users)
+
+
 class FormConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     app: AppSection = AppSection()
+    directory: DirectorySection = DirectorySection()
     adapter: AdapterSection = AdapterSection()
     publish: PublishSection = PublishSection()
     history: HistorySection = HistorySection()
@@ -269,6 +329,17 @@ class FormConfig(BaseModel):
             if form.id == form_id and form.enabled:
                 return form
         return None
+
+
+def _check_domain_fields(fields: List["FieldDef"], where: str) -> None:
+    """A user lookup's domain_field must name a sibling field."""
+    names = {f.name for f in fields}
+    for f in fields:
+        if f.domain_field and f.domain_field not in names:
+            raise ValueError(
+                f"{where}: field '{f.name}' has domain_field '{f.domain_field}', "
+                "but there is no such field next to it"
+            )
 
 
 def _check_unique(names: List[str], what: str) -> None:
@@ -423,6 +494,8 @@ def _public_field(field: FieldDef, cfg: FormConfig) -> dict:
         "min_items": field.min_items,
         "max_items": field.max_items,
         "item_label": field.item_label,
+        "lookup": field.lookup,
+        "domain_field": field.domain_field,
     }
     if field.auto and field.auto not in ("now", "uuid"):
         data["auto_value"] = resolve_auto(field.auto, cfg)
@@ -445,6 +518,7 @@ def public_view(cfg: FormConfig) -> dict:
         },
         "user": {k: user.get(k, "") for k in ("user_id", "domain", "name")},
         "history_enabled": cfg.history.enabled,
+        "directory": {"enabled": cfg.directory.active},
         "builder": {
             "enabled": cfg.builder.enabled,
             "requires_token": bool(cfg.builder.admin_token),
@@ -456,7 +530,6 @@ def public_view(cfg: FormConfig) -> dict:
                 "msg_type": form.msg_type,
                 "title": form.title,
                 "description": form.description,
-                "submit_label": form.submit_label,
                 "site": form_site(cfg, form),
                 "topic_prefix": topic_prefix(cfg, form_site(cfg, form)),
                 "fields": [_public_field(f, cfg) for f in form.fields if not f.hidden],

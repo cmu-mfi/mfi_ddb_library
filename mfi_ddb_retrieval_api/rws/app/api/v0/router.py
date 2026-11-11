@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from dateutil import parser
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 
 from app.schema import schema
 from app.services.pg_mds import MdsReader
@@ -124,7 +124,15 @@ async def list_endpoints():
         {
             "endpoint": "/type4",
             "description": "Download files/bytes data. (NOT IMPLEMENTED YET)",
-        }
+        },
+        {
+            "endpoint": "/users",
+            "description": "Search registered users (user ID, domain, name). Requester in X-User-Id / X-User-Domain headers.",
+        },
+        {
+            "endpoint": "/users/{domain}/{user_id}",
+            "description": "Check whether one user is registered.",
+        },
     ]
 
     return schema.Type0Response(
@@ -251,3 +259,86 @@ async def search_trials_and_get_data(request: schema.Type3Request, metadata_read
         message=f"Found {len(trials)} trial(s).",
         trials=[schema.Type1Response.TrialInfo(**trial) for trial in trials],
     )
+
+
+# ---------------------------------------------------------------------------
+# Users: directory lookups for "pick a person" lists
+# ---------------------------------------------------------------------------
+
+
+def get_requester(
+    x_user_id: Optional[str] = Header(None, description="Requesting user's ID"),
+    x_user_domain: Optional[str] = Header(None, description="Requesting user's domain"),
+) -> tuple:
+    """Who is asking.
+
+    Today the caller states it in the X-User-Id / X-User-Domain headers. With
+    single sign-on, the login proxy in front of RWS sets these headers from the
+    verified login (and strips any sent by the client), so this function and
+    the endpoints using it do not change.
+    """
+    if not x_user_id or not x_user_id.strip():
+        raise HTTPException(status_code=401, detail="Missing X-User-Id header (who is asking).")
+    return (x_user_id.strip(), (x_user_domain or "").strip())
+
+
+def _require_registered(requester: tuple, metadata_reader: MdsReader) -> None:
+    """Only users registered in the metadata store may look others up."""
+    if requester == ("superadmin", "superadmin"):
+        return
+    if metadata_reader.get_user(requester[0], requester[1]) is None:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Requester {requester[0]} / {requester[1] or '-'} is not a registered user.",
+        )
+
+
+@router.get(
+    "/users",
+    summary="Users: Search registered users",
+    response_model=schema.UsersResponse,
+)
+async def search_users(
+    search: Optional[str] = Query(None, description="Text to match in user ID, name or domain"),
+    limit: int = Query(25, ge=1, le=100, description="Maximum number of users to return"),
+    include_system: bool = Query(
+        False, description="Also list platform accounts such as superadmin (superadmin requesters only)"
+    ),
+    requester: tuple = Depends(get_requester),
+    metadata_reader: MdsReader = Depends(get_metadata_reader),
+):
+    """
+    Search users registered in the metadata store, for "pick a person" lists
+    (e.g. project members, "created by"). Returns only user ID, domain and name.
+    Platform accounts (superadmin) are not people to pick and are left out.
+    """
+    _require_registered(requester, metadata_reader)
+    if include_system and requester != ("superadmin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Only superadmin can list platform accounts.")
+    users = metadata_reader.search_users(search, limit, include_system=include_system)
+    return schema.UsersResponse(
+        status="success",
+        message=f"Found {len(users)} user(s).",
+        users=[schema.UserInfo(**u) for u in users],
+    )
+
+
+@router.get(
+    "/users/{domain}/{user_id}",
+    summary="Users: Check one user",
+    response_model=schema.UserResponse,
+)
+async def get_user(
+    domain: str,
+    user_id: str,
+    requester: tuple = Depends(get_requester),
+    metadata_reader: MdsReader = Depends(get_metadata_reader),
+):
+    """
+    Check whether a user is registered. 404 if not.
+    """
+    _require_registered(requester, metadata_reader)
+    user = metadata_reader.get_user(user_id, domain)
+    if user is None:
+        raise HTTPException(status_code=404, detail=f"User {user_id} / {domain} is not registered.")
+    return schema.UserResponse(status="success", message="User found.", user=schema.UserInfo(**user))

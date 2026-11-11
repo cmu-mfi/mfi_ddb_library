@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Eye, Loader2, RotateCcw, Send, Sparkles, XCircle } from "lucide-react";
-import FieldInput from "./FieldInput";
+import FieldInput, { pickedValues } from "./FieldInput";
+import { SectionHeader, useSections } from "./Sections";
 import { previewForm, submitForm } from "../api";
 import { describeAuto, indexErrors, initialValues, isUserField, toSubmitValues } from "../lib/form";
 
@@ -21,12 +22,29 @@ function PayloadBlock({ title, topic, payload }) {
 export default function MetadataForm({ form, onSubmitted }) {
   const userFields = useMemo(() => form.fields.filter(isUserField), [form]);
   const autoFields = useMemo(() => form.fields.filter((f) => !isUserField(f)), [form]);
+  const sections = useSections(userFields);
+  const { reset: resetSections, reveal: revealSections } = sections;
 
   const [values, setValues] = useState(() => initialValues(form.fields));
   const [errors, setErrors] = useState({ byPath: {}, general: [] });
   const [busy, setBusy] = useState(null); // "preview" | "submit" | null
   const [result, setResult] = useState(null);
   const [preview, setPreview] = useState(null);
+  // Person fields currently holding someone who isn't registered: {path: true}
+  const [unregistered, setUnregistered] = useState({});
+  const onUserStatus = useCallback(
+    (path, status) =>
+      setUnregistered((prev) => {
+        const bad = Boolean(status && !status.registered && !status.reserved);
+        if (Boolean(prev[path]) === bad) return prev;
+        const next = { ...prev };
+        if (bad) next[path] = true;
+        else delete next[path];
+        return next;
+      }),
+    [],
+  );
+  const blockedBy = Object.keys(unregistered).length;
 
   // Reset when the form definition changes (another tab or a config reload).
   useEffect(() => {
@@ -34,7 +52,8 @@ export default function MetadataForm({ form, onSubmitted }) {
     setErrors({ byPath: {}, general: [] });
     setResult(null);
     setPreview(null);
-  }, [form]);
+    resetSections();
+  }, [form, resetSections]);
 
   const setField = (name, value) => {
     setValues((prev) => ({ ...prev, [name]: value }));
@@ -58,6 +77,7 @@ export default function MetadataForm({ form, onSubmitted }) {
     if (!response.ok) {
       const indexed = indexErrors(response.data?.errors || [{ message: response.data?.message || "Request failed" }]);
       setErrors(indexed);
+      revealSections(Object.keys(indexed.byPath)); // open collapsed sections that hold an error
       if (kind === "submit" && response.status >= 500) {
         setResult({ ok: false, message: response.data?.message, payload: response.data?.payload });
       }
@@ -98,16 +118,23 @@ export default function MetadataForm({ form, onSubmitted }) {
       </div>
 
       <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
-        {userFields.map((field) => (
-          <FieldInput
-            key={field.name}
-            field={field}
-            path={field.name}
-            value={values[field.name]}
-            onChange={(v) => setField(field.name, v)}
-            errors={errors.byPath}
-          />
-        ))}
+        {userFields.map((field) =>
+          field.type === "section" ? (
+            <SectionHeader key={field.name} field={field} sections={sections} />
+          ) : sections.isHidden(field) ? null : (
+            <FieldInput
+              key={field.name}
+              field={field}
+              path={field.name}
+              value={values[field.name]}
+              onChange={(v) => setField(field.name, v)}
+              siblings={values}
+              onPick={(user) => setValues((prev) => ({ ...prev, ...pickedValues(field, user) }))}
+              onUserStatus={onUserStatus}
+              errors={errors.byPath}
+            />
+          ),
+        )}
       </div>
 
       {autoFields.length > 0 && (
@@ -136,9 +163,14 @@ export default function MetadataForm({ form, onSubmitted }) {
       )}
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <button type="submit" className="btn-primary" disabled={Boolean(busy)}>
+        <button
+          type="submit"
+          className="btn-primary"
+          disabled={Boolean(busy) || blockedBy > 0}
+          title={blockedBy > 0 ? "Fix the people who are not registered first" : undefined}
+        >
           {busy === "submit" ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-          {busy === "submit" ? "Publishing…" : form.submit_label}
+          {busy === "submit" ? "Publishing…" : "Submit"}
         </button>
         <button type="button" className="btn-secondary" disabled={Boolean(busy)} onClick={() => run("preview")}>
           {busy === "preview" ? <Loader2 size={16} className="animate-spin" /> : <Eye size={16} />}
@@ -147,6 +179,11 @@ export default function MetadataForm({ form, onSubmitted }) {
         <button type="button" className="btn-secondary" disabled={Boolean(busy)} onClick={reset}>
           <RotateCcw size={16} /> Reset
         </button>
+        {blockedBy > 0 && (
+          <span className="text-sm text-red-600">
+            {blockedBy === 1 ? "A person entered is" : `${blockedBy} people entered are`} not registered.
+          </span>
+        )}
       </div>
 
       {preview && <PayloadBlock title="Payload preview (not sent)" topic={preview.topic} payload={preview.payload} />}

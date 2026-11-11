@@ -96,3 +96,25 @@ class Type3Request(Type1Request):
     frequency: int = Field(0, description="The frequency (in Hz) at which to retrieve data for the trials.")
     
 Type3Response = Union[Type1Response, Type2Response]
+
+class UserInfo(BaseModel):
+    """
+    Public directory entry for a registered user (no email or audit fields).
+    """
+    user_id: str = Field(..., description="User ID, e.g. the Andrew ID.")
+    domain: str = Field(..., description="Domain of the user, e.g. 'ANDREW'.")
+    name: Optional[str] = Field(None, description="Display name, if known.")
+
+
+class UsersResponse(_Response):
+    """
+    Response model for GET /users (search registered users).
+    """
+    users: List[UserInfo] = Field(default_factory=list, description="Matching users.")
+
+
+class UserResponse(_Response):
+    """
+    Response model for GET /users/{domain}/{user_id}.
+    """
+    user: Optional[UserInfo] = Field(None, description="The user, if registered.")

@@ -24,11 +24,14 @@ services:
       MQTT_USERNAME: ${MQTT_USERNAME:-}
       MQTT_PASSWORD: ${MQTT_PASSWORD:-}
       MQTT_ENTERPRISE: ${MQTT_ENTERPRISE:-CMU}
-      MQTT_SITE: ${MQTT_SITE:-Mill-19}
+      MQTT_SITE: ${MQTT_SITE:-M19}
       FORM_USER_ID: ${FORM_USER_ID:-metadata-form}
       FORM_USER_DOMAIN: ${FORM_USER_DOMAIN:-ANDREW}
       FORM_DRY_RUN: ${FORM_DRY_RUN:-false}
       FORM_ADMIN_TOKEN: ${FORM_ADMIN_TOKEN:-}
+      RWS_URL: ${RWS_URL:-http://mfi-rws-app:8000}   # user directory for "pick a person" fields
+      DIRECTORY_USER_ID: ${DIRECTORY_USER_ID:-superadmin}
+      DIRECTORY_USER_DOMAIN: ${DIRECTORY_USER_DOMAIN:-superadmin}
     volumes:
       - ../../mfi_ddb_metadata_form/config:/app/config:ro
       - ./.data/metadata_form:/app/data

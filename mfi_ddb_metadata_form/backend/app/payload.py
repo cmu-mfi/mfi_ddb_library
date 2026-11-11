@@ -267,6 +267,8 @@ def _build_fields(
 ) -> dict:
     out: dict = {}
     for field in fields:
+        if field.type == "section":
+            continue  # headings only; never part of the payload
         path = f"{prefix}{field.name}"
         if field.auto and not field.editable:
             value: Any = resolve_auto(field.auto, cfg)

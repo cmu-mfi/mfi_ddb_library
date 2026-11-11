@@ -30,13 +30,18 @@ services:
       MQTT_USERNAME: ${MQTT_USERNAME:-}
       MQTT_PASSWORD: ${MQTT_PASSWORD:-}
       MQTT_ENTERPRISE: ${MQTT_ENTERPRISE:-CMU}
-      MQTT_SITE: ${MQTT_SITE:-Mill-19}
+      MQTT_SITE: ${MQTT_SITE:-M19}
       FORM_USER_ID: ${FORM_USER_ID:-metadata-form}
       FORM_USER_DOMAIN: ${FORM_USER_DOMAIN:-ANDREW}
       FORM_USER_EMAIL: ${FORM_USER_EMAIL:-}
       FORM_USER_NAME: ${FORM_USER_NAME:-Metadata Form}
       FORM_DRY_RUN: ${FORM_DRY_RUN:-false}
       FORM_ADMIN_TOKEN: ${FORM_ADMIN_TOKEN:-}
+      # Retrieval API for the user directory ("pick a person" fields).
+      # Empty = off; e.g. http://host.docker.internal:8000 for an RWS on this host.
+      RWS_URL: ${RWS_URL:-}
+      DIRECTORY_USER_ID: ${DIRECTORY_USER_ID:-superadmin}
+      DIRECTORY_USER_DOMAIN: ${DIRECTORY_USER_DOMAIN:-superadmin}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     extra_hosts:
       - "host.docker.internal:host-gateway"         # makes the host reachable on Linux too

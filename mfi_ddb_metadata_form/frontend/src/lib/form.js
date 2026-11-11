@@ -11,8 +11,11 @@ export function toLocalInput(date) {
   )}:${pad(date.getMinutes())}`;
 }
 
-/** Fields the user fills in (auto fields that aren't editable are server-side only). */
+/** Fields the user sees (auto fields that aren't editable are server-side only). */
 export const isUserField = (field) => !field.auto || field.editable;
+
+/** Section headings: shown in the form, never part of the values. */
+export const isSection = (field) => field.type === "section";
 
 function initialValue(field) {
   if (field.type === "list") {
@@ -38,7 +41,7 @@ function initialValue(field) {
 export function initialValues(fields) {
   const values = {};
   for (const field of fields) {
-    if (isUserField(field)) values[field.name] = initialValue(field);
+    if (!isSection(field) && isUserField(field)) values[field.name] = initialValue(field);
   }
   return values;
 }
@@ -47,7 +50,7 @@ export function initialValues(fields) {
 export function toSubmitValues(fields, values) {
   const out = {};
   for (const field of fields) {
-    if (!isUserField(field)) continue;
+    if (isSection(field) || !isUserField(field)) continue;
     const value = values[field.name];
     if (field.type === "datetime") {
       out[field.name] = value ? new Date(value).toISOString() : "";
