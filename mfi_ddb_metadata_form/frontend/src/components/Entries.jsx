@@ -1,18 +1,22 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
   Copy,
   Download,
+  Eye,
   Loader2,
   PencilLine,
   Printer,
   RotateCcw,
+  Scissors,
   Search,
   Users,
 } from "lucide-react";
 import { printLabels, searchEntries } from "../api";
+import { cellValue, formatTime } from "../lib/entries";
 import { useUsers, userKey, userLabel } from "../lib/users";
+import EntryView from "./EntryView";
 
 // Field types that get a filter control, and how.
 const FILTER_KIND = {
@@ -32,24 +36,18 @@ const LABEL_SIZE_KEY = "mfi-label-size";
 
 const isVisible = (f) => !f.auto || f.editable;
 
-const formatTime = (iso) => {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
-};
-
-function cellValue(field, values) {
-  if (field.type === "user") {
-    const id = values[field.user_id_key];
-    return id ? `${id} · ${values[field.domain_key] ?? ""}` : "";
-  }
-  const v = values[field.name];
-  if (v == null) return "";
-  if (field.type === "checkbox") return v ? "Yes" : "No";
-  if (field.type === "datetime") return formatTime(v);
-  if (typeof v === "object") return JSON.stringify(v);
-  return String(v);
+/** Local time as a datetime-local input value ("2026-11-12T14:05"). */
+function toLocalInput(d) {
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
+
+/** Default "Entered between" window: one hour ago -> now. */
+function defaultWindow() {
+  const now = new Date();
+  return { from: toLocalInput(new Date(now.getTime() - 60 * 60 * 1000)), to: toLocalInput(now) };
+}
+
 
 /** UI filter state -> API filters (empty filters dropped). */
 function toApiFilters(fields, state) {
@@ -197,11 +195,15 @@ function downloadCsv(form, columns, entries) {
   URL.revokeObjectURL(url);
 }
 
-export default function Entries({ forms, initialFormId, showAll, onUpdate, labels }) {
+export default function Entries({ forms, initialFormId, showAll, onUpdate, labels, splits }) {
   const [formId, setFormId] = useState(
     forms.some((f) => f.id === initialFormId) ? initialFormId : forms[0]?.id
   );
   const form = forms.find((f) => f.id === formId);
+
+  // ---- split by weight (forms listed under splits: in the config) ----
+  const splitKey = form ? splits?.[form.id] : undefined;
+  const canSplit = (e) => Boolean(onUpdate && splitKey && Number(e?.values?.[splitKey]) > 0);
 
   // ---- label printing (only for forms with a label configured) ----
   const labelSizes = labels?.sizes || [];
@@ -245,8 +247,9 @@ export default function Entries({ forms, initialFormId, showAll, onUpdate, label
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
 
-  const [enteredFrom, setEnteredFrom] = useState("");
-  const [enteredTo, setEnteredTo] = useState("");
+  // Default window: the last hour (from = now - 1 h, to = now).
+  const [enteredFrom, setEnteredFrom] = useState(() => defaultWindow().from);
+  const [enteredTo, setEnteredTo] = useState(() => defaultWindow().to);
   const [text, setText] = useState("");
   const [filters, setFilters] = useState({});
   const [viewer, setViewer] = useState(() => {
@@ -261,6 +264,21 @@ export default function Entries({ forms, initialFormId, showAll, onUpdate, label
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(null);
+
+  // Read-only view of one entry. Shown in place of the search + results; all their
+  // state stays here, so closing returns to exactly the same filters and results.
+  const [viewing, setViewing] = useState(null);
+  const savedScroll = useRef(null); // null until a view has been opened
+  const openView = (entry) => {
+    savedScroll.current = window.scrollY;
+    setError(null);
+    setViewing(entry);
+  };
+  const closeView = useCallback(() => setViewing(null), []);
+  useLayoutEffect(() => {
+    if (savedScroll.current === null) return; // first render: leave the page where it is
+    window.scrollTo({ top: viewing ? 0 : savedScroll.current });
+  }, [viewing]);
 
   const filterFields = useMemo(
     () => (form?.fields || []).filter((f) => isVisible(f) && FILTER_KIND[f.type]),
@@ -289,7 +307,8 @@ export default function Entries({ forms, initialFormId, showAll, onUpdate, label
       const res = await searchEntries(form.id, {
         viewer: showAll ? null : viewer,
         entered_from: state.enteredFrom ? new Date(state.enteredFrom).toISOString() : null,
-        entered_to: state.enteredTo ? new Date(state.enteredTo).toISOString() : null,
+        // the box only holds minutes: "to 14:05" includes everything up to 14:05:59.999
+        entered_to: state.enteredTo ? new Date(new Date(state.enteredTo).getTime() + 59_999).toISOString() : null,
         text: state.text.trim() || null,
         filters: toApiFilters(filterFields, state.filters),
       });
@@ -306,11 +325,12 @@ export default function Entries({ forms, initialFormId, showAll, onUpdate, label
   );
 
   const reset = () => {
-    setEnteredFrom("");
-    setEnteredTo("");
+    const { from, to } = defaultWindow(); // back to the last hour, as of now
+    setEnteredFrom(from);
+    setEnteredTo(to);
     setText("");
     setFilters({});
-    run({ enteredFrom: "", enteredTo: "", text: "", filters: {} });
+    run({ enteredFrom: from, enteredTo: to, text: "", filters: {} });
   };
 
   // New form (or viewer) -> fresh search with no filters.
@@ -332,6 +352,24 @@ export default function Entries({ forms, initialFormId, showAll, onUpdate, label
   };
 
   const entries = result?.entries || [];
+
+  if (viewing && form) {
+    return (
+      <EntryView
+        form={form}
+        entry={viewing}
+        onClose={closeView}
+        onUpdate={onUpdate}
+        canSplit={canSplit(viewing)}
+        splitKey={splitKey}
+        canPrint={canPrint}
+        labelSize={labelSize}
+        printing={printing}
+        onPrint={(e) => print([e])}
+        error={error}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -502,7 +540,7 @@ export default function Entries({ forms, initialFormId, showAll, onUpdate, label
                     </th>
                   )}
                   <th className="w-8 py-2" />
-                  {onUpdate && <th className="py-2 pr-4" />}
+                  <th className="py-2 pr-4" />
                   <th className="whitespace-nowrap py-2 pr-4 font-medium">Entered</th>
                   <th className="whitespace-nowrap py-2 pr-4 font-medium">Trial ID</th>
                   <th className="whitespace-nowrap py-2 pr-4 font-medium">Created by</th>
@@ -541,9 +579,21 @@ export default function Entries({ forms, initialFormId, showAll, onUpdate, label
                         <td className="py-2 text-gray-400">
                           {open === key ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                         </td>
-                        {onUpdate && (
-                          <td className="whitespace-nowrap py-1.5 pr-4">
-                            <div className="flex gap-1.5">
+                        <td className="whitespace-nowrap py-1.5 pr-4">
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              className="btn-secondary px-2.5 py-1 text-xs"
+                              title="See all of this entry's data (read-only)"
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                openView(e);
+                              }}
+                            >
+                              <Eye size={13} /> View
+                            </button>
+                            {onUpdate && (
+                              <>
                               <button
                                 type="button"
                                 className="btn-secondary px-2.5 py-1 text-xs"
@@ -566,6 +616,21 @@ export default function Entries({ forms, initialFormId, showAll, onUpdate, label
                               >
                                 <Copy size={13} /> Copy
                               </button>
+                              {canSplit(e) && (
+                                <button
+                                  type="button"
+                                  className="btn-secondary px-2.5 py-1 text-xs"
+                                  title={`Split off part of this entry's ${splitKey} into a new entry`}
+                                  onClick={(ev) => {
+                                    ev.stopPropagation();
+                                    onUpdate(form.id, e, "split");
+                                  }}
+                                >
+                                  <Scissors size={13} /> Split
+                                </button>
+                              )}
+                              </>
+                            )}
                               {canPrint && (
                                 <button
                                   type="button"
@@ -580,9 +645,8 @@ export default function Entries({ forms, initialFormId, showAll, onUpdate, label
                                   <Printer size={13} /> Print
                                 </button>
                               )}
-                            </div>
-                          </td>
-                        )}
+                          </div>
+                        </td>
                         <td className="whitespace-nowrap py-2 pr-4 text-gray-700">{formatTime(e.entered_at)}</td>
                         <td className="whitespace-nowrap py-2 pr-4 font-mono text-xs">
                           {e.trial_id}
@@ -606,7 +670,7 @@ export default function Entries({ forms, initialFormId, showAll, onUpdate, label
                       {open === key && (
                         <tr className="border-b border-gray-100 bg-gray-50">
                           <td
-                            colSpan={(canPrint ? 1 : 0) + (onUpdate ? 5 : 4) + columns.length}
+                            colSpan={(canPrint ? 1 : 0) + 5 + columns.length}
                             className="space-y-3 p-3"
                           >
                             <p className="text-xs font-medium text-gray-600">

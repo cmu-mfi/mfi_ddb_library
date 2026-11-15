@@ -90,6 +90,22 @@ entries:
   timeout_seconds: 15
   max_results: 500
 
+# Batch add ("Single entry | Batch add" on each form): many entries from one
+# CSV / Excel file or cells pasted from a spreadsheet. Column titles are field
+# keys or labels; each row is one entry. Every row is checked (required values,
+# choices, number limits, dates ...) and nothing is published unless all pass.
+batch:
+  enabled: true
+  max_rows: 200
+
+# Split (Entries page -> Split): a new entry takes part of an entry's weight
+# and the original gets a new version with the rest (weight - split weight).
+# Map form id -> the number key that is split; only these forms get Split.
+splits:
+  enabled: true
+  forms:
+    powder-library: weight
+
 # Printable labels (Entries page -> Print), rendered with the label maker in
 # label_maker_main/ (blabel templates, mounted at /app/labels). The big title is
 # the short entry ID (unique, same for every version of an entry); owner_displ is

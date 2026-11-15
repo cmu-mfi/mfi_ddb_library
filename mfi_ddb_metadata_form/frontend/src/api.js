@@ -21,19 +21,31 @@ export const fetchHealth = () => request("/health");
 export const fetchSubmissions = (limit = 20) => request(`/submissions?limit=${limit}`);
 export const fetchUsers = (refresh = false) => request(`/users${refresh ? "?refresh=true" : ""}`);
 
-function post(path, values, revises) {
+function post(path, values, { revises, split } = {}) {
+  const body = { values };
+  if (revises) body.revises = revises;
+  if (split) body.split = split;
   return request(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(revises ? { values, revises } : { values }),
+    body: JSON.stringify(body),
   });
 }
 
-// `revises` ({entry_id, version, trial_uuid}) saves the values as the next version of that entry.
-export const previewForm = (formId, values, revises) =>
-  post(`/forms/${encodeURIComponent(formId)}/preview`, values, revises);
-export const submitForm = (formId, values, revises) =>
-  post(`/forms/${encodeURIComponent(formId)}/submit`, values, revises);
+// options.revises ({entry_id, version, trial_uuid}) saves the values as the next version of that entry.
+// options.split ({revises, values}) saves them as a new entry split off that entry by weight.
+export const previewForm = (formId, values, options) =>
+  post(`/forms/${encodeURIComponent(formId)}/preview`, values, options);
+export const submitForm = (formId, values, options) =>
+  post(`/forms/${encodeURIComponent(formId)}/submit`, values, options);
+/** Batch add: check a table ({format: csv|tsv|xlsx, content, created_by}); publishes nothing. */
+export const checkBatch = (formId, body) =>
+  request(`/forms/${encodeURIComponent(formId)}/batch/check`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
 /** Label PDF for entries -> {ok: true, blob} or {ok: false, message}. */
 export async function printLabels(formId, size, entries) {
   let response;

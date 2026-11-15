@@ -126,6 +126,16 @@ def lint_config(cfg: FormConfig) -> List[str]:
                 f"form '{form.id}': msg_type 'data' needs a trial_id field; the KV adapter "
                 "drops 'data' payloads without one"
             )
+    if cfg.splits.enabled:
+        for form_id, key in cfg.splits.forms.items():
+            form = cfg.get_form(form_id)
+            if form is None:  # e.g. a builder form that doesn't exist (yet)
+                continue
+            field = next((f for f in form.fields if f.name == key), None)
+            if field is None or field.type not in ("number", "integer"):
+                warnings.append(
+                    f"splits: form '{form_id}' has no number field '{key}' to split by"
+                )
     return warnings
 
 

@@ -12,12 +12,14 @@ Endpoints (nginx exposes them under /api):
   GET  /submissions               recent submissions (if history is enabled)
   GET  /users                     registered users (metadata store) for 'user' fields
   POST /forms/{form_id}/entries   search previous entries of a form (via RWS type1)
+  POST /forms/{form_id}/batch/check   check a CSV / Excel / pasted table of entries (batch add)
   POST /labels                    printable label PDF for entries (label_maker_main templates)
   GET/POST/PUT/DELETE /builder/forms[/{id}]   forms created in the browser
   GET/PUT/DELETE /settings        MQTT target + per-form site (Settings page)
   POST /settings/test             try connecting to the MQTT broker
 """
 
+import json
 import logging
 import os
 import sys
@@ -45,6 +47,9 @@ from fastapi import Body, Header  # noqa: E402
 from pydantic import ValidationError  # noqa: E402
 
 from app.config import ConfigManager, FormConfig, default_site, form_site, public_view  # noqa: E402
+import csv  # noqa: E402
+
+from app.batch import BatchError, BatchRequest, check_batch  # noqa: E402
 from app.custom_forms import BuilderForm, CustomFormStore  # noqa: E402
 from app.entries import EntriesError, EntriesQuery, search_entries  # noqa: E402
 from app.history import History  # noqa: E402
@@ -52,6 +57,7 @@ from app.labels import LabelError, LabelRequest, check_templates, labels_view, r
 from app.payload import Revision, SubmissionError, build_payload, lint_config  # noqa: E402
 from app.publisher import PublishError, check_broker, publish, topic_for  # noqa: E402
 from app.settings import MqttSettings, Settings, SettingsStore, SettingsUpdate, apply_settings  # noqa: E402
+from app.split import PreparedSplit, Split, SplitError, check_not_stale, prepare_split  # noqa: E402
 from app.users import UserDirectoryError, directory as user_directory  # noqa: E402
 
 logger = logging.getLogger("metadata_form")
@@ -123,6 +129,8 @@ class SubmitBody(BaseModel):
     # Update of an existing entry: {entry_id, version, trial_uuid} of the version it replaces.
     # Validated in _prepare so errors come back in the app's usual format.
     revises: Optional[Dict[str, Any]] = None
+    # Split: {revises: {...}, values: {...}} of the original entry (see app/split.py).
+    split: Optional[Dict[str, Any]] = None
 
 
 def _error(status: int, message: str, errors: Optional[list] = None, **extra) -> JSONResponse:
@@ -195,6 +203,19 @@ def _prepare(form_id: str, body: SubmitBody):
     if form is None:
         return cfg, None, None, _error(404, f"Unknown form '{form_id}'")
     revision = None
+    if body.split is not None:
+        if body.revises is not None:
+            return cfg, form, None, _error(422, "Send either 'revises' or 'split', not both.")
+        try:
+            split = Split(**body.split)
+        except ValidationError as err:
+            return cfg, form, None, _error(422, "Invalid entry to split.", _validation_errors(err))
+        try:
+            return cfg, form, prepare_split(cfg, form, body.values, split), None
+        except SubmissionError as err:
+            return cfg, form, None, _error(422, "Please fix the highlighted fields.", err.errors)
+        except SplitError as err:
+            return cfg, form, None, _error(err.status, str(err))
     if body.revises is not None:
         try:
             revision = Revision(**body.revises)
@@ -215,7 +236,11 @@ async def preview(form_id: str, body: SubmitBody):
         return _error(503, f"Form configuration is not available: {err}")
     if error:
         return error
-    return {"ok": True, "payload": payload, "topic": topic_for(cfg, form.msg_type, form_site(cfg, form))}
+    topic = topic_for(cfg, form.msg_type, form_site(cfg, form))
+    if isinstance(payload, PreparedSplit):
+        return {"ok": True, "payload": payload.child, "parent_payload": payload.parent,
+                "remaining": payload.remaining, "topic": topic}
+    return {"ok": True, "payload": payload, "topic": topic}
 
 
 @app.post("/forms/{form_id}/submit")
@@ -226,6 +251,40 @@ async def submit(form_id: str, body: SubmitBody):
         return _error(503, f"Form configuration is not available: {err}")
     if error:
         return error
+    if isinstance(payload, PreparedSplit):
+        return await _submit_split(cfg, form, payload)
+    return await _publish_one(cfg, form, payload)
+
+
+async def _submit_split(cfg: FormConfig, form, prepared: PreparedSplit):
+    """New entry first, then the original's reduced version."""
+    try:
+        await run_in_threadpool(check_not_stale, cfg, form, prepared.revises)
+    except SplitError as err:
+        return _error(err.status, str(err))
+
+    child = await _publish_one(cfg, form, prepared.child)
+    if isinstance(child, JSONResponse):
+        return child  # nothing was changed
+    parent = await _publish_one(cfg, form, prepared.parent)
+    if isinstance(parent, JSONResponse):
+        failure = json.loads(parent.body)
+        return _error(
+            502,
+            f"The new entry was saved, but the original's {prepared.key} was NOT reduced to "
+            f"{prepared.remaining:g}: {failure.get('message')}",
+            split_partial=True,
+            payload=prepared.child,
+            parent_payload=prepared.parent,
+            remaining=prepared.remaining,
+            retry={"values": prepared.parent_values, "revises": prepared.revises.model_dump()},
+        )
+    return {**child, "parent_payload": prepared.parent, "parent_submission_id": parent["submission_id"],
+            "remaining": prepared.remaining}
+
+
+async def _publish_one(cfg: FormConfig, form, payload: dict):
+    """Publish one payload -> success dict, or a JSONResponse error."""
 
     def record(status: str, topic: Optional[str], err: Optional[str] = None) -> Optional[int]:
         if not cfg.history.enabled:
@@ -266,6 +325,30 @@ async def submissions(limit: int = Query(25, ge=1, le=200)):
     if cfg is not None and not cfg.history.enabled:
         return []
     return history.recent(limit)
+
+
+@app.post("/forms/{form_id}/batch/check")
+async def batch_check(form_id: str, data: Dict[str, Any] = Body(...)):
+    """Parse a CSV / Excel / pasted table and check every row (publishes nothing)."""
+    try:
+        cfg = _require_config()
+    except RuntimeError as err:
+        return _error(503, f"Form configuration is not available: {err}")
+    if not cfg.batch.enabled:
+        return _error(403, "Batch add is disabled in the configuration.")
+    form = cfg.get_form(form_id)
+    if form is None:
+        return _error(404, f"Unknown form '{form_id}'")
+    try:
+        request = BatchRequest(**data)
+    except ValidationError as err:
+        return _error(422, "Invalid batch upload.", _validation_errors(err))
+    try:
+        return await run_in_threadpool(check_batch, cfg, form, request)
+    except BatchError as err:
+        return _error(err.status, str(err))
+    except (UnicodeError, csv.Error) as err:
+        return _error(422, f"The table could not be read: {err}")
 
 
 @app.post("/labels")

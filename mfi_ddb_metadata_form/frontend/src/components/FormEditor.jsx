@@ -108,7 +108,7 @@ function DefaultInput({ row, update }) {
   return <input {...common} type={type} placeholder={row.type === "datetime" ? "now" : ""} />;
 }
 
-function KeyRow({ row, index, count, update, move, remove, error }) {
+function KeyRow({ row, index, count, update, move, moveTo, remove, error }) {
   const isNumber = row.type === "number" || row.type === "integer";
   return (
     <div className={`rounded-md border p-4 ${error ? "border-red-300 bg-red-50/40" : "border-gray-200 bg-gray-50"}`}>
@@ -155,7 +155,7 @@ function KeyRow({ row, index, count, update, move, remove, error }) {
             Required
           </label>
           <div className="mb-1">
-            <MoveRemove index={index} count={count} move={move} remove={remove} what="key" />
+            <MoveRemove index={index} count={count} move={move} moveTo={moveTo} remove={remove} what="key" />
           </div>
         </div>
 
@@ -187,9 +187,50 @@ function KeyRow({ row, index, count, update, move, remove, error }) {
   );
 }
 
-function MoveRemove({ index, count, move, remove, what }) {
+/**
+ * The row's position (1..count). Typing a new number and pressing Enter (or leaving
+ * the box) moves the row there; rows from that position down shift by one.
+ */
+function PositionInput({ index, count, moveTo, what }) {
+  const [draft, setDraft] = useState(null); // null = not editing, show the current number
+  const commit = () => {
+    if (draft === null) return;
+    const n = parseInt(draft, 10);
+    setDraft(null);
+    if (Number.isNaN(n)) return;
+    const target = Math.min(Math.max(n, 1), count) - 1;
+    if (target !== index) moveTo(target);
+  };
   return (
-    <div className="flex gap-0.5">
+    <label className="mr-1 inline-flex items-center gap-1 text-xs text-gray-500" title={`Type a number to move this ${what}`}>
+      #
+      <input
+        type="number"
+        min={1}
+        max={count}
+        aria-label={`Position of this ${what} (1 to ${count})`}
+        className="w-14 rounded border border-gray-300 bg-white px-1.5 py-1 text-center text-sm text-gray-800 focus:border-blue-500 focus:outline-none"
+        value={draft ?? index + 1}
+        onChange={(e) => setDraft(e.target.value)}
+        onFocus={(e) => e.target.select()}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit();
+          } else if (e.key === "Escape") {
+            setDraft(null);
+          }
+        }}
+      />
+    </label>
+  );
+}
+
+function MoveRemove({ index, count, move, moveTo, remove, what }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      <PositionInput index={index} count={count} moveTo={moveTo} what={what} />
       <button type="button" aria-label="Move up" disabled={index === 0} onClick={() => move(-1)}
         className="rounded p-1.5 text-gray-500 hover:bg-gray-200 disabled:opacity-30">
         <ArrowUp size={16} />
@@ -207,7 +248,7 @@ function MoveRemove({ index, count, move, remove, what }) {
 }
 
 /** A heading that groups the keys below it (until the next section). Sends no data. */
-function SectionRow({ row, index, count, update, move, remove, error }) {
+function SectionRow({ row, index, count, update, move, moveTo, remove, error }) {
   return (
     <div className={`rounded-md border-l-4 p-4 ${error ? "border-red-400 bg-red-50/40" : "border-blue-500 bg-blue-50/60"}`}>
       <div className="flex flex-wrap items-start gap-3">
@@ -226,7 +267,7 @@ function SectionRow({ row, index, count, update, move, remove, error }) {
           <input className="input" value={row.help} onChange={(e) => update({ help: e.target.value })} />
         </label>
         <div className="mt-6">
-          <MoveRemove index={index} count={count} move={move} remove={remove} what="section" />
+          <MoveRemove index={index} count={count} move={move} moveTo={moveTo} remove={remove} what="section" />
         </div>
       </div>
       <p className="mt-2 text-xs text-gray-500">Groups the keys below it on the form. It sends no data.</p>
@@ -290,12 +331,20 @@ export default function FormEditor({ initial, defaultSite, onSave, onCancel }) {
 
   const setRows = (fn) => setState((s) => ({ ...s, rows: fn(s.rows) }));
   const updateRow = (i, patch) => setRows((rows) => rows.map((r, j) => (j === i ? { ...r, ...patch } : r)));
-  const moveRow = (i, d) =>
+  // Take the row out and insert it at `to`: rows from `to` down shift by one,
+  // rows below its old position stay where they are. Row errors are keyed by
+  // position, so they're cleared rather than left on the wrong row.
+  const moveRowTo = (from, to) => {
     setRows((rows) => {
+      if (to < 0 || to >= rows.length || to === from) return rows;
       const next = [...rows];
-      [next[i], next[i + d]] = [next[i + d], next[i]];
+      const [row] = next.splice(from, 1);
+      next.splice(to, 0, row);
       return next;
     });
+    setErrors((e) => ({ ...e, rows: {} }));
+  };
+  const moveRow = (i, d) => moveRowTo(i, i + d);
 
   const save = async () => {
     setSaving(true);
@@ -384,6 +433,7 @@ export default function FormEditor({ initial, defaultSite, onSave, onCancel }) {
               count={state.rows.length}
               update={(patch) => updateRow(i, patch)}
               move={(d) => moveRow(i, d)}
+              moveTo={(to) => moveRowTo(i, to)}
               remove={() => setRows((rows) => rows.filter((_, j) => j !== i))}
               error={errors.rows[i]}
             />

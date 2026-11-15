@@ -40,7 +40,9 @@ logger = logging.getLogger(__name__)
 DEFAULT_CONFIG_PATH = "/app/config/form-config.yaml"
 
 MSG_TYPES = ("project", "user", "tp-tag", "data")
-RESERVED_FIELD_NAMES = {"schema_version", "msg_type", "form_id", "entry_id", "entry_version", "supersedes"}
+RESERVED_FIELD_NAMES = {
+    "schema_version", "msg_type", "form_id", "entry_id", "entry_version", "supersedes", "split_from", "split_into",
+}
 FIELD_TYPES = Literal[
     "text",
     "textarea",
@@ -307,6 +309,23 @@ class EntriesSection(BaseModel):
     max_results: int = Field(500, ge=1, le=5000)
 
 
+class BatchSection(BaseModel):
+    """Batch add: many entries from one CSV / Excel / pasted table."""
+
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = True
+    max_rows: int = Field(200, ge=1, le=2000)
+
+
+class SplitsSection(BaseModel):
+    """Split an entry by weight: a new entry takes part of it, the original keeps the rest."""
+
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = True
+    # form id -> the number key that is split (e.g. powder-library: weight)
+    forms: dict[str, str] = Field(default_factory=dict)
+
+
 class LabelSize(BaseModel):
     model_config = ConfigDict(extra="forbid")
     template: str = Field(..., description="Jinja/blabel HTML template file in template_dir.")
@@ -344,6 +363,8 @@ class FormConfig(BaseModel):
     users: UsersSection = UsersSection()
     entries: EntriesSection = EntriesSection()
     labels: LabelsSection = LabelsSection()
+    batch: BatchSection = BatchSection()
+    splits: SplitsSection = SplitsSection()
     streamer: dict = Field(..., description="mfi_ddb Streamer config (user, mqtt, project).")
     forms: List[FormDef] = Field(..., min_length=1)
 
@@ -555,6 +576,8 @@ def public_view(cfg: FormConfig) -> dict:
         "user": {k: user.get(k, "") for k in ("user_id", "domain", "name")},
         "history_enabled": cfg.history.enabled,
         "entries": {"enabled": cfg.entries.enabled, "show_all": cfg.entries.show_all},
+        "batch": cfg.batch.model_dump(),
+        "splits": dict(cfg.splits.forms) if cfg.splits.enabled else {},
         "builder": {
             "enabled": cfg.builder.enabled,
             "requires_token": bool(cfg.builder.admin_token),

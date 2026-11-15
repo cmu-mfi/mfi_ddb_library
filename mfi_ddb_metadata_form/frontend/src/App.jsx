@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, ClipboardList, Loader2, Radio, Search, Settings as SettingsIcon, Wrench } from "lucide-react";
+import {
+  AlertTriangle,
+  ClipboardList,
+  Loader2,
+  Radio,
+  Search,
+  Settings as SettingsIcon,
+  Table2,
+  Wrench,
+} from "lucide-react";
+import BatchAdd from "./components/BatchAdd";
 import Entries from "./components/Entries";
 import FormBuilder from "./components/FormBuilder";
 import MetadataForm from "./components/MetadataForm";
@@ -24,6 +34,7 @@ export default function App() {
   const [history, setHistory] = useState([]);
   // Entry being updated: {formId, trialId, values, revises: {entry_id, version, trial_uuid}}
   const [editing, setEditing] = useState(null);
+  const [entryMode, setEntryMode] = useState("single"); // "single" | "batch" (Fill in forms)
 
   const loadConfig = useCallback(async () => {
     const res = await fetchConfig();
@@ -73,13 +84,29 @@ export default function App() {
     if (!form) return;
     const values = valuesFromPayload(form.fields, entry.values);
     if (mode === "copy" && "trial_id" in values) values.trial_id = ""; // a new entry needs its own trial ID
+    const opened = { entry_id: entry.entry_id, version: entry.version, trial_uuid: entry.uuid };
+    let split = null;
+    if (mode === "split") {
+      // new entry: same data and trial ID, weight emptied; the original keeps weight - new weight
+      const key = config?.splits?.[formId];
+      const field = form.fields.find((f) => f.name === key);
+      if (!field) return;
+      split = {
+        key,
+        label: field.label || key,
+        weight: Number(entry.values[key]),
+        revises: opened,
+        values: valuesFromPayload(form.fields, entry.values),
+      };
+      values[key] = "";
+    }
     setEditing({
       formId,
       mode,
       trialId: entry.trial_id,
       values,
-      revises:
-        mode === "update" ? { entry_id: entry.entry_id, version: entry.version, trial_uuid: entry.uuid } : null,
+      revises: mode === "update" ? opened : null,
+      split,
     });
     setActiveId(formId);
     setView("forms");
@@ -195,6 +222,7 @@ export default function App() {
                 showAll={config.entries.show_all}
                 onUpdate={startUpdate}
                 labels={config.labels}
+                splits={config.splits}
               />
             ) : view === "settings" ? (
               <div className="rounded-lg bg-white p-6 shadow">
@@ -234,14 +262,41 @@ export default function App() {
                 </nav>
               )}
               <div className="p-6">
-                {activeForm && (
-                  <MetadataForm
-                    form={activeForm}
-                    onSubmitted={loadHistory}
-                    editing={editing?.formId === activeForm.id ? editing : null}
-                    onEditDone={() => setEditing(null)}
-                  />
+                {activeForm && config.batch?.enabled && !editing && (
+                  <div className="mb-5 inline-flex gap-1 rounded-lg bg-gray-100 p-1" role="group" aria-label="Entry mode">
+                    {[
+                      ["single", "Single entry", ClipboardList],
+                      ["batch", "Batch add", Table2],
+                    ].map(([key, label, Icon]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        aria-pressed={entryMode === key}
+                        onClick={() => setEntryMode(key)}
+                        className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                          entryMode === key ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
+                        }`}
+                      >
+                        <Icon size={15} /> {label}
+                      </button>
+                    ))}
+                  </div>
                 )}
+                {activeForm &&
+                  (entryMode === "batch" && config.batch?.enabled && !editing ? (
+                    <BatchAdd
+                      form={activeForm}
+                      onSubmitted={loadHistory}
+                      onShowEntries={config.entries?.enabled ? () => setView("entries") : undefined}
+                    />
+                  ) : (
+                    <MetadataForm
+                      form={activeForm}
+                      onSubmitted={loadHistory}
+                      editing={editing?.formId === activeForm.id ? editing : null}
+                      onEditDone={() => setEditing(null)}
+                    />
+                  ))}
               </div>
             </div>
 

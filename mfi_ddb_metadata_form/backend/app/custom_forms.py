@@ -30,7 +30,7 @@ BUILDER_TYPES = Literal[
     "section",  # a heading grouping the keys below it (label = title, help = description)
 ]
 RESERVED_KEYS = {
-    "schema_version", "msg_type", "form_id", "entry_id", "entry_version", "supersedes",
+    "schema_version", "msg_type", "form_id", "entry_id", "entry_version", "supersedes", "split_from", "split_into",
     "trial_id", "timestamp",
     "created_by", "created_by_user_id", "created_by_domain",
 }

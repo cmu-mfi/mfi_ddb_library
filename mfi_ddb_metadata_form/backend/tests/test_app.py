@@ -784,6 +784,232 @@ def test_entries_show_latest_version_with_history(client, rws):
     assert [e["trial_id"] for e in only_v1["entries"]] == ["old"]
 
 
+# --------------------------------------------------------------------------- split by weight
+
+SPLIT_FORM = {
+    "title": "Powder Library",  # -> id powder-library, which config/splits maps to 'weight'
+    "keys": [
+        {"name": "alloy", "type": "text", "required": True},
+        {"name": "weight", "type": "number"},
+    ],
+}
+ORIGINAL = {"trial_id": "p1", "alloy": "17-4 PH", "weight": 10, "created_by": None}
+OPENED_AT = {"entry_id": "e-1", "version": 2, "trial_uuid": "uuid-p1-v2"}
+
+
+@pytest.fixture
+def split_client(client, rws, monkeypatch):
+    """Powder form with a weight, RWS holding entry e-1 at version 2, publishes recorded."""
+    import app.main as main
+
+    assert client.post("/builder/forms", json=SPLIT_FORM).json()["form"]["id"] == "powder-library"
+    stored = []
+    for version in (1, 2):
+        p = _powder("p1", "17-4 PH", "EOS", 35.0, "2017-02-01", f"2026-11-05T1{version}:00:00Z")
+        p.update(entry_id="e-1", entry_version=version, weight=10)
+        stored.append(_trial(f"p1-v{version}", p))
+    rws.trials = stored
+
+    published = []
+
+    def fake_publish(payload, cfg, site=None):
+        if getattr(fake_publish, "fail_on", None) == len(published):
+            from app.publisher import PublishError
+            raise PublishError("broker down")
+        published.append(payload)
+        return {"status": "published", "topic": "t", "trial_id": payload["trial_id"]}
+
+    monkeypatch.setattr(main, "publish", fake_publish)
+    client.published = published
+    client.fake_publish = fake_publish
+    return client
+
+
+def _split(client, weight, endpoint="submit", original=None, opened_at=None):
+    return client.post(f"/forms/powder-library/{endpoint}", json={
+        "values": {"trial_id": "p1", "alloy": "17-4 PH", "weight": weight, "created_by": OP},
+        "split": {"revises": opened_at or OPENED_AT, "values": original or ORIGINAL},
+    })
+
+
+def test_split_creates_new_entry_and_reduces_original(split_client, rws):
+    res = _split(split_client, 4)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    child, parent = split_client.published  # new entry first, then the original
+    assert body["payload"] == child and body["parent_payload"] == parent and body["remaining"] == 6
+
+    assert child["weight"] == 4 and child["trial_id"] == "p1"
+    assert child["entry_version"] == 1 and child["entry_id"] != "e-1"
+    assert child["split_from"] == "e-1"
+
+    assert parent["entry_id"] == "e-1" and parent["entry_version"] == 3
+    assert parent["supersedes"] == "uuid-p1-v2"
+    assert parent["weight"] == 6 and parent["split_into"] == child["entry_id"]
+    assert parent["alloy"] == "17-4 PH"
+    assert (parent["created_by_user_id"], parent["created_by_domain"]) == ("op", "ANDREW")
+    # stale check looked the original up by its entry id
+    assert rws.requests[-1]["search_terms"] == ["powder-library", "e-1"]
+
+
+def test_split_whole_weight_and_preview(split_client):
+    preview = _split(split_client, 10, endpoint="preview").json()
+    assert preview["ok"] and preview["remaining"] == 0
+    assert preview["parent_payload"]["weight"] == 0 and preview["payload"]["weight"] == 10
+    assert split_client.published == []  # preview publishes nothing
+
+    assert _split(split_client, 2.5, endpoint="preview").json()["parent_payload"]["weight"] == 7.5
+
+
+def test_split_weight_rules(split_client):
+    for weight, message in [(12, "more than the original's 10"), (0, "more than 0"), ("", "more than 0")]:
+        res = _split(split_client, weight)
+        assert res.status_code == 422, weight
+        assert res.json()["errors"][0]["field"] == "weight"
+        assert message in res.json()["errors"][0]["message"]
+    no_weight = _split(split_client, 4, original={**ORIGINAL, "weight": None})
+    assert no_weight.status_code == 422 and "no weight" in no_weight.json()["message"]
+    assert split_client.published == []
+
+
+def test_split_refused_when_original_changed(split_client):
+    res = _split(split_client, 4, opened_at={**OPENED_AT, "version": 1, "trial_uuid": "uuid-p1-v1"})
+    assert res.status_code == 409 and "now version 2" in res.json()["message"]
+    assert split_client.published == []
+
+
+def test_split_original_not_reduced_reports_partial(split_client):
+    split_client.fake_publish.fail_on = 1  # the new entry goes out, the original's update fails
+    res = _split(split_client, 4)
+    assert res.status_code == 502
+    body = res.json()
+    assert body["split_partial"] is True and "NOT reduced" in body["message"]
+    assert len(split_client.published) == 1 and split_client.published[0]["weight"] == 4
+    assert body["retry"]["revises"] == OPENED_AT and body["retry"]["values"]["weight"] == 6
+
+    # the retry is a plain update of the original
+    split_client.fake_publish.fail_on = None
+    again = split_client.post("/forms/powder-library/submit", json=body["retry"])
+    assert again.status_code == 200 and again.json()["payload"]["weight"] == 6
+
+
+def test_split_only_on_configured_forms(split_client):
+    res = split_client.post("/forms/user/submit", json={
+        "values": {"user_id": "u1", "domain": "ANDREW", "created_by": ADMIN},
+        "split": {"revises": OPENED_AT, "values": {}},
+    })
+    assert res.status_code == 422 and "can't be split" in res.json()["message"]
+    assert split_client.post("/builder/forms", json={"title": "X", "keys": [{"name": "split_from"}]}).status_code == 422
+    assert split_client.get("/config").json()["splits"] == {"powder-library": "weight"}
+
+
+# --------------------------------------------------------------------------- batch add
+
+
+def _batch(client, form_id, content, fmt="csv", created_by=ADMIN):
+    body = {"format": fmt, "content": content}
+    if created_by is not None:
+        body["created_by"] = created_by
+    res = client.post(f"/forms/{form_id}/batch/check", json=body)
+    assert res.status_code == 200, res.text
+    return res.json()
+
+
+def test_batch_csv_all_rows_ok(client):
+    form_id = client.post("/builder/forms", json=POWDER_FORM).json()["form"]["id"]
+    assert client.get("/config").json()["batch"] == {"enabled": True, "max_rows": 200}
+    # key names and labels both work as column titles; blank rows are skipped
+    csv_text = (
+        "﻿trial_id,Alloy,VENDOR,date_received,D50\n"
+        "p-1,17-4 PH,EOS,2017-02-01,35.5\n"
+        ",,,,\n"
+        "p-2,316L,6K,2024-06-10,\n"
+    )
+    result = _batch(client, form_id, csv_text)
+    assert result["ok"] is True, result
+    assert result["count"] == 2 and result["errors"] == []
+    assert [c["field"] for c in result["columns"]] == ["trial_id", "alloy", "vendor", "date_received", "d50"]
+    first, second = result["rows"]
+    assert first["row"] == 2 and second["row"] == 4  # spreadsheet row numbers
+    assert first["values"]["created_by"] == ADMIN and first["values"]["d50"] == "35.5"
+
+    # the checked values publish unchanged through the normal submit
+    sent = client.post(f"/forms/{form_id}/submit", json={"values": first["values"]}).json()
+    assert sent["payload"]["d50"] == 35.5 and sent["payload"]["created_by_user_id"] == "superadmin"
+
+
+def test_batch_reports_every_problem(client):
+    form_id = client.post("/builder/forms", json=POWDER_FORM).json()["form"]["id"]
+    result = _batch(client, form_id, (
+        "trial_id,alloy,vendor,d50\n"
+        "p-1,,EOS,30\n"          # blank required value
+        "p-2,316L,Lathe,30\n"    # not one of the choices
+        "p-3,316L,EOS,abc\n"     # not a number
+        "p-4,316L,EOS,20\n"      # fine
+    ))
+    assert result["ok"] is False and result["bad_rows"] == 3
+    by_row = {r["row"]: {e["field"] for e in r["errors"]} for r in result["rows"]}
+    assert by_row == {2: {"alloy"}, 3: {"vendor"}, 4: {"d50"}, 5: set()}
+
+
+def test_batch_column_problems(client):
+    form_id = client.post("/builder/forms", json=POWDER_FORM).json()["form"]["id"]
+    result = _batch(client, form_id, "trial_id,alloy,colour,timestamp,created_by\np-1,316L,red,x,y\n")
+    messages = " | ".join(e["message"] for e in result["errors"])
+    assert "Missing required column: vendor (vendor)" in messages
+    assert "'colour' doesn't match any field" in messages
+    assert "'timestamp' is filled in automatically" in messages
+    assert "'created_by' is chosen once for the whole batch" in messages
+    assert result["ok"] is False
+
+    dup = _batch(client, form_id, "trial_id,alloy,Alloy,vendor\np,a,b,EOS\n")
+    assert any("both fill" in e["message"] for e in dup["errors"])
+
+
+def test_batch_needs_a_registered_created_by(client):
+    form_id = client.post("/builder/forms", json=POWDER_FORM).json()["form"]["id"]
+    table = "trial_id,alloy,vendor\np-1,316L,EOS\n"
+    missing = _batch(client, form_id, table, created_by=None)
+    assert any("Created by" in e["message"] for e in missing["errors"]) and not missing["ok"]
+    ghost = _batch(client, form_id, table, created_by={"user_id": "ghost", "domain": "x"})
+    assert any("not a registered user" in e["message"] for e in ghost["errors"]) and not ghost["ok"]
+
+
+def test_batch_pasted_cells_and_excel_match_csv(client):
+    import base64
+    import io
+    from datetime import date
+
+    from openpyxl import Workbook
+
+    form_id = client.post("/builder/forms", json=POWDER_FORM).json()["form"]["id"]
+    pasted = _batch(client, form_id, "trial_id\talloy\tvendor\td50\np-1\t17-4 PH\tEOS\t35\n", fmt="tsv")
+    assert pasted["ok"] and pasted["rows"][0]["values"]["alloy"] == "17-4 PH"
+
+    book = Workbook()
+    sheet = book.active
+    sheet.append(["Trial ID", "Alloy", "Vendor", "Date Received", "D50"])
+    sheet.append(["p-1", "17-4 PH", "EOS", date(2017, 2, 1), 35.0])
+    buf = io.BytesIO()
+    book.save(buf)
+    xlsx = _batch(client, form_id, base64.b64encode(buf.getvalue()).decode(), fmt="xlsx")
+    assert xlsx["ok"], xlsx
+    values = xlsx["rows"][0]["values"]
+    assert values["date_received"] == "2017-02-01" and values["d50"] == 35
+
+    not_excel = client.post(f"/forms/{form_id}/batch/check",
+                            json={"format": "xlsx", "content": base64.b64encode(b"hello").decode(),
+                                  "created_by": ADMIN})
+    assert not_excel.status_code == 422
+
+
+def test_batch_row_limit(client):
+    form_id = client.post("/builder/forms", json=POWDER_FORM).json()["form"]["id"]
+    table = "trial_id,alloy,vendor\n" + "".join(f"p-{i},316L,EOS\n" for i in range(201))
+    result = _batch(client, form_id, table)
+    assert not result["ok"] and any("at most 200" in e["message"] for e in result["errors"])
+
+
 # --------------------------------------------------------------------------- labels
 
 from app.labels import LabelEntry, label_record, owner_display, short_entry_id  # noqa: E402

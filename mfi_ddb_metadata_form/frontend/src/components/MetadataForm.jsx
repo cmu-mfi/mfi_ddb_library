@@ -8,6 +8,7 @@ import {
   Loader2,
   PencilLine,
   RotateCcw,
+  Scissors,
   Send,
   Sparkles,
   X,
@@ -107,21 +108,40 @@ export default function MetadataForm({ form, onSubmitted, editing = null, onEdit
     }
   };
 
+  // Split (from Entries): the new entry takes `weight` W, the original keeps split.weight - W.
+  const split = editing?.split || null;
+  const splitTaken = split ? Number(values[split.key]) : NaN;
+  const splitHasValue = split && values[split.key] !== "" && values[split.key] != null && !Number.isNaN(splitTaken);
+  const splitLeft = splitHasValue ? Math.round((split.weight - splitTaken) * 1e6) / 1e6 : null;
+
   const run = async (kind) => {
+    if (split && splitHasValue && splitTaken > split.weight) {
+      const byPath = { [split.key]: `Can't split off more than the original's ${split.weight}.` };
+      setErrors({ byPath, general: [] });
+      revealErrors(byPath);
+      return;
+    }
     setBusy(kind);
     setResult(null);
     setPreview(null);
     const body = toSubmitValues(form.fields, values);
-    const revises = editing?.revises;
+    const options = split
+      ? { split: { revises: split.revises, values: toSubmitValues(form.fields, split.values) } }
+      : { revises: editing?.revises };
     const response =
-      kind === "preview" ? await previewForm(form.id, body, revises) : await submitForm(form.id, body, revises);
+      kind === "preview" ? await previewForm(form.id, body, options) : await submitForm(form.id, body, options);
     setBusy(null);
 
     if (!response.ok) {
       const indexed = indexErrors(response.data?.errors || [{ message: response.data?.message || "Request failed" }]);
       setErrors(indexed);
       revealErrors(indexed.byPath);
-      if (kind === "submit" && response.status >= 500) {
+      if (kind === "submit" && response.data?.split_partial) {
+        // the new entry is published; only the original's reduced version is missing
+        onSubmitted?.();
+        setErrors({ byPath: {}, general: [] });
+        setResult({ ok: false, partial: true, ...response.data });
+      } else if (kind === "submit" && response.status >= 500) {
         setResult({ ok: false, message: response.data?.message, payload: response.data?.payload });
       }
       return;
@@ -136,6 +156,24 @@ export default function MetadataForm({ form, onSubmitted, editing = null, onEdit
       onSubmitted?.();
       if (editing) onEditDone?.();
     }
+  };
+
+  // After a partial split: publish only the original's reduced version.
+  const retryOriginal = async () => {
+    const retry = result?.retry;
+    if (!retry) return;
+    setBusy("retry");
+    const response = await submitForm(form.id, retry.values, { revises: retry.revises });
+    setBusy(null);
+    if (!response.ok) {
+      setResult((prev) => ({ ...prev, retryError: response.data?.message || "Publishing failed." }));
+      return;
+    }
+    setErrors({ byPath: {}, general: [] });
+    setResult({ ...result, ok: true, partial: false, retried: true, parent_payload: response.data.payload });
+    setValues(initialValues(form.fields));
+    onSubmitted?.();
+    onEditDone?.();
   };
 
   const reset = () => {
@@ -161,7 +199,28 @@ export default function MetadataForm({ form, onSubmitted, editing = null, onEdit
         {form.description && <p className="mt-1 text-sm text-gray-600">{form.description}</p>}
       </div>
 
-      {editing && (
+      {split && (
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-md border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+          <p className="flex items-center gap-2">
+            <Scissors size={16} className="shrink-0" />
+            <span>
+              Splitting <span className="font-mono font-medium">{editing.trialId}</span> ({split.label.toLowerCase()}{" "}
+              <span className="font-medium">{split.weight}</span>). Enter the {split.label.toLowerCase()} to take for
+              the new entry; the original will keep{" "}
+              <span className={`font-medium ${splitLeft != null && splitLeft < 0 ? "text-red-700" : ""}`}>
+                {splitLeft == null ? `${split.weight} − what you enter` : splitLeft}
+              </span>{" "}
+              (saved as its version {split.revises.version + 1}). Pick yourself under{" "}
+              <span className="font-medium">Created by</span>.
+            </span>
+          </p>
+          <button type="button" className="btn-secondary py-1.5" disabled={Boolean(busy)} onClick={() => onEditDone?.()}>
+            <X size={16} /> Cancel split
+          </button>
+        </div>
+      )}
+
+      {editing && !split && (
         <div
           className={`mb-5 flex flex-wrap items-center justify-between gap-3 rounded-md border px-4 py-3 text-sm ${
             editing.revises ? "border-amber-200 bg-amber-50 text-amber-900" : "border-blue-200 bg-blue-50 text-blue-900"
@@ -223,7 +282,7 @@ export default function MetadataForm({ form, onSubmitted, editing = null, onEdit
           return (
             <FieldInput
               key={field.name}
-              field={field}
+              field={split && field.name === split.key ? { ...field, required: true } : field}
               path={field.name}
               value={values[field.name]}
               onChange={(v) => setField(field.name, v)}
@@ -259,9 +318,21 @@ export default function MetadataForm({ form, onSubmitted, editing = null, onEdit
       )}
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <button type="submit" className="btn-primary" disabled={Boolean(busy)}>
-          {busy === "submit" ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-          {busy === "submit" ? "Publishing…" : editing?.revises ? `Save version ${editing.revises.version + 1}` : form.submit_label}
+        <button type="submit" className="btn-primary" disabled={Boolean(busy) || Boolean(result?.partial)}>
+          {busy === "submit" ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : split ? (
+            <Scissors size={16} />
+          ) : (
+            <Send size={16} />
+          )}
+          {busy === "submit"
+            ? "Publishing…"
+            : split
+              ? "Split off new entry"
+              : editing?.revises
+                ? `Save version ${editing.revises.version + 1}`
+                : form.submit_label}
         </button>
         <button type="button" className="btn-secondary" disabled={Boolean(busy)} onClick={() => run("preview")}>
           {busy === "preview" ? <Loader2 size={16} className="animate-spin" /> : <Eye size={16} />}
@@ -272,7 +343,38 @@ export default function MetadataForm({ form, onSubmitted, editing = null, onEdit
         </button>
       </div>
 
-      {preview && <PayloadBlock title="Payload preview (not sent)" topic={preview.topic} payload={preview.payload} />}
+      {preview && (
+        <PayloadBlock
+          title={preview.parent_payload ? "New entry (not sent)" : "Payload preview (not sent)"}
+          topic={preview.topic}
+          payload={preview.payload}
+        />
+      )}
+      {preview?.parent_payload && (
+        <PayloadBlock
+          title={`Original, version ${preview.parent_payload.entry_version} — keeps ${preview.remaining} (not sent)`}
+          payload={preview.parent_payload}
+        />
+      )}
+
+      {result?.partial && (
+        <div role="alert" className="mt-5 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="flex items-center gap-2 font-medium">
+            <XCircle size={16} /> Split only half done
+          </p>
+          <p className="mt-1">{result.message}</p>
+          <p className="mt-1">
+            The new entry is saved. Don't split again — retry only the original's update (it will keep{" "}
+            <span className="font-medium">{result.remaining}</span>).
+          </p>
+          {result.retryError && <p className="mt-1 text-red-700">Retry failed: {result.retryError}</p>}
+          <button type="button" className="btn-primary mt-3 py-1.5" disabled={Boolean(busy)} onClick={retryOriginal}>
+            {busy === "retry" ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
+            Retry reducing original
+          </button>
+          <PayloadBlock title="New entry (published)" payload={result.payload} />
+        </div>
+      )}
 
       {result?.ok && (
         <div
@@ -286,10 +388,19 @@ export default function MetadataForm({ form, onSubmitted, editing = null, onEdit
             {result.status === "dry_run" ? "Validated (dry run, not published)" : "Published through the KV adapter"}
             {result.payload?.entry_version > 1 && ` as version ${result.payload.entry_version}`}
           </p>
-          <p className="mt-1 break-all text-xs">
-            Topic: <code>{result.topic}</code>
-          </p>
-          <PayloadBlock title="Sent payload" payload={result.payload} />
+          {result.parent_payload && (
+            <p className="mt-1">
+              Split done: the new entry was created, and the original is now version{" "}
+              {result.parent_payload.entry_version} with {result.parent_payload[split?.key] ?? result.remaining} left.
+            </p>
+          )}
+          {result.topic && (
+            <p className="mt-1 break-all text-xs">
+              Topic: <code>{result.topic}</code>
+            </p>
+          )}
+          <PayloadBlock title={result.parent_payload ? "New entry" : "Sent payload"} payload={result.payload} />
+          {result.parent_payload && <PayloadBlock title="Original (new version)" payload={result.parent_payload} />}
         </div>
       )}
       {result && !result.ok && (
