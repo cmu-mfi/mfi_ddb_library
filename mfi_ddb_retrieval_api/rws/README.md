@@ -1,5 +1,9 @@
 # Retrieval Web Service (RWS)
 
+For the optional experiment RAG pipeline, read-only MCP server, and assistant UI,
+see [Experiment RAG and MCP](AI.md). Enable it explicitly; ordinary RWS deployments
+do not require AI dependencies or a model provider.
+
 The RWS is implemented as a RESTful web service that handles incoming requests from users, processes them using the metadata, and retrieves the relevant data from the database nodes. It provides endpoints for querying the data based on various parameters and returns the results in a structured format (e.g., JSON).
 
 ## API Endpoints
