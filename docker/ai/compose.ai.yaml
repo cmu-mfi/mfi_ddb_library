@@ -1,0 +1,34 @@
+# Optional overlay for docker/docker-compose.yaml. No additional database service.
+services:
+  metadata-store-db:
+    image: mfi-ddb-metadata-pgvector:15
+    build:
+      context: ./ai
+      dockerfile: Dockerfile.pgvector
+
+  rws-app:
+    build:
+      args:
+        INSTALL_AI: "true"
+    secrets:
+      - ddb_ai_tokens
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      DDB_AI_ENABLED: "true"
+      DDB_AI_TOKEN_FILE: /run/secrets/ddb_ai_tokens
+      DDB_AI_BASE_URL: ${DDB_AI_BASE_URL:-http://host.docker.internal:11434/v1}
+      DDB_AI_API_KEY: ${DDB_AI_API_KEY:-ollama}
+      DDB_AI_EMBEDDING_MODEL: ${DDB_AI_EMBEDDING_MODEL:-nomic-embed-text}
+      DDB_AI_EMBEDDING_DIMENSIONS: ${DDB_AI_EMBEDDING_DIMENSIONS:-768}
+      DDB_AI_CHAT_MODEL: ${DDB_AI_CHAT_MODEL:-}
+      DDB_AI_SYNC_ENABLED: ${DDB_AI_SYNC_ENABLED:-true}
+      DDB_AI_POLL_SECONDS: ${DDB_AI_POLL_SECONDS:-30}
+      DDB_AI_SETTLE_SECONDS: ${DDB_AI_SETTLE_SECONDS:-30}
+      DDB_AI_RECONCILE_SECONDS: ${DDB_AI_RECONCILE_SECONDS:-900}
+      DDB_AI_MAX_POINTS: ${DDB_AI_MAX_POINTS:-100000}
+      DDB_AI_MCP_HOSTS: ${DDB_AI_MCP_HOSTS:-localhost:*,127.0.0.1:*}
+
+secrets:
+  ddb_ai_tokens:
+    file: ${DDB_AI_TOKEN_FILE:?Set DDB_AI_TOKEN_FILE to an absolute path to your token JSON file}

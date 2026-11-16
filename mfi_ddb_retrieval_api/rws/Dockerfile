@@ -8,8 +8,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # 1. Copy only requirements first to leverage Docker layer caching
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt numpy
+COPY requirements*.txt ./
+ARG INSTALL_AI=false
+RUN if [ "$INSTALL_AI" = "true" ]; then \
+      pip install --no-cache-dir -r requirements-ai.txt numpy; \
+    else \
+      pip install --no-cache-dir -r requirements.txt numpy; \
+    fi
 
 # 2. Copy the localized RWS node files (main.py, app/, schema/, services/, utils/, etc.)
 COPY . .
