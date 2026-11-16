@@ -1,7 +1,7 @@
 import datetime
 
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
-import models_pb2 as _models_pb2
+from . import models_pb2 as _models_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
@@ -61,3 +61,21 @@ class StreamDataResponse(_message.Message):
     DATAPOINT_FIELD_NUMBER: _ClassVar[int]
     datapoint: _models_pb2.Datapoint
     def __init__(self, datapoint: _Optional[_Union[_models_pb2.Datapoint, _Mapping]] = ...) -> None: ...
+
+class StreamDataRangeRequest(_message.Message):
+    __slots__ = ("topic", "start_time", "end_time", "batch_size")
+    TOPIC_FIELD_NUMBER: _ClassVar[int]
+    START_TIME_FIELD_NUMBER: _ClassVar[int]
+    END_TIME_FIELD_NUMBER: _ClassVar[int]
+    BATCH_SIZE_FIELD_NUMBER: _ClassVar[int]
+    topic: str
+    start_time: _timestamp_pb2.Timestamp
+    end_time: _timestamp_pb2.Timestamp
+    batch_size: int
+    def __init__(self, topic: _Optional[str] = ..., start_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., end_time: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., batch_size: _Optional[int] = ...) -> None: ...
+
+class StreamDataRangeResponse(_message.Message):
+    __slots__ = ("datapoints",)
+    DATAPOINTS_FIELD_NUMBER: _ClassVar[int]
+    datapoints: _containers.RepeatedCompositeFieldContainer[_models_pb2.Datapoint]
+    def __init__(self, datapoints: _Optional[_Iterable[_Union[_models_pb2.Datapoint, _Mapping]]] = ...) -> None: ...

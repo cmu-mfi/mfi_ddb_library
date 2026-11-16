@@ -26,7 +26,13 @@ if _version_not_supported:
 
 
 class DataServiceStub:
-    """import "app/utils/dws/proto/models.proto";
+    """=============================================================================
+    SOURCE OF TRUTH. This file (and models.proto next to it) is copied into every
+    database node's DWS and into the Retrieval API by ../sync_proto.sh, which also
+    regenerates their Python code. Edit it here, then run:
+    bash mfi_ddb_database_nodes/dws/sync_proto.sh
+    `sync_proto.sh --check` fails if any copy has drifted.
+    =============================================================================
 
     The Data Retrieval Service definition
     """
@@ -52,10 +58,21 @@ class DataServiceStub:
                 request_serializer=service__pb2.StreamDataRequest.SerializeToString,
                 response_deserializer=service__pb2.StreamDataResponse.FromString,
                 _registered_method=True)
+        self.StreamDataRange = channel.unary_stream(
+                '/dws.service.DataService/StreamDataRange',
+                request_serializer=service__pb2.StreamDataRangeRequest.SerializeToString,
+                response_deserializer=service__pb2.StreamDataRangeResponse.FromString,
+                _registered_method=True)
 
 
 class DataServiceServicer:
-    """import "app/utils/dws/proto/models.proto";
+    """=============================================================================
+    SOURCE OF TRUTH. This file (and models.proto next to it) is copied into every
+    database node's DWS and into the Retrieval API by ../sync_proto.sh, which also
+    regenerates their Python code. Edit it here, then run:
+    bash mfi_ddb_database_nodes/dws/sync_proto.sh
+    `sync_proto.sh --check` fails if any copy has drifted.
+    =============================================================================
 
     The Data Retrieval Service definition
     """
@@ -68,14 +85,26 @@ class DataServiceServicer:
         raise NotImplementedError('Method not implemented!')
 
     def GetDataRange(self, request, context):
-        """2. Range of Datapoints: Topic + Start + End -> List of Datapoints
+        """2. Range of Datapoints: Topic + Start + End -> List of Datapoints (paged)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def StreamData(self, request, context):
-        """3. Live Stream: Topic -> Stream of Datapoints
+        """3. Live Stream: Topic -> Stream of Datapoints (keeps tailing new data)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def StreamDataRange(self, request, context):
+        """4. Range Stream: Topic + Start + End -> Stream of Datapoint batches.
+        Like GetDataRange, but the server pushes every datapoint in the window
+        in batches and then ends the stream: no page tokens, nothing skipped,
+        and no single message has to hold the whole window.
+        Servers that don't implement it answer UNIMPLEMENTED; callers then fall
+        back to GetDataRange.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -99,6 +128,11 @@ def add_DataServiceServicer_to_server(servicer, server):
                     request_deserializer=service__pb2.StreamDataRequest.FromString,
                     response_serializer=service__pb2.StreamDataResponse.SerializeToString,
             ),
+            'StreamDataRange': grpc.unary_stream_rpc_method_handler(
+                    servicer.StreamDataRange,
+                    request_deserializer=service__pb2.StreamDataRangeRequest.FromString,
+                    response_serializer=service__pb2.StreamDataRangeResponse.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             'dws.service.DataService', rpc_method_handlers)
@@ -108,7 +142,13 @@ def add_DataServiceServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class DataService:
-    """import "app/utils/dws/proto/models.proto";
+    """=============================================================================
+    SOURCE OF TRUTH. This file (and models.proto next to it) is copied into every
+    database node's DWS and into the Retrieval API by ../sync_proto.sh, which also
+    regenerates their Python code. Edit it here, then run:
+    bash mfi_ddb_database_nodes/dws/sync_proto.sh
+    `sync_proto.sh --check` fails if any copy has drifted.
+    =============================================================================
 
     The Data Retrieval Service definition
     """
@@ -184,6 +224,33 @@ class DataService:
             '/dws.service.DataService/StreamData',
             service__pb2.StreamDataRequest.SerializeToString,
             service__pb2.StreamDataResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StreamDataRange(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/dws.service.DataService/StreamDataRange',
+            service__pb2.StreamDataRangeRequest.SerializeToString,
+            service__pb2.StreamDataRangeResponse.FromString,
             options,
             channel_credentials,
             insecure,

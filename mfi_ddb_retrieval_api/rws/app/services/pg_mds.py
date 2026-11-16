@@ -15,6 +15,7 @@ from app.services.pg_config import load_config
 
 _ALLOWED_TABLES = {
     "user",
+    "ddb_user",
     "project",
     "trial",
     "user_project_role_linking",
@@ -22,6 +23,9 @@ _ALLOWED_TABLES = {
 }
 
 DEFAULT_USER = ("superadmin", "superadmin")
+
+# Platform accounts that are not people; hidden from user search results.
+SYSTEM_USERS = {DEFAULT_USER}
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +154,58 @@ class MdsReader:
         
         return filtered_rows           
             
+
+    # ------------------------------------------------------------------
+    # Users (directory lookups). Only the public fields a "pick a person"
+    # list needs are returned - never email or audit columns.
+    # ------------------------------------------------------------------
+    _USER_FIELDS = sql.SQL("user_id, domain, name")
+
+    def get_user(self, user_id: str, domain: str) -> Optional[Dict[str, Any]]:
+        """Return {user_id, domain, name} for one registered user, or None."""
+        query = sql.SQL("SELECT {fields} FROM ddb_user WHERE user_id = %s AND domain = %s;").format(
+            fields=self._USER_FIELDS
+        )
+        rows = self._fetch(query, [user_id, domain])
+        return rows[0] if rows else None
+
+    def search_users(
+        self, search: Optional[str] = None, limit: int = 25, include_system: bool = False
+    ) -> List[Dict[str, Any]]:
+        """Registered users whose id, name or domain contains `search` (case-insensitive).
+
+        System accounts (SYSTEM_USERS, e.g. superadmin) are left out unless
+        include_system is set: they are not people to pick in a list.
+        """
+        values: List[Any] = []
+        clauses: List[sql.Composable] = []
+        if search:
+            like = f"%{search.strip()}%"
+            clauses.append(sql.SQL("(user_id ILIKE %s OR name ILIKE %s OR domain ILIKE %s)"))
+            values.extend([like, like, like])
+        if not include_system:
+            for user_id, domain in SYSTEM_USERS:
+                clauses.append(sql.SQL("NOT (user_id = %s AND domain = %s)"))
+                values.extend([user_id, domain])
+        where = sql.SQL(" WHERE ") + sql.SQL(" AND ").join(clauses) if clauses else sql.SQL("")
+        query = (
+            sql.SQL("SELECT {fields} FROM ddb_user").format(fields=self._USER_FIELDS)
+            + where
+            + sql.SQL(" ORDER BY lower(user_id), domain LIMIT %s;")
+        )
+        values.append(limit)
+        return self._fetch(query, values)
+
+    def _fetch(self, query, values) -> List[Dict[str, Any]]:
+        conn = None
+        try:
+            conn = self.__conn_pool.getconn()
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(query, values)
+                return [dict(row) for row in cur.fetchall()]
+        finally:
+            if conn is not None:
+                self.__conn_pool.putconn(conn)
 
     def get_trial_by_uuid(self, trial_uuid: str, user_id: str, user_domain: Optional[str]) -> Optional[Dict[str, Any]]:
         row = self._lookup("trial", {"uuid": trial_uuid})

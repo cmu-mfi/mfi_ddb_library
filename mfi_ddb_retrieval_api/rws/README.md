@@ -73,3 +73,34 @@ Following are the API endpoints for the Retrieval Web Service (RWS):
 ## Type 4: Download file/bytes data
 
 (TBD)
+
+## Users: registered user directory
+
+Read-only lookups of the users registered in the metadata store (`ddb_user`),
+for "pick a person" lists such as project members or "created by". Only
+`user_id`, `domain` and `name` are returned, never email.
+
+**Who is asking** goes in headers, not the body:
+
+```
+X-User-Id: ssterenr
+X-User-Domain: ANDREW
+```
+
+The requester must be a registered user (`superadmin` is always allowed);
+otherwise `401` (no header) or `403` (unknown requester). With single sign-on,
+the login proxy in front of RWS sets these headers from the verified login,
+so the endpoints do not change.
+
+**Search**: GET `/users?search=<text>&limit=25`
+Matches `search` (case-insensitive) in user ID, name or domain; `limit` 1-100.
+
+```json
+{"status": "success", "message": "Found 1 user(s).",
+ "users": [{"user_id": "ssterenr", "domain": "ANDREW", "name": "Stephanie Steren-Ruta"}]}
+```
+
+**Check one user**: GET `/users/{domain}/{user_id}`
+`200` with `{"user": {...}}` if registered, `404` if not.
+
+Tests that need no database: `pytest -v test_rws/test_rws_users.py`
