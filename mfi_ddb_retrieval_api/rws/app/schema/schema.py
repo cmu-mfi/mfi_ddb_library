@@ -65,7 +65,7 @@ class Type1Response(_Response):
         metadata: Optional[dict] = Field(None, description="A dictionary containing metadata about the trial.")
         data_topics: Optional[List[str]] = Field(None, description="A list of data topics associated with the trial.")
         birth_timestamp: str = Field(..., description="The start time of the trial.")
-        death_timestamp: str = Field(..., description="The end time of the trial.")
+        death_timestamp: Optional[str] = Field(None, description="The end time of the trial; null while running.")
         created_at: str = Field(..., description="The timestamp when the trial was created.")
         updated_at: str = Field(..., description="The timestamp when the trial was last updated.")
 

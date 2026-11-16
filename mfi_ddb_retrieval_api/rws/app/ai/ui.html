@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DDB Data Assistant</title>
+  <style>
+    :root{font-family:system-ui,sans-serif;color:#17334a;background:#f4f7fa}*{box-sizing:border-box}
+    body{margin:0}main{max-width:920px;margin:40px auto;padding:0 22px}h1{font-size:30px;margin:4px 0 10px}
+    .muted{color:#586b7b;font-size:14px}section{background:white;border:1px solid #d9e2eb;border-radius:12px;padding:20px;margin:20px 0}
+    label{display:block;font-size:14px;margin:8px 0}input,textarea{width:100%;padding:12px;border:1px solid #bdcbd8;border-radius:6px;font:inherit}
+    textarea{min-height:94px;resize:vertical}button{background:#0d4968;color:white;border:0;border-radius:6px;padding:11px 18px;cursor:pointer;font:inherit;margin:10px 6px 0 0}
+    button.secondary{background:#e9f0f5;color:#17334a}button:disabled{opacity:.5;cursor:wait}.message{white-space:pre-wrap;overflow-wrap:anywhere;padding:16px 0;border-bottom:1px solid #e4eaf0;line-height:1.6}
+    .message strong{display:block;color:#0d4968;margin-bottom:5px}details{margin:12px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;background:#f4f7fa;padding:12px;border-radius:6px}.error{color:#a02b2b}
+  </style>
+</head>
+<body><main>
+  <p class="muted">MFI DIGITAL DATA BACKBONE</p><h1>Explore your experiment data</h1>
+  <p>Find trials, understand collected signals, and ask questions backed by measurements and indexed evidence.</p>
+  <section><label for="token">Your DDB AI access token</label><input id="token" type="password" autocomplete="off" placeholder="Bearer token supplied by your administrator">
+    <button id="status" class="secondary">Check connection</button><span id="connection" class="muted" role="status"></span>
+    <p class="muted">The token stays in this page’s memory. Documents and machine control are outside this assistant’s scope.</p>
+  </section>
+  <section><div id="messages" aria-live="polite"></div>
+    <form id="form"><label for="question">Question</label><textarea id="question" required maxlength="2000" placeholder="What signals were collected in my recent trials?"></textarea>
+      <button id="ask" type="submit">Ask assistant</button><button id="search" type="button" class="secondary">Search indexed experiments</button>
+      <button id="clear" type="button" class="secondary">Clear conversation</button>
+    </form><p id="error" class="error" role="alert"></p>
+  </section>
+</main>
+<script>
+  const el=id=>document.getElementById(id); let history=[];
+  async function request(path,body){
+    const headers={Authorization:'Bearer '+el('token').value.trim()};
+    if(body)headers['Content-Type']='application/json';
+    const response=await fetch('/mfi-ddb/ai/'+path,{method:body?'POST':'GET',headers,body:body?JSON.stringify(body):undefined});
+    const result=await response.json();if(!response.ok)throw Error(typeof result.detail==='string'?result.detail:JSON.stringify(result.detail));return result;
+  }
+  function message(role,text){const box=document.createElement('div');box.className='message';const label=document.createElement('strong');label.textContent=role;box.append(label,document.createTextNode(text));el('messages').append(box);}
+  function evidence(items){if(!items.length)return;const details=document.createElement('details');const summary=document.createElement('summary');summary.textContent='Evidence ('+items.length+')';details.append(summary);for(const item of items){const pre=document.createElement('pre');pre.textContent=JSON.stringify(item,null,2);details.append(pre);}el('messages').append(details);}
+  async function run(searchOnly){
+    const question=el('question').value.trim();if(!question)return;
+    el('error').textContent='';el('ask').disabled=el('search').disabled=true;message('You',question);
+    try{const result=await request(searchOnly?'search':'chat',searchOnly?{query:question}:{question,history:history.slice(-10)});
+      if(searchOnly){message('Search',result.evidence.length?'Relevant indexed evidence is shown below.':'No accessible indexed evidence was found. A trial may still be awaiting synchronization.');evidence(result.evidence);}
+      else{message('Assistant',result.answer);evidence(result.citations);history.push({role:'user',content:question},{role:'assistant',content:result.answer.slice(0,4000)});}
+      el('question').value='';
+    }catch(error){el('error').textContent=error.message;}finally{el('ask').disabled=el('search').disabled=false;}
+  }
+  el('form').addEventListener('submit',event=>{event.preventDefault();run(false);});
+  el('search').onclick=()=>run(true);el('clear').onclick=()=>{history=[];el('messages').replaceChildren();el('error').textContent='';};
+  el('status').onclick=async()=>{try{const result=await request('status');el('connection').textContent='Connected · embedding: '+result.embedding_model+' · chat: '+(result.chat_model||'not configured');}catch(error){el('connection').textContent=error.message;}};
+</script></body></html>
