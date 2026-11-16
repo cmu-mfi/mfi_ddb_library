@@ -1,0 +1,63 @@
+name: Issue Labeler
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  issues: write
+
+jobs:
+  label-by-component:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Apply component label
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          COMPONENT=$(printf '%s\n' "$ISSUE_BODY" |
+            awk '
+              /^### Component$/ {
+                found = 1
+                next
+              }
+              found && /^### / { exit }
+              found && NF {
+                print
+                exit
+              }
+            ')
+
+          if [ -z "$COMPONENT" ]; then
+            echo "No Component value found; skipping."
+            exit 0
+          fi
+
+          # Skip generic component selections
+          if [ "$COMPONENT" = "Multiple / Not sure" ]; then
+            echo "Component is 'Multiple / Not sure'; skipping label creation."
+            exit 0
+          fi
+
+          # Normalize the component value into a GitHub label
+          LABEL=$(printf '%s' "$COMPONENT" |
+            sed -E 's/ \(.*\)$//; s/[[:space:]]+$//')
+
+          echo "Applying label: $LABEL"
+
+          # Create the label if it doesn't already exist
+          gh label create "$LABEL" \
+            --repo "$GH_REPO" \
+            --color "1D76DB" \
+            --force
+
+          # Add the component label to the issue
+          gh issue edit "$ISSUE_NUMBER" \
+            --repo "$GH_REPO" \
+            --add-label "$LABEL"
