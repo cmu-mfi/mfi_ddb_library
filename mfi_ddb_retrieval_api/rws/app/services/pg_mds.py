@@ -36,12 +36,16 @@ class MdsReader:
             )
             logger.info("Database connection pool created successfully")
         except Exception as error:
-            logger.error(f"Error occurred while creating connection pool: {error}. Config used: {config}")
+            logger.error("Could not create metadata connection pool (%s)", type(error).__name__)
             raise error
         
     def __del__(self):
+        self.close()
+
+    def close(self):
         if getattr(self, '_MdsReader__conn_pool', None):
             self.__conn_pool.closeall()
+            self.__conn_pool = None
             logger.info("Database connection pool closed")
 
     def _validate_table(self, table: str):

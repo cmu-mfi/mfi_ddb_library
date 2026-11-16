@@ -104,6 +104,9 @@ Compatible database storage nodes:
 Data retrieval services:
 - **Metadata Store (MDS)**: PostgreSQL-based metadata storage
 - **Retrieval Web Service (RWS)**: REST API for data queries
+- **Optional RAG and MCP assistant**: Background experiment synchronization, hybrid
+  pgvector search in the existing MDS database, and read-only data exploration.
+  See the [setup and API guide](mfi_ddb_retrieval_api/rws/AI.md).
 
 ---
 

@@ -363,7 +363,7 @@ class MdsConnector:
             "user_domain": user[1],
             "project_id": project_id,
             "birth_timestamp": birth_timestamp,
-            "death_timestamp": death_timestamp if death_timestamp is not None else birth_timestamp,
+            "death_timestamp": death_timestamp,
             "clean_exit": clean_exit,
             "metadata": metadata,
             "data_topics": data_topics,
