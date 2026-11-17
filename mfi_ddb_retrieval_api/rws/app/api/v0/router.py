@@ -5,12 +5,14 @@ Configuration Router for MFI DDB Retrieval API
 """
 
 import datetime
+import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from dateutil import parser
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 
 from app.schema import schema
 from app.services.pg_mds import MdsReader
@@ -19,6 +21,16 @@ from app.services.dws_agent import DwsAgent
 logger = logging.getLogger(__name__)
 
 # FastAPI router
+#
+# Handlers that query the metadata store (psycopg) or the database nodes (gRPC)
+# are plain `def`, not `async def`. Those calls block. In an `async def`
+# handler they would run on the server's single event loop, and one long
+# retrieval (e.g. a multi-day Type 2 window) would freeze the whole API until
+# it finished: health checks and every other request would time out and the
+# Retrieval App would show the API as offline. FastAPI runs `def` handlers in a
+# worker thread pool instead, so a slow request only occupies its own thread.
+# Keep new handlers that do blocking I/O as `def`; only handlers that do no I/O
+# (or truly await async I/O) should be `async def`.
 router = APIRouter()
 
 # psql initialization
@@ -28,6 +40,51 @@ def get_metadata_reader(request: Request):
 
 # dws initialization
 dws_agent = None  # Placeholder for DWS agent initialization
+
+
+def _csv_cell(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list)):
+        value = json.dumps(value, separators=(",", ":"))
+    text = str(value)
+    if any(c in text for c in ',"\n\r'):
+        text = '"' + text.replace('"', '""') + '"'
+    return text
+
+
+def _csv_response(payload: Dict[str, Any]) -> StreamingResponse:
+    """data_format=csv: stream `topic,timestamp,value` rows (one per datapoint).
+
+    Trial details go in headers (the body is plain data), and the file name
+    follows the trial: <trial_name>_<uuid8>.csv.
+    """
+    meta = payload.get("metadata", {})
+    data = payload.get("data", {}) or {}
+
+    def rows():
+        yield "topic,timestamp,value\n"
+        for topic in sorted(data):
+            cell = _csv_cell(topic)
+            buffer = []
+            for point in data[topic]:
+                buffer.append(f"{cell},{point.get('timestamp', '')},{_csv_cell(point.get('value'))}\n")
+                if len(buffer) >= 5000:
+                    yield "".join(buffer)
+                    buffer = []
+            if buffer:
+                yield "".join(buffer)
+
+    trial_name = str(meta.get("trial_name") or "trial")
+    trial_uuid = str(meta.get("trial_uuid") or "")
+    safe_name = "".join(c if c.isalnum() or c in "-_." else "_" for c in trial_name)
+    headers = {
+        "Content-Disposition": f'attachment; filename="{safe_name}_{trial_uuid[:8]}.csv"',
+        "X-Trial-UUID": trial_uuid,
+        "X-Time-Start": str(meta.get("time_start", "")),
+        "X-Time-End": str(meta.get("time_end", "")),
+    }
+    return StreamingResponse(rows(), media_type="text/csv; charset=utf-8", headers=headers)
 
 
 def _parse_time_value(value: Optional[str], field_name: str) -> Optional[datetime.datetime]:
@@ -124,7 +181,15 @@ async def list_endpoints():
         {
             "endpoint": "/type4",
             "description": "Download files/bytes data. (NOT IMPLEMENTED YET)",
-        }
+        },
+        {
+            "endpoint": "/users",
+            "description": "Search registered users (user ID, domain, name). Requester in X-User-Id / X-User-Domain headers.",
+        },
+        {
+            "endpoint": "/users/{domain}/{user_id}",
+            "description": "Check whether one user is registered.",
+        },
     ]
 
     return schema.Type0Response(
@@ -140,7 +205,7 @@ async def list_endpoints():
     summary="Type 1: Search Trials",
     response_model=schema.Type1Response,
 )
-async def search_trials(request: schema.Type1Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
+def search_trials(request: schema.Type1Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
     """
     Search for trials based on provided criteria.
 
@@ -183,7 +248,7 @@ async def search_trials(request: schema.Type1Request, metadata_reader: MdsReader
     summary="Type 2: Get Trial Data",
     response_model=schema.Type2Response,
 )
-async def get_trial_details(request: schema.Type2Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
+def get_trial_details(request: schema.Type2Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
     """
     Retrieve detailed data for a specific trial.
 
@@ -195,6 +260,8 @@ async def get_trial_details(request: schema.Type2Request, metadata_reader: MdsRe
         raise HTTPException(status_code=404, detail="Trial not found")
 
     data = _build_trial_payload(trial, request)
+    if request.data_format == schema._ResponseTypeEnum.csv:
+        return _csv_response(data)
     return schema.Type2Response(
         status="success",
         message="Trial data retrieved successfully.",
@@ -208,7 +275,7 @@ async def get_trial_details(request: schema.Type2Request, metadata_reader: MdsRe
     summary="Type 3: Search Trials and Get Data",
     response_model=schema.Type3Response,
 )
-async def search_trials_and_get_data(request: schema.Type3Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
+def search_trials_and_get_data(request: schema.Type3Request, metadata_reader: MdsReader = Depends(get_metadata_reader)):
     """
     Search for trials based on provided criteria and retrieve detailed data for matching trials.
 
@@ -235,6 +302,8 @@ async def search_trials_and_get_data(request: schema.Type3Request, metadata_read
 
     if len(trials) == 1:
         data = _build_trial_payload(trials[0], request) # type: ignore
+        if request.data_format == schema._ResponseTypeEnum.csv:
+            return _csv_response(data)
         return schema.Type2Response(
             status="success",
             message="Unique trial found and data retrieved.",
@@ -251,3 +320,86 @@ async def search_trials_and_get_data(request: schema.Type3Request, metadata_read
         message=f"Found {len(trials)} trial(s).",
         trials=[schema.Type1Response.TrialInfo(**trial) for trial in trials],
     )
+
+
+# ---------------------------------------------------------------------------
+# Users: directory lookups for "pick a person" lists
+# ---------------------------------------------------------------------------
+
+
+def get_requester(
+    x_user_id: Optional[str] = Header(None, description="Requesting user's ID"),
+    x_user_domain: Optional[str] = Header(None, description="Requesting user's domain"),
+) -> tuple:
+    """Who is asking.
+
+    Today the caller states it in the X-User-Id / X-User-Domain headers. With
+    single sign-on, the login proxy in front of RWS sets these headers from the
+    verified login (and strips any sent by the client), so this function and
+    the endpoints using it do not change.
+    """
+    if not x_user_id or not x_user_id.strip():
+        raise HTTPException(status_code=401, detail="Missing X-User-Id header (who is asking).")
+    return (x_user_id.strip(), (x_user_domain or "").strip())
+
+
+def _require_registered(requester: tuple, metadata_reader: MdsReader) -> None:
+    """Only users registered in the metadata store may look others up."""
+    if requester == ("superadmin", "superadmin"):
+        return
+    if metadata_reader.get_user(requester[0], requester[1]) is None:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Requester {requester[0]} / {requester[1] or '-'} is not a registered user.",
+        )
+
+
+@router.get(
+    "/users",
+    summary="Users: Search registered users",
+    response_model=schema.UsersResponse,
+)
+def search_users(
+    search: Optional[str] = Query(None, description="Text to match in user ID, name or domain"),
+    limit: int = Query(25, ge=1, le=100, description="Maximum number of users to return"),
+    include_system: bool = Query(
+        False, description="Also list platform accounts such as superadmin (superadmin requesters only)"
+    ),
+    requester: tuple = Depends(get_requester),
+    metadata_reader: MdsReader = Depends(get_metadata_reader),
+):
+    """
+    Search users registered in the metadata store, for "pick a person" lists
+    (e.g. project members, "created by"). Returns only user ID, domain and name.
+    Platform accounts (superadmin) are not people to pick and are left out.
+    """
+    _require_registered(requester, metadata_reader)
+    if include_system and requester != ("superadmin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Only superadmin can list platform accounts.")
+    users = metadata_reader.search_users(search, limit, include_system=include_system)
+    return schema.UsersResponse(
+        status="success",
+        message=f"Found {len(users)} user(s).",
+        users=[schema.UserInfo(**u) for u in users],
+    )
+
+
+@router.get(
+    "/users/{domain}/{user_id}",
+    summary="Users: Check one user",
+    response_model=schema.UserResponse,
+)
+def get_user(
+    domain: str,
+    user_id: str,
+    requester: tuple = Depends(get_requester),
+    metadata_reader: MdsReader = Depends(get_metadata_reader),
+):
+    """
+    Check whether a user is registered. 404 if not.
+    """
+    _require_registered(requester, metadata_reader)
+    user = metadata_reader.get_user(user_id, domain)
+    if user is None:
+        raise HTTPException(status_code=404, detail=f"User {user_id} / {domain} is not registered.")
+    return schema.UserResponse(status="success", message="User found.", user=schema.UserInfo(**user))

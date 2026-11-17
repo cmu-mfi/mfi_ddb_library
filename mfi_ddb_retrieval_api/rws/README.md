@@ -70,6 +70,62 @@ Following are the API endpoints for the Retrieval Web Service (RWS):
 
 **Response**: The data in requested format, if the search returns unique trial UUID. Otherwise, a list of trial UUIDs that match the search criteria.
 
+## How data is retrieved (Type 2 / Type 3)
+
+- For each topic family (first topic level) RWS asks the DWS servers listed in
+  `dws.endpoints.yaml` for every datapoint in the window. It uses the
+  `StreamDataRange` RPC (batches, one query) and falls back to paging with
+  `GetDataRange` on servers that answer `UNIMPLEMENTED`.
+- Every datapoint is kept with its full timestamp precision; only exact
+  duplicates (the same datapoint from two servers) are dropped. Timestamps are
+  returned as ISO 8601 in UTC; request times without an offset are read as UTC.
+- If one DWS server fails, the data from the others is still returned (the
+  failure is logged).
+- `data_format: "csv"` returns `text/csv` with one `topic,timestamp,value` row
+  per datapoint (JSON values as compact JSON). The file name is
+  `<trial_name>_<uuid8>.csv`; the trial UUID and window are in the
+  `X-Trial-UUID`, `X-Time-Start` and `X-Time-End` headers.
+- The whole window is gathered before the response is sent, so very large
+  windows take long and use a lot of memory: request them in smaller pieces.
+- **Not applied yet:** `frequency` is accepted and echoed in the response
+  metadata, but data always comes back as stored. The `enterprise`, `site` and
+  `device` search filters are accepted but do not narrow the search.
+
+Handlers that do blocking I/O (metadata store, DWS) are plain `def`, so
+FastAPI runs them in its thread pool: a long retrieval does not block health
+checks or other requests (`test_rws/test_rws_concurrency.py`).
+
 ## Type 4: Download file/bytes data
 
 (TBD)
+
+## Users: registered user directory
+
+Read-only lookups of the users registered in the metadata store (`ddb_user`),
+for "pick a person" lists such as project members or "created by". Only
+`user_id`, `domain` and `name` are returned, never email.
+
+**Who is asking** goes in headers, not the body:
+
+```
+X-User-Id: ssterenr
+X-User-Domain: ANDREW
+```
+
+The requester must be a registered user (`superadmin` is always allowed);
+otherwise `401` (no header) or `403` (unknown requester). With single sign-on,
+the login proxy in front of RWS sets these headers from the verified login,
+so the endpoints do not change.
+
+**Search**: GET `/users?search=<text>&limit=25`
+Matches `search` (case-insensitive) in user ID, name or domain; `limit` 1-100.
+
+```json
+{"status": "success", "message": "Found 1 user(s).",
+ "users": [{"user_id": "ssterenr", "domain": "ANDREW", "name": "Stephanie Steren-Ruta"}]}
+```
+
+**Check one user**: GET `/users/{domain}/{user_id}`
+`200` with `{"user": {...}}` if registered, `404` if not.
+
+Tests that need no database: `pytest -v test_rws/test_rws_users.py`
