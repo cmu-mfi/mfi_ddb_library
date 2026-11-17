@@ -38,21 +38,22 @@ Connection state (configs + whether each connection should be streaming/paused/s
 ### Prerequisites & Installation
 
 **Requirements:**
-- Python 3.9 or higher
-- pip package manager
-- Virtual environment (recommended)
+- Python 3.12 (the current `mfi_ddb` dependency requires Python below 3.13)
+- uv package manager, for manual installation
 
-**Installation Steps:**
+For an automatic installation of Python, uv, Node and both application components, use the [module's source installer](../../README.md#install-and-build-from-source). It keeps its own environment in `mfi_ddb_data_adapter/.tools/venvs/` and does not use `backend/.venv`.
+
+**Manual backend-only installation** (after installing [uv](https://docs.astral.sh/uv/getting-started/installation/)):
 
 ```bash
 cd mfi_ddb_data_adapter/data_adapter_app/backend
-python -m venv .venv
+uv venv --python 3.12
 source .venv/bin/activate      # on Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 > [!Note]
-> `requirements.txt` pins `mfi_ddb` from PyPI. If you're working against local changes to `mfi_ddb_package` in this same repo, install that instead, e.g. `pip install -e ../../../mfi_ddb_package`, run *after* the `requirements.txt` install so it takes precedence.
+> `requirements.txt` requires `mfi_ddb>=1.1.0` from PyPI. If you're working against local changes to `mfi_ddb_package` in this same repo, install that instead, e.g. `uv pip install -e ../../../mfi_ddb_package`, run *after* the `requirements.txt` install so it takes precedence.
 
 ## API Endpoints
 

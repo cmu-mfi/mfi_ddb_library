@@ -14,6 +14,26 @@ The application gives a REST API interface (`backend`) to the mfi-ddb library fo
   <img src="../images/disconnect.png" height="200" alt="Disconnecting a connection">
 </p>
 
+## Build from source (Linux, macOS, Windows)
+
+Use the [source installer](../README.md#install-and-build-from-source) to download the supported Python runtime, latest Node LTS/npm, OS prerequisites, backend dependencies, and frontend dependencies, then build the UI. No existing Python, Node, uv or Docker installation is required.
+
+From the repository root:
+
+```bash
+# Linux / macOS
+bash mfi_ddb_data_adapter/setup.sh
+bash mfi_ddb_data_adapter/setup.sh start
+```
+
+```bat
+rem Windows
+.\mfi_ddb_data_adapter\setup.bat
+.\mfi_ddb_data_adapter\setup.bat start
+```
+
+Open `http://127.0.0.1:3000` for the UI and `http://127.0.0.1:8000/docs` for the API. See the [module README](../README.md) for supported systems, custom ports, verification, persistence, and protocol-specific dependencies.
+
 ## Docker Setup
 
 The application can be run using Docker for a consistent and isolated environment.
