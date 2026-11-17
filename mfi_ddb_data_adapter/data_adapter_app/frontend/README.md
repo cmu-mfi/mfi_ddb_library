@@ -4,14 +4,18 @@ React (Vite) UI for creating, editing, and monitoring `mfi_ddb` data adapter con
 
 ## Getting Started
 
+**Build from source with automatic prerequisites:** use the [module source installer](../../README.md#install-and-build-from-source). It downloads Python/uv and the latest Node LTS/npm, installs backend dependencies, runs `npm ci` including dev/optional packages, and builds this frontend. Its `start` command serves the built UI on `http://127.0.0.1:3000` and runs the API on port 8000.
+
 **Via Docker** (recommended - see the [top-level README](../README.md)): `docker compose up --build -d` from `data_adapter_app/`, then open `http://localhost:3000`. In this mode, nginx (inside the frontend container) proxies all `/api/` requests to the backend container internally - the frontend never needs to know the backend's address directly.
 
 **Standalone dev server** (hot-reload, no Docker):
 ```bash
-npm install
-VITE_API_URL=http://localhost:8000 npm run dev
+npm ci
+npm run dev
 ```
-Setting `VITE_API_URL` points the frontend directly at a backend you're running separately (see [backend/README.md](../backend/README.md)), bypassing the nginx proxy entirely - this works because the backend already has CORS wide open. Without it, `API_BASE_URL` (in `src/data/defaults.js`) falls back to `/api`, which only resolves correctly behind the Docker/nginx setup.
+Start the backend separately (see [backend/README.md](../backend/README.md)). The default `/api` base URL works with the proxy in `vite.config.js`, which is used by both Vite dev and preview. It forwards to `http://localhost:8000`; `MFI_DAA_BACKEND_URL` can override that target. The source installer's `start --backend-port PORT` sets this automatically.
+
+Setting `VITE_API_URL` explicitly instead points the browser directly at that backend, bypassing the proxy. This setting is compiled into production assets at build time. The automatic source installer builds with `VITE_API_URL=/api`, so its chosen backend port can change without rebuilding.
 
 ## Project Structure
 
