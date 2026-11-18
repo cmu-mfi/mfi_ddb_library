@@ -4,8 +4,8 @@ Configuration Router for MFI DDB Retrieval API
 ...
 """
 
-import asyncio
 import datetime
+import json
 import logging
 import os
 import shutil
@@ -17,6 +17,7 @@ from typing import Any, Literal, Optional
 import psutil
 from dateutil import parser
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
 from app.schema import schema
 from app.services.dws_agent import DwsAgent
@@ -25,6 +26,12 @@ from app.services.pg_mds import MdsReader
 logger = logging.getLogger(__name__)
 
 # FastAPI router
+#
+# Handlers that query the metadata store or the database nodes are plain `def`,
+# not `async def`: those calls block, and in an `async def` handler one long
+# retrieval would hold up every other request until it finished. A `def`
+# handler runs in its own worker thread. Keep new handlers that do blocking I/O
+# as `def`.
 router = APIRouter()
 
 # Docs are read at import time; resolve relative to this file so the service
@@ -43,6 +50,46 @@ RESOURCE_POLL_INTERVAL_S = 0.5
 def get_metadata_reader(request: Request):
     """Dependency to get metadata_reader from app state."""
     return request.app.state.metadata_reader
+
+
+def _csv_cell(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list)):
+        value = json.dumps(value, separators=(",", ":"))
+    text = str(value)
+    if any(c in text for c in ',"\n\r'):
+        text = '"' + text.replace('"', '""') + '"'
+    return text
+
+
+def _csv_response(payload: dict[str, Any]) -> StreamingResponse:
+    """data_format=csv: stream `topic,timestamp,value` rows (one per datapoint).
+
+    Trial details go in headers (the body is plain data).
+    """
+    meta = payload.get("metadata", {})
+    data = payload.get("data", {}) or {}
+
+    def rows():
+        yield "topic,timestamp,value\n"
+        for topic in sorted(data):
+            cell = _csv_cell(topic)
+            buffer = []
+            for point in data[topic]:
+                buffer.append(f"{cell},{point.get('timestamp', '')},{_csv_cell(point.get('value'))}\n")
+                if len(buffer) >= 5000:
+                    yield "".join(buffer)
+                    buffer = []
+            if buffer:
+                yield "".join(buffer)
+
+    headers = {
+        "X-Trial-UUID": str(meta.get("trial_uuid") or ""),
+        "X-Time-Start": str(meta.get("time_start", "")),
+        "X-Time-End": str(meta.get("time_end", "")),
+    }
+    return StreamingResponse(rows(), media_type="text/csv; charset=utf-8", headers=headers)
 
 
 def _parse_time_value(
@@ -120,7 +167,7 @@ def _validate_time_range(
         )
 
 
-async def _check_system_resources() -> None:
+def _check_system_resources() -> None:
     """
     Wait until enough memory and CPU are available to serve a file download.
 
@@ -150,7 +197,8 @@ async def _check_system_resources() -> None:
                 ),
             )
 
-        await asyncio.sleep(RESOURCE_POLL_INTERVAL_S)
+        # Runs in the request's worker thread: sleeping only pauses this request.
+        time.sleep(RESOURCE_POLL_INTERVAL_S)
         cpu_percent = psutil.cpu_percent(interval=None)
 
 
@@ -203,7 +251,7 @@ async def list_endpoints():
     summary="Type 1: Search Trials",
     response_model=schema.Type1Response,
 )
-async def search_trials(
+def search_trials(
     request: schema.Type1Request,
     metadata_reader: MdsReader = Depends(get_metadata_reader),
 ):
@@ -249,7 +297,7 @@ async def search_trials(
     summary="Type 2: Get Trial Data",
     response_model=schema.Type2Response,
 )
-async def get_trial_details(
+def get_trial_details(
     request: schema.Type2Request,
     metadata_reader: MdsReader = Depends(get_metadata_reader),
 ):
@@ -266,6 +314,8 @@ async def get_trial_details(
         raise HTTPException(status_code=404, detail="Trial not found")
 
     data = _build_trial_payload(trial, request)
+    if request.data_format == schema._ResponseTypeEnum.csv:
+        return _csv_response(data)
     return schema.Type2Response(
         status="success",
         message="Trial data retrieved successfully.",
@@ -279,7 +329,7 @@ async def get_trial_details(
     summary="Type 3: Search Trials and Get Data",
     response_model=schema.Type3Response,
 )
-async def search_trials_and_get_data(
+def search_trials_and_get_data(
     request: schema.Type3Request,
     metadata_reader: MdsReader = Depends(get_metadata_reader),
 ):
@@ -309,6 +359,8 @@ async def search_trials_and_get_data(
 
     if len(trials) == 1:
         data = _build_trial_payload(trials[0], request)  # type: ignore
+        if request.data_format == schema._ResponseTypeEnum.csv:
+            return _csv_response(data)
         return schema.Type2Response(
             status="success",
             message="Unique trial found and data retrieved.",
@@ -335,7 +387,7 @@ async def search_trials_and_get_data(
     # be a pydantic response_model; the file is returned directly.
     response_model=None,
 )
-async def get_file_value(
+def get_file_value(
     request: schema.Type4Request,
     background_tasks: BackgroundTasks,
     metadata_reader: MdsReader = Depends(get_metadata_reader),
@@ -352,7 +404,7 @@ async def get_file_value(
 
     # Wait (within limits) until enough memory and CPU are available before
     # pulling potentially large file contents from the DWS servers.
-    await _check_system_resources()
+    _check_system_resources()
 
     trial = metadata_reader.get_trial_by_uuid(
         request.trial_uuid, request.user_id, request.user_domain
