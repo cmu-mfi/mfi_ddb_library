@@ -2,12 +2,8 @@
 DWS agent: fetches datapoints for trial topics from the database nodes (DWS).
 
 For each topic family (first topic level, e.g. "mfi-v1.0-historian") the
-configured DWS servers are asked for every datapoint in [time_start, time_end]:
-
-  1. StreamDataRange (preferred): the server streams all datapoints in batches
-     and ends the stream - one query, nothing skipped, no page tokens.
-  2. GetDataRange (fallback, for servers that answer UNIMPLEMENTED, e.g. the
-     AVEVA PI and blob nodes): page through with page tokens.
+configured DWS servers are asked for every datapoint in [time_start, time_end]
+with GetDataRange, following the page tokens to the last page.
 
 Only exact duplicates (e.g. the same datapoint from two servers of a family)
 are dropped, timestamps keep their full precision, and one failing server
@@ -19,7 +15,7 @@ import logging
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, Iterator, List, Union
+from typing import Dict, Iterator, List, Union
 
 import grpc
 import yaml
@@ -30,16 +26,14 @@ from app.utils.dws.gen.models_pb2 import Datapoint
 from app.utils.dws.gen.service_pb2 import (
     GetDataRangeRequest,
     GetDataRangeResponse,
-    StreamDataRangeRequest,
 )
 from app.utils.dws.gen.service_pb2_grpc import DataServiceStub
 
 logger = logging.getLogger(__name__)
 
-PAGE_SIZE = 1000            # GetDataRange fallback page size
-STREAM_BATCH_SIZE = 5000    # datapoints per StreamDataRange message
+PAGE_SIZE = 1000            # GetDataRange page size
 CHANNEL_OPTIONS = [
-    # Headroom above gRPC's 4 MB default for large pages / batches.
+    # Headroom above gRPC's 4 MB default for large pages.
     ("grpc.max_receive_message_length", 64 * 1024 * 1024),
 ]
 
@@ -130,7 +124,7 @@ class __DwsAgent:
             for server in self.config[topic_family]:
                 logger.info("Retrieving %s from %s at %s", family_topics, server["name"], server["url"])
                 try:
-                    for dp in self._fetch_from_server(server["url"], topic, start_ts, end_ts):
+                    for dp in self._page_dws_server(server["url"], topic, start_ts, end_ts):
                         # Drop only exact duplicates (same datapoint from two servers).
                         key = dp.SerializeToString(deterministic=True)
                         if key in seen:
@@ -163,29 +157,6 @@ class __DwsAgent:
     # DWS calls
     # ------------------------------------------------------------------
 
-    def _fetch_from_server(
-        self, endpoint: str, topic: str, start_ts: Timestamp, end_ts: Timestamp
-    ) -> Iterator[Datapoint]:
-        """Stream the window if the server supports it, otherwise page through it."""
-        stream_request = StreamDataRangeRequest(
-            topic=topic, start_time=start_ts, end_time=end_ts, batch_size=STREAM_BATCH_SIZE
-        )
-        try:
-            # Materialize the first batch here so UNIMPLEMENTED surfaces before
-            # anything is yielded and the fallback can take over cleanly.
-            batches = iter(self._stream_dws_server(endpoint, stream_request))
-            first = next(batches, None)
-        except grpc.RpcError as err:
-            if err.code() != grpc.StatusCode.UNIMPLEMENTED:
-                raise
-            logger.info("DWS at %s has no StreamDataRange; paging with GetDataRange", endpoint)
-            yield from self._page_dws_server(endpoint, topic, start_ts, end_ts)
-            return
-        if first is not None:
-            yield from first
-            for batch in batches:
-                yield from batch
-
     def _page_dws_server(
         self, endpoint: str, topic: str, start_ts: Timestamp, end_ts: Timestamp
     ) -> Iterator[Datapoint]:
@@ -208,12 +179,6 @@ class __DwsAgent:
                 channel = grpc.insecure_channel(endpoint, options=CHANNEL_OPTIONS)
                 self._channels[endpoint] = channel
             return channel
-
-    def _stream_dws_server(self, endpoint: str, request: StreamDataRangeRequest) -> Iterable[List[Datapoint]]:
-        """Yield the datapoint batches of a StreamDataRange call."""
-        stub = DataServiceStub(self._channel(endpoint))
-        for message in stub.StreamDataRange(request):
-            yield list(message.datapoints)
 
     def _call_dws_server(self, endpoint: str, request: GetDataRangeRequest) -> GetDataRangeResponse:
         stub = DataServiceStub(self._channel(endpoint))

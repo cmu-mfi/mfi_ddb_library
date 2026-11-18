@@ -26,7 +26,7 @@ from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__
 from . import models_pb2 as models__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rservice.proto\x12\x0b\x64ws.service\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x0cmodels.proto\"l\n\x13GetDataPointRequest\x12\r\n\x05topic\x18\x01 \x01(\t\x12-\n\ttimestamp\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x17\n\x0f\x64o_closest_past\x18\x03 \x01(\x08\"@\n\x14GetDataPointResponse\x12(\n\tdatapoint\x18\x01 \x01(\x0b\x32\x15.dws.models.Datapoint\"\xa9\x01\n\x13GetDataRangeRequest\x12\r\n\x05topic\x18\x01 \x01(\t\x12.\n\nstart_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12,\n\x08\x65nd_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x11\n\tpage_size\x18\x04 \x01(\x05\x12\x12\n\npage_token\x18\x05 \x01(\t\"Z\n\x14GetDataRangeResponse\x12)\n\ndatapoints\x18\x01 \x03(\x0b\x32\x15.dws.models.Datapoint\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t\"f\n\x11StreamDataRequest\x12\r\n\x05topic\x18\x01 \x01(\t\x12\x33\n\nstart_from\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.TimestampH\x00\x88\x01\x01\x42\r\n\x0b_start_from\">\n\x12StreamDataResponse\x12(\n\tdatapoint\x18\x01 \x01(\x0b\x32\x15.dws.models.Datapoint\"\x99\x01\n\x16StreamDataRangeRequest\x12\r\n\x05topic\x18\x01 \x01(\t\x12.\n\nstart_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12,\n\x08\x65nd_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x12\n\nbatch_size\x18\x04 \x01(\x05\"D\n\x17StreamDataRangeResponse\x12)\n\ndatapoints\x18\x01 \x03(\x0b\x32\x15.dws.models.Datapoint2\xe8\x02\n\x0b\x44\x61taService\x12S\n\x0cGetDataPoint\x12 .dws.service.GetDataPointRequest\x1a!.dws.service.GetDataPointResponse\x12S\n\x0cGetDataRange\x12 .dws.service.GetDataRangeRequest\x1a!.dws.service.GetDataRangeResponse\x12O\n\nStreamData\x12\x1e.dws.service.StreamDataRequest\x1a\x1f.dws.service.StreamDataResponse0\x01\x12^\n\x0fStreamDataRange\x12#.dws.service.StreamDataRangeRequest\x1a$.dws.service.StreamDataRangeResponse0\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\rservice.proto\x12\x0b\x64ws.service\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x0cmodels.proto\"l\n\x13GetDataPointRequest\x12\r\n\x05topic\x18\x01 \x01(\t\x12-\n\ttimestamp\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x17\n\x0f\x64o_closest_past\x18\x03 \x01(\x08\"@\n\x14GetDataPointResponse\x12(\n\tdatapoint\x18\x01 \x01(\x0b\x32\x15.dws.models.Datapoint\"\xa9\x01\n\x13GetDataRangeRequest\x12\r\n\x05topic\x18\x01 \x01(\t\x12.\n\nstart_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12,\n\x08\x65nd_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x11\n\tpage_size\x18\x04 \x01(\x05\x12\x12\n\npage_token\x18\x05 \x01(\t\"Z\n\x14GetDataRangeResponse\x12)\n\ndatapoints\x18\x01 \x03(\x0b\x32\x15.dws.models.Datapoint\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\t\"R\n\x11StreamDataRequest\x12\r\n\x05topic\x18\x01 \x01(\t\x12.\n\nstart_from\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\">\n\x12StreamDataResponse\x12(\n\tdatapoint\x18\x01 \x01(\x0b\x32\x15.dws.models.Datapoint2\x88\x02\n\x0b\x44\x61taService\x12S\n\x0cGetDataPoint\x12 .dws.service.GetDataPointRequest\x1a!.dws.service.GetDataPointResponse\x12S\n\x0cGetDataRange\x12 .dws.service.GetDataRangeRequest\x1a!.dws.service.GetDataRangeResponse\x12O\n\nStreamData\x12\x1e.dws.service.StreamDataRequest\x1a\x1f.dws.service.StreamDataResponse0\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -42,13 +42,9 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_GETDATARANGERESPONSE']._serialized_start=425
   _globals['_GETDATARANGERESPONSE']._serialized_end=515
   _globals['_STREAMDATAREQUEST']._serialized_start=517
-  _globals['_STREAMDATAREQUEST']._serialized_end=619
-  _globals['_STREAMDATARESPONSE']._serialized_start=621
-  _globals['_STREAMDATARESPONSE']._serialized_end=683
-  _globals['_STREAMDATARANGEREQUEST']._serialized_start=686
-  _globals['_STREAMDATARANGEREQUEST']._serialized_end=839
-  _globals['_STREAMDATARANGERESPONSE']._serialized_start=841
-  _globals['_STREAMDATARANGERESPONSE']._serialized_end=909
-  _globals['_DATASERVICE']._serialized_start=912
-  _globals['_DATASERVICE']._serialized_end=1272
+  _globals['_STREAMDATAREQUEST']._serialized_end=599
+  _globals['_STREAMDATARESPONSE']._serialized_start=601
+  _globals['_STREAMDATARESPONSE']._serialized_end=663
+  _globals['_DATASERVICE']._serialized_start=666
+  _globals['_DATASERVICE']._serialized_end=930
 # @@protoc_insertion_point(module_scope)

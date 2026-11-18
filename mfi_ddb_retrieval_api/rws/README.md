@@ -73,9 +73,8 @@ Following are the API endpoints for the Retrieval Web Service (RWS):
 ## How data is retrieved (Type 2 / Type 3)
 
 - For each topic family (first topic level) RWS asks the DWS servers listed in
-  `dws.endpoints.yaml` for every datapoint in the window. It uses the
-  `StreamDataRange` RPC (batches, one query) and falls back to paging with
-  `GetDataRange` on servers that answer `UNIMPLEMENTED`.
+  `dws.endpoints.yaml` for every datapoint in the window with
+  `GetDataRange`, following the page tokens to the last page.
 - Every datapoint is kept with its full timestamp precision; only exact
   duplicates (the same datapoint from two servers) are dropped. Timestamps are
   returned as ISO 8601 in UTC; request times without an offset are read as UTC.

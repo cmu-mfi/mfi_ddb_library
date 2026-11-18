@@ -5,93 +5,67 @@ package dws.service;
 import "google/protobuf/timestamp.proto";
 import "models.proto";
 
-// =============================================================================
-// SOURCE OF TRUTH. This file (and models.proto next to it) is copied into every
-// database node's DWS and into the Retrieval API by ../sync_proto.sh, which also
-// regenerates their Python code. Edit it here, then run:
-//     bash mfi_ddb_database_nodes/dws/sync_proto.sh
-// `sync_proto.sh --check` fails if any copy has drifted.
-// =============================================================================
+//import "app/utils/dws/proto/models.proto";
 
 // The Data Retrieval Service definition
 service DataService {
-
+  
   // 1. Single Datapoint: Topic + Timestamp -> Datapoint
   rpc GetDataPoint(GetDataPointRequest) returns (GetDataPointResponse);
 
-  // 2. Range of Datapoints: Topic + Start + End -> List of Datapoints (paged)
+  // 2. Range of Datapoints: Topic + Start + End -> List of Datapoints
   rpc GetDataRange(GetDataRangeRequest) returns (GetDataRangeResponse);
 
-  // 3. Live Stream: Topic -> Stream of Datapoints (keeps tailing new data)
+  // 3. Live Stream: Topic -> Stream of Datapoints
   rpc StreamData(StreamDataRequest) returns (stream StreamDataResponse);
-
-  // 4. Range Stream: Topic + Start + End -> Stream of Datapoint batches.
-  //    Like GetDataRange, but the server pushes every datapoint in the window
-  //    in batches and then ends the stream: no page tokens, nothing skipped,
-  //    and no single message has to hold the whole window.
-  //    Servers that don't implement it answer UNIMPLEMENTED; callers then fall
-  //    back to GetDataRange.
-  rpc StreamDataRange(StreamDataRangeRequest) returns (stream StreamDataRangeResponse);
 }
 
 // --- Request/Response Definitions ---
 
 message GetDataPointRequest {
-  string topic = 1; // can include wildcard in the topic name
+  string topic = 1;
+  // TODO: is the user_id necessary?? Discuss.
+  // string user_id = 2; 
   google.protobuf.Timestamp timestamp = 2;
-  // Return the closest datapoint to the requested timestamp if there is no
-  // exact match: in the past when true, in the future when false.
-  // (proto3 has no explicit defaults: an unset field reads as false.)
   bool do_closest_past = 3;
 }
 
 message GetDataPointResponse {
   dws.models.Datapoint datapoint = 1;
-  // returns error if multiple topics exist for the requested topic
 }
 
 message GetDataRangeRequest {
-  string topic = 1; // can include wildcard in the topic name
+  string topic = 1;
+  // TODO: is the user_id necessary?? Discuss.
+  // string user_id = 2;
   google.protobuf.Timestamp start_time = 2;
   google.protobuf.Timestamp end_time = 3;
-
+  
   // Pagination for range requests to avoid memory overflow
   // Reference: https://google.aip.dev/158
-  // Servers use a page size of 1000 when this is 0 (unset).
+  // Assuming a default page size of 1000 if not specified, but allowing clients to set it as needed.
   int32 page_size = 4;
-  string page_token = 5;  // empty = first page
+  string page_token = 5;
 }
 
 message GetDataRangeResponse {
   repeated dws.models.Datapoint datapoints = 1;
-
-  // Pagination token for the next set of results; empty = last page
+  
+  // Pagination token for the next set of results
   // Reference: https://google.aip.dev/158
   string next_page_token = 2;
 }
 
 message StreamDataRequest {
   string topic = 1;
-
-  // Start streaming from a specific point in the past.
-  // If not set, implies "start from now".
-  optional google.protobuf.Timestamp start_from = 2;
+  // TODO: is the user_id necessary?? Discuss.
+  // string user_id = 2;
+  
+  // Optional: Start streaming from a specific point in the past?
+  // If nil, implies "start from now"
+  google.protobuf.Timestamp start_from = 2; 
 }
 
 message StreamDataResponse {
   dws.models.Datapoint datapoint = 1;
-}
-
-message StreamDataRangeRequest {
-  string topic = 1; // can include wildcard in the topic name
-  google.protobuf.Timestamp start_time = 2;  // inclusive
-  google.protobuf.Timestamp end_time = 3;    // inclusive
-
-  // Datapoints per streamed message; servers pick a default when 0.
-  // Keep each message well under gRPC's 4 MB default limit.
-  int32 batch_size = 4;
-}
-
-message StreamDataRangeResponse {
-  repeated dws.models.Datapoint datapoints = 1;  // ordered by timestamp
 }
