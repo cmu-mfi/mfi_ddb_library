@@ -10,7 +10,7 @@ HTTP. Nothing else from the pipeline has to run on the same machine.
 
 | Page | What it does | RWS endpoint |
 |------|--------------|--------------|
-| **Trials** | Search by time range, trial ID, project ID/name and search terms. When exactly one trial matches, it opens right away. | `POST /type1` |
+| **Trials** | Search by time range, trial ID, project ID/name and search terms, then open a trial from the list. | `POST /type1` |
 | Trial page | Metadata and data topics. Pick a time window (the whole trial by default), then **Download data** (CSV or JSON) or **Download files** (one file as is, several as a `.zip`). | `POST /type2`, `POST /type4` |
 | **API console** | Endpoint list from RWS, raw requests to any endpoint, inspect/download the response | `/type0`-`/type4` |
 

@@ -13,7 +13,7 @@ export function initialSearch() {
   };
 }
 
-/** Find trials (Type 1). When exactly one trial matches it opens right away. */
+/** Find trials (Type 1). Open one from the list to download its data or files. */
 export default function TrialSearch({ identity, blocked, state, setState, onOpen }) {
   const { filters, result } = state;
   const [busy, setBusy] = useState(false);
@@ -36,9 +36,7 @@ export default function TrialSearch({ identity, blocked, state, setState, onOpen
     setBusy(true);
     const res = await searchTrials(body);
     setBusy(false);
-    const trials = res.ok ? res.data?.trials || [] : [];
-    setState((s) => ({ ...s, result: res.ok ? { trials, message: res.data?.message } : { error: res.error } }));
-    if (trials.length === 1) onOpen(trials[0]);
+    setState((s) => ({ ...s, result: res.ok ? { trials: res.data?.trials || [], message: res.data?.message } : { error: res.error } }));
   };
 
   const trials = result?.trials || [];
