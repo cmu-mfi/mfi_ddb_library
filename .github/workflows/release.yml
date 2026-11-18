@@ -96,9 +96,78 @@ jobs:
           cd docker
           docker compose --profile '*' build --no-cache
           docker compose --profile '*' push
-          
+
+  setup-wizard-release:
+    name: ${{ matrix.platform }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            platform: linux
+            arch: x64
+            extension: AppImage
+          - os: windows-2022
+            platform: win
+            arch: x64
+            extension: exe
+          - os: macos-15
+            platform: mac
+            arch: arm64
+            extension: dmg
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      # Build the Python backend and Electron app for the same native architecture.
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          architecture: ${{ matrix.arch }}
+          cache: pip
+          cache-dependency-path: setup-wizard/backend/requirements.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          architecture: ${{ matrix.arch }}
+          cache: npm
+          cache-dependency-path: setup-wizard/ui/package-lock.json
+
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libarchive-tools
+
+      - name: Install backend build dependencies
+        run: python -m pip install -r setup-wizard/backend/requirements.txt pyinstaller
+
+      - name: Install UI dependencies
+        working-directory: setup-wizard/ui
+        run: npm ci
+
+      - name: Build installer
+        working-directory: setup-wizard/ui
+        run: npm run electron:build -- --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v6
+        with:
+          name: setup-wizard-${{ matrix.platform }}-${{ matrix.arch }}
+          path: setup-wizard/ui/dist/*.${{ matrix.extension }}
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
   github-release:
-    needs: [docker-release, pypi-release]
+    needs: [docker-release, pypi-release, setup-wizard-release]
     runs-on: ubuntu-latest
 
     steps:
@@ -122,6 +191,28 @@ jobs:
           tar czf payload-schema.tar.gz mfi_ddb_package/src/mfi_ddb/topic_families/schema
           zip -r payload-schema.zip mfi_ddb_package/src/mfi_ddb/topic_families/schema
 
+      - name: Download setup wizard artifacts
+        uses: actions/download-artifact@v6
+        with:
+          pattern: setup-wizard-*
+          path: setup-wizard-artifacts
+
+      - name: Rename setup wizard installers
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          shopt -s nullglob
+          for dir in setup-wizard-artifacts/setup-wizard-*; do
+            variant="${dir##*/setup-wizard-}"
+            for file in "$dir"/*; do
+              extension="${file##*.}"
+              target="setup-wizard-${VERSION}-${variant}.${extension}"
+              if [ -e "$target" ]; then
+                target="setup-wizard-${VERSION}-${variant}-$(basename "$file")"
+              fi
+              mv "$file" "$target"
+            done
+          done
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -132,3 +223,6 @@ jobs:
             docker-${{ steps.version.outputs.VERSION }}.zip
             payload-schema.tar.gz
             payload-schema.zip
+            setup-wizard-*.AppImage
+            setup-wizard-*.exe
+            setup-wizard-*.dmg
