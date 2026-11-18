@@ -1,0 +1,45 @@
+# Rendered by the nginx image at startup (envsubst). Only ${RWS_URL} (defined
+# in the Dockerfile / compose) is substituted; nginx variables like $host are
+# left untouched.
+server {
+    listen 80;
+    server_name localhost;
+
+    # Resolve the RWS host per request through Docker's embedded DNS. A literal
+    # host in proxy_pass is resolved only once at startup, so the proxy would
+    # keep a stale address (502) after the RWS container restarts with a new
+    # IP. With a variable upstream, proxy_pass forwards the request URI as is,
+    # so each location rewrites the path itself.
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $rws "${RWS_URL}";
+
+    # Retrieval responses can be large (one JSON with every datapoint).
+    gzip on;
+    gzip_types application/json text/csv;
+    gzip_min_length 1024;
+
+    location / {
+        root /usr/share/nginx/html;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # RWS health: its root endpoint.
+    location = /api/health {
+        rewrite ^ / break;
+        proxy_pass $rws;
+        proxy_read_timeout 10s;
+    }
+
+    # /api/<endpoint> -> RWS /mfi-ddb/<endpoint>
+    location /api/ {
+        rewrite ^/api/(.*)$ /mfi-ddb/$1 break;
+        proxy_pass $rws;
+        proxy_read_timeout 300s;
+        client_max_body_size 1m;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
