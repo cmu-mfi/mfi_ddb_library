@@ -44,7 +44,7 @@ class FakeReader:
 def test_health_answers_while_a_slow_retrieval_runs(monkeypatch):
     started = threading.Event()
 
-    def slow_get_data(topics, start, end):
+    def slow_get_data(topics, start, end, bytes=False):
         started.set()
         time.sleep(SLOW_SECONDS)  # blocking, like the real gRPC calls
         return {}

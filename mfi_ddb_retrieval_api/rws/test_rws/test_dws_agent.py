@@ -63,6 +63,24 @@ def _make_real_response(*datapoints: Datapoint, next_page_token: str = "") -> Ge
     return response
 
 
+def _make_file_datapoint(
+    topic: str,
+    seconds: int,
+    filename: str,
+    content: bytes,
+    sha256: str = "",
+) -> Datapoint:
+    """Build a real protobuf Datapoint carrying a file_value."""
+    dp = Datapoint()
+    dp.topic = topic
+    dp.timestamp.CopyFrom(Timestamp(seconds=seconds))
+    dp.file_value.filename = filename
+    dp.file_value.content = content
+    if sha256:
+        dp.file_value.sha256 = sha256
+    return dp
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -202,3 +220,128 @@ def test_pagination_all_pages_fetched_and_merged(agent):
 
     values = [entry["value"] for entry in result["kv/sensor/temp"]]
     assert values == pytest.approx([10.0, 11.0, 12.0, 13.0, 14.0])
+
+
+# ===========================================================================
+# Test 6 – file_value: bytes=True saves the content to a temporary file and
+#          returns the filepath as value, plus the original filename under
+#          the "filename" key.
+# ===========================================================================
+
+def test_file_value_saved_to_temp_file(agent):
+    import datetime
+    import hashlib
+    import shutil
+    from pathlib import Path
+
+    content = b"hello world"
+    sha256 = hashlib.sha256(content).hexdigest()
+    dp = _make_file_datapoint("blob/files/data", TS_IN_RANGE, "report.pdf", content, sha256)
+
+    with patch.object(agent, "_call_dws_server", return_value=_make_real_response(dp)):
+        result = agent.get_data("blob/files/data", TIME_START, TIME_END, bytes=True)
+
+    entry = result["blob/files/data"][0]
+    filepath = Path(entry["value"])
+    try:
+        assert filepath.is_file(), "The file content must be saved to disk."
+        assert filepath.read_bytes() == content, \
+            "The saved file must contain the exact bytes sent by the DWS server."
+        assert filepath.name == "0000_report.pdf", \
+            "On-disk names are prefixed with an index to avoid collisions."
+        assert entry["filename"] == "report.pdf", \
+            "The original filename must be returned under the 'filename' key."
+        assert entry["timestamp"] == datetime.datetime.fromtimestamp(TS_IN_RANGE).isoformat()
+    finally:
+        shutil.rmtree(filepath.parent, ignore_errors=True)
+
+
+# ===========================================================================
+# Test 7 – file_value: a wrong sha256 is logged as a warning, but the file
+#          is still saved and returned.
+# ===========================================================================
+
+def test_file_value_sha256_mismatch_logs_warning(agent):
+    import shutil
+    from pathlib import Path
+
+    dp = _make_file_datapoint("blob/files/data", TS_IN_RANGE, "report.pdf", b"hello world", sha256="deadbeef")
+
+    with patch.object(agent, "_call_dws_server", return_value=_make_real_response(dp)):
+        result = agent.get_data("blob/files/data", TIME_START, TIME_END, bytes=True)
+
+    entry = result["blob/files/data"][0]
+    filepath = Path(entry["value"])
+    try:
+        assert filepath.is_file()
+        assert filepath.read_bytes() == b"hello world"
+    finally:
+        shutil.rmtree(filepath.parent, ignore_errors=True)
+
+
+def test_file_value_sha256_match_does_not_warn(agent, caplog):
+    import hashlib
+    import shutil
+    from pathlib import Path
+
+    content = b"hello world"
+    sha256 = hashlib.sha256(content).hexdigest()
+    dp = _make_file_datapoint("blob/files/data", TS_IN_RANGE, "report.pdf", content, sha256)
+
+    with caplog.at_level("WARNING"):
+        with patch.object(agent, "_call_dws_server", return_value=_make_real_response(dp)):
+            result = agent.get_data("blob/files/data", TIME_START, TIME_END, bytes=True)
+
+    entry = result["blob/files/data"][0]
+    try:
+        assert "SHA256 mismatch" not in caplog.text
+        assert Path(entry["value"]).read_bytes() == content
+    finally:
+        shutil.rmtree(Path(entry["value"]).parent, ignore_errors=True)
+
+
+# ===========================================================================
+# Test 8 – file_value: bytes=False (default) returns only the filename,
+#          no files are written to disk and no "filename" key is added.
+# ===========================================================================
+
+def test_file_value_filename_only_when_bytes_false(agent):
+    dp = _make_file_datapoint("blob/files/data", TS_IN_RANGE, "report.pdf", b"hello world")
+
+    with patch.object(agent, "_call_dws_server", return_value=_make_real_response(dp)):
+        result = agent.get_data("blob/files/data", TIME_START, TIME_END)
+
+    entry = result["blob/files/data"][0]
+    assert entry["value"] == "report.pdf", \
+        "With bytes=False the value must be the original filename, not a filepath."
+    assert "filename" not in entry
+
+
+# ===========================================================================
+# Test 9 – multiple file_values with the same filename: all are saved with
+#          distinct filepaths in the same temporary directory.
+# ===========================================================================
+
+def test_multiple_file_values_same_name_distinct_paths(agent):
+    import shutil
+    from pathlib import Path
+
+    dp1 = _make_file_datapoint("blob/files/a", TS_IN_RANGE, "same.bin", b"AAA")
+    dp2 = _make_file_datapoint("blob/files/b", TS_IN_RANGE + 1, "same.bin", b"BBB")
+
+    with patch.object(agent, "_call_dws_server", return_value=_make_real_response(dp1, dp2)):
+        result = agent.get_data("blob/files/a", TIME_START, TIME_END, bytes=True)
+
+    path_a = Path(result["blob/files/a"][0]["value"])
+    path_b = Path(result["blob/files/b"][0]["value"])
+    try:
+        assert path_a != path_b, \
+            "Same-named files must not overwrite each other."
+        assert path_a.parent == path_b.parent, \
+            "All files of one call must live in the same temporary directory."
+        assert path_a.name == "0000_same.bin"
+        assert path_b.name == "0001_same.bin"
+        assert path_a.read_bytes() == b"AAA"
+        assert path_b.read_bytes() == b"BBB"
+    finally:
+        shutil.rmtree(path_a.parent, ignore_errors=True)

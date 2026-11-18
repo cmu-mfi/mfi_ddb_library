@@ -51,7 +51,7 @@ class FakeReader:
 @pytest.fixture
 def client(monkeypatch):
     app.dependency_overrides[get_metadata_reader] = lambda: FakeReader()
-    monkeypatch.setattr(router_module.DwsAgent, "get_data", lambda topics, start, end: DATA)
+    monkeypatch.setattr(router_module.DwsAgent, "get_data", lambda topics, start, end, bytes=False: DATA)
     yield TestClient(app)  # no `with`: the real database pool is not opened
     app.dependency_overrides.clear()
 
