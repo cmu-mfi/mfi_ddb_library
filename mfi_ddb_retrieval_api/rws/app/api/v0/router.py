@@ -4,7 +4,6 @@ Configuration Router for MFI DDB Retrieval API
 ...
 """
 
-import asyncio
 import datetime
 import json
 import logging
@@ -168,7 +167,7 @@ def _validate_time_range(
         )
 
 
-async def _check_system_resources() -> None:
+def _check_system_resources() -> None:
     """
     Wait until enough memory and CPU are available to serve a file download.
 
@@ -198,7 +197,8 @@ async def _check_system_resources() -> None:
                 ),
             )
 
-        await asyncio.sleep(RESOURCE_POLL_INTERVAL_S)
+        # Runs in the request's worker thread: sleeping only pauses this request.
+        time.sleep(RESOURCE_POLL_INTERVAL_S)
         cpu_percent = psutil.cpu_percent(interval=None)
 
 
@@ -387,7 +387,7 @@ def search_trials_and_get_data(
     # be a pydantic response_model; the file is returned directly.
     response_model=None,
 )
-async def get_file_value(
+def get_file_value(
     request: schema.Type4Request,
     background_tasks: BackgroundTasks,
     metadata_reader: MdsReader = Depends(get_metadata_reader),
@@ -404,7 +404,7 @@ async def get_file_value(
 
     # Wait (within limits) until enough memory and CPU are available before
     # pulling potentially large file contents from the DWS servers.
-    await _check_system_resources()
+    _check_system_resources()
 
     trial = metadata_reader.get_trial_by_uuid(
         request.trial_uuid, request.user_id, request.user_domain

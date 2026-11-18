@@ -2,7 +2,8 @@
 A slow data retrieval must not freeze the rest of the API.
 
 The data handlers do blocking I/O, so they are plain `def` and FastAPI runs
-them in a thread pool. Were they `async def`, a long Type 2 request would block
+them in a thread pool. Were they `async def`, a long Type 2 (data) or Type 4
+(file download) request would block
 the event loop and the health check (and every other request) would hang
 until it finished. No database or DWS needed: both are faked.
 
@@ -14,6 +15,7 @@ import threading
 import time
 from contextlib import asynccontextmanager
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.api.v0 import router as router_module
@@ -41,7 +43,8 @@ class FakeReader:
         return dict(TRIAL)
 
 
-def test_health_answers_while_a_slow_retrieval_runs(monkeypatch):
+@pytest.mark.parametrize("endpoint", ["type2", "type4"])
+def test_health_answers_while_a_slow_retrieval_runs(monkeypatch, endpoint):
     started = threading.Event()
 
     def slow_get_data(topics, start, end, bytes=False):
@@ -60,13 +63,13 @@ def test_health_answers_while_a_slow_retrieval_runs(monkeypatch):
     # The startup hook is swapped out so no real database pool is opened.
     monkeypatch.setattr(app.router, "lifespan_context", no_database)
     with TestClient(app) as client:
-        _check_health_during_slow_retrieval(client, started)
+        _check_health_during_slow_retrieval(client, started, endpoint)
     app.dependency_overrides.clear()
 
 
-def _check_health_during_slow_retrieval(client, started):
+def _check_health_during_slow_retrieval(client, started, endpoint):
     try:
-        slow = threading.Thread(target=lambda: client.post("/mfi-ddb/type2", json={
+        slow = threading.Thread(target=lambda: client.post(f"/mfi-ddb/{endpoint}", json={
             "trial_uuid": TRIAL["uuid"], "user_id": "superadmin", "user_domain": "superadmin",
             "time_start": "2026-11-11T16:00:00Z", "time_end": "2026-11-11T16:01:00Z",
         }))
