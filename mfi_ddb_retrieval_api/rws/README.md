@@ -70,30 +70,6 @@ Following are the API endpoints for the Retrieval Web Service (RWS):
 
 **Response**: The data in requested format, if the search returns unique trial UUID. Otherwise, a list of trial UUIDs that match the search criteria.
 
-## How data is retrieved (Type 2 / Type 3)
-
-- For each topic family (first topic level) RWS asks the DWS servers listed in
-  `dws.endpoints.yaml` for every datapoint in the window with
-  `GetDataRange`, following the page tokens to the last page.
-- Every datapoint is kept with its full timestamp precision; only exact
-  duplicates (the same datapoint from two servers) are dropped. Timestamps are
-  returned as ISO 8601 in UTC; request times without an offset are read as UTC.
-- If one DWS server fails, the data from the others is still returned (the
-  failure is logged).
-- `data_format: "csv"` returns `text/csv` with one `topic,timestamp,value` row
-  per datapoint (JSON values as compact JSON). The file name is
-  `<trial_name>_<uuid8>.csv`; the trial UUID and window are in the
-  `X-Trial-UUID`, `X-Time-Start` and `X-Time-End` headers.
-- The whole window is gathered before the response is sent, so very large
-  windows take long and use a lot of memory: request them in smaller pieces.
-- **Not applied yet:** `frequency` is accepted and echoed in the response
-  metadata, but data always comes back as stored. The `enterprise`, `site` and
-  `device` search filters are accepted but do not narrow the search.
-
-Handlers that do blocking I/O (metadata store, DWS) are plain `def`, so
-FastAPI runs them in its thread pool: a long retrieval does not block health
-checks or other requests (`test_rws/test_rws_concurrency.py`).
-
 ## Type 4: Download file/bytes data
 
 (TBD)

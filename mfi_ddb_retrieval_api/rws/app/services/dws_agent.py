@@ -1,21 +1,8 @@
-"""
-DWS agent: fetches datapoints for trial topics from the database nodes (DWS).
-
-For each topic family (first topic level, e.g. "mfi-v1.0-historian") the
-configured DWS servers are asked for every datapoint in [time_start, time_end]
-with GetDataRange, following the page tokens to the last page.
-
-Only exact duplicates (e.g. the same datapoint from two servers of a family)
-are dropped, timestamps keep their full precision, and one failing server
-doesn't lose the data of the others.
-"""
-
 import copy
 import logging
-import threading
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterator, List, Union
+from typing import List, Optional, Union, Dict
 
 import grpc
 import yaml
@@ -24,165 +11,118 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 from app.utils.dws.gen.models_pb2 import Datapoint
 from app.utils.dws.gen.service_pb2 import (
+    GetDataPointRequest,
+    GetDataPointResponse,
     GetDataRangeRequest,
     GetDataRangeResponse,
 )
 from app.utils.dws.gen.service_pb2_grpc import DataServiceStub
 
 logger = logging.getLogger(__name__)
-
-PAGE_SIZE = 1000            # GetDataRange page size
-CHANNEL_OPTIONS = [
-    # Headroom above gRPC's 4 MB default for large pages.
-    ("grpc.max_receive_message_length", 64 * 1024 * 1024),
-]
-
-
-def _to_timestamp(value: str) -> Timestamp:
-    """ISO 8601 string -> protobuf Timestamp, full precision. Naive times are UTC."""
-    dt = datetime.fromisoformat(value)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    ts = Timestamp()
-    ts.FromDatetime(dt)
-    return ts
-
-
-def _value_of(dp: Datapoint):
-    field = dp.WhichOneof("value")
-    if field == "int_value":
-        return dp.int_value
-    if field == "float_value":
-        return dp.float_value
-    if field == "string_value":
-        return dp.string_value
-    if field == "json_value":
-        return MessageToDict(dp.json_value)
-    if field == "file_value":
-        logger.warning(
-            "File value found for topic %s at %s; returning the filename instead of the content.",
-            dp.topic, dp.timestamp.ToJsonString(),
-        )
-        return dp.file_value.filename
-    return None
-
-
 class __DwsAgent:
-    def __init__(self, cfg_file: str = "dws.endpoints.yaml"):
+    def __init__(self, cfg_file:str = "dws.endpoints.yaml"):
         current_dir = Path(__file__).parent
         dws_config_path = Path(current_dir, "../config", cfg_file)
-
+        
         self.config = self._load_config(dws_config_path)
-        self._channels: Dict[str, grpc.Channel] = {}
-        self._channels_lock = threading.Lock()
-
+        
     def _load_config(self, config_file):
-        with open(config_file, "r") as f:
+        with open(config_file, 'r') as f:
             data = yaml.safe_load(f)
-
+            
         if "services" not in data:
             raise ValueError("Invalid DWS configuration: 'services' key not found.")
-
+        
         config = {}
-        for service in data["services"]:
-            service_cfg = data["services"][service]
-            service_cfg["name"] = service
-            for topic_family in service_cfg["topic_families"]:
+        for service in data['services']:
+            service_cfg = data['services'][service]
+            service_cfg['name'] = service
+            for topic_family in service_cfg['topic_families']:
                 if topic_family not in config:
                     config[topic_family] = []
                 config[topic_family].append(service_cfg)
-        return config
-
-    # ------------------------------------------------------------------
-    # public
-    # ------------------------------------------------------------------
+        return config   
 
     def get_data(self, topics: Union[str, List[str]], time_start: str, time_end: str) -> Dict:
-        """{topic: [{"timestamp": ISO 8601 UTC, "value": ...}, ...]} ordered by time."""
+        
         if isinstance(topics, str):
             topics = [topics]
-
-        topic_family_map: Dict[str, List[str]] = {}
+            
+        topic_family_map = {}
         for topic in topics:
             topic_family = topic.split("/")[0]
-            topic_family_map.setdefault(topic_family, []).append(topic)
-
-        start_ts = _to_timestamp(time_start)
-        end_ts = _to_timestamp(time_end)
-
-        collected: Dict[str, list] = {}
-        seen = set()
-        for topic_family, family_topics in topic_family_map.items():
-            if topic_family not in getattr(self, "config", {}):
-                logger.error(
-                    "Topic family '%s' not found in DWS configuration. Skipping topics: %s",
-                    topic_family, family_topics,
-                )
-                continue
-
-            topic = ",".join(family_topics)
-            for server in self.config[topic_family]:
-                logger.info("Retrieving %s from %s at %s", family_topics, server["name"], server["url"])
-                try:
-                    for dp in self._page_dws_server(server["url"], topic, start_ts, end_ts):
-                        # Drop only exact duplicates (same datapoint from two servers).
-                        key = dp.SerializeToString(deterministic=True)
-                        if key in seen:
-                            continue
-                        seen.add(key)
-                        collected.setdefault(dp.topic, []).append(
-                            ((dp.timestamp.seconds, dp.timestamp.nanos), _value_of(dp))
-                        )
-                except grpc.RpcError as err:
-                    logger.error(
-                        "DWS %s (%s) failed: %s %s",
-                        server["name"], server["url"], err.code(), err.details(),
-                    )
-                except Exception:
-                    logger.exception("DWS %s (%s) failed", server["name"], server["url"])
-
+            topic_family_map[topic_family] = topic_family_map.get(topic_family, []) + [topic]
+        
         result = {}
-        for topic, items in collected.items():
-            items.sort(key=lambda item: item[0])
-            result[topic] = [
-                {
-                    "timestamp": datetime.fromtimestamp(sec + nanos / 1e9, tz=timezone.utc).isoformat(),
-                    "value": value,
-                }
-                for (sec, nanos), value in items
-            ]
+        for topic_family in list(topic_family_map.keys()):
+            if topic_family not in self.config:
+                logger.error(f"Topic family '{topic_family}' not found in DWS configuration. Skipping data retrieval for topics: {topic_family_map[topic_family]}")
+                continue
+                        
+            request = GetDataRangeRequest(
+                topic=",".join(topic_family_map[topic_family]),
+                start_time=Timestamp(seconds=int(datetime.fromisoformat(time_start).timestamp())),
+                end_time=Timestamp(seconds=int(datetime.fromisoformat(time_end).timestamp())),
+                page_size=1000,
+                page_token=""
+            )
+            
+            servers = self.config[topic_family]
+            data_points: List[Datapoint] = []
+            for server in servers:
+                logger.info(f"Retrieving data for topics: {topic_family_map[topic_family]} from server: {server['name']} at {server['url']}")
+                response: GetDataRangeResponse = self._call_dws_server(server['url'], request)
+                raw_data = response.datapoints
+
+                while response.next_page_token != "":
+                    request = copy.deepcopy(request)
+                    request.page_token = response.next_page_token
+                    response: GetDataRangeResponse = self._call_dws_server(server['url'], request)
+                    raw_data.extend(response.datapoints)
+                    
+                data_points.extend(raw_data)
+                    
+            # REMOVE DUPLICATES BASED ON TOPIC AND TIMESTAMP
+            seen = set()
+            unique_data_points: List[Datapoint] = []
+            for dp in data_points:
+                key = (dp.topic, dp.timestamp.seconds)
+                if key not in seen:
+                    seen.add(key)
+                    unique_data_points.append(dp)
+                                
+            # CONVERT TO KEY VALUE PAIRS
+            for dp in unique_data_points:
+                value = None
+                value_field = dp.WhichOneof("value")
+                if value_field == "int_value":
+                    value = dp.int_value
+                elif value_field == "float_value":
+                    value = dp.float_value
+                elif value_field == "string_value":
+                    value = dp.string_value
+                elif value_field == "json_value":
+                    value = MessageToDict(dp.json_value)
+                elif value_field == "file_value":
+                    value = dp.file_value.filename
+                    logger.warning(f"File value found for topic {dp.topic} at timestamp {dp.timestamp.seconds}. Returning filename '{value}' instead of file content.")
+                
+                if dp.topic in result:
+                    result[dp.topic].append({
+                        "timestamp": datetime.fromtimestamp(dp.timestamp.seconds).isoformat(),
+                        "value": value
+                    })
+                else:
+                    result[dp.topic] = [{
+                        "timestamp": datetime.fromtimestamp(dp.timestamp.seconds).isoformat(),
+                        "value": value
+                    }]
         return result
-
-    # ------------------------------------------------------------------
-    # DWS calls
-    # ------------------------------------------------------------------
-
-    def _page_dws_server(
-        self, endpoint: str, topic: str, start_ts: Timestamp, end_ts: Timestamp
-    ) -> Iterator[Datapoint]:
-        request = GetDataRangeRequest(
-            topic=topic, start_time=start_ts, end_time=end_ts, page_size=PAGE_SIZE, page_token=""
-        )
-        response: GetDataRangeResponse = self._call_dws_server(endpoint, request)
-        yield from response.datapoints
-        while response.next_page_token != "":
-            request = copy.deepcopy(request)
-            request.page_token = response.next_page_token
-            response = self._call_dws_server(endpoint, request)
-            yield from response.datapoints
-
-    def _channel(self, endpoint: str) -> grpc.Channel:
-        """One reusable channel per endpoint (gRPC channels are thread-safe)."""
-        with self._channels_lock:
-            channel = self._channels.get(endpoint)
-            if channel is None:
-                channel = grpc.insecure_channel(endpoint, options=CHANNEL_OPTIONS)
-                self._channels[endpoint] = channel
-            return channel
-
+        
     def _call_dws_server(self, endpoint: str, request: GetDataRangeRequest) -> GetDataRangeResponse:
-        stub = DataServiceStub(self._channel(endpoint))
-        return stub.GetDataRange(request)
-
-
+        with grpc.insecure_channel(endpoint) as channel:
+            stub = DataServiceStub(channel)
+            response = stub.GetDataRange(request)
+            return response
+        
 DwsAgent = __DwsAgent()

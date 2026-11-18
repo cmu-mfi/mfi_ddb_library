@@ -22,15 +22,11 @@ logger = logging.getLogger(__name__)
 
 # FastAPI router
 #
-# Handlers that query the metadata store (psycopg) or the database nodes (gRPC)
-# are plain `def`, not `async def`. Those calls block. In an `async def`
-# handler they would run on the server's single event loop, and one long
-# retrieval (e.g. a multi-day Type 2 window) would freeze the whole API until
-# it finished: health checks and every other request would time out and the
-# Retrieval App would show the API as offline. FastAPI runs `def` handlers in a
-# worker thread pool instead, so a slow request only occupies its own thread.
-# Keep new handlers that do blocking I/O as `def`; only handlers that do no I/O
-# (or truly await async I/O) should be `async def`.
+# Handlers that query the metadata store or the database nodes are plain `def`,
+# not `async def`: those calls block, and in an `async def` handler one long
+# retrieval would hold up every other request until it finished. A `def`
+# handler runs in its own worker thread. Keep new handlers that do blocking I/O
+# as `def`.
 router = APIRouter()
 
 # psql initialization
@@ -56,8 +52,7 @@ def _csv_cell(value: Any) -> str:
 def _csv_response(payload: Dict[str, Any]) -> StreamingResponse:
     """data_format=csv: stream `topic,timestamp,value` rows (one per datapoint).
 
-    Trial details go in headers (the body is plain data), and the file name
-    follows the trial: <trial_name>_<uuid8>.csv.
+    Trial details go in headers (the body is plain data).
     """
     meta = payload.get("metadata", {})
     data = payload.get("data", {}) or {}
@@ -75,12 +70,8 @@ def _csv_response(payload: Dict[str, Any]) -> StreamingResponse:
             if buffer:
                 yield "".join(buffer)
 
-    trial_name = str(meta.get("trial_name") or "trial")
-    trial_uuid = str(meta.get("trial_uuid") or "")
-    safe_name = "".join(c if c.isalnum() or c in "-_." else "_" for c in trial_name)
     headers = {
-        "Content-Disposition": f'attachment; filename="{safe_name}_{trial_uuid[:8]}.csv"',
-        "X-Trial-UUID": trial_uuid,
+        "X-Trial-UUID": str(meta.get("trial_uuid") or ""),
         "X-Time-Start": str(meta.get("time_start", "")),
         "X-Time-End": str(meta.get("time_end", "")),
     }
@@ -181,9 +172,8 @@ async def list_endpoints():
         {
             "endpoint": "/type4",
             "description": "Download files/bytes data. (NOT IMPLEMENTED YET)",
-        },
+        }
     ]
-
 
     return schema.Type0Response(
         status="success",
@@ -313,4 +303,3 @@ def search_trials_and_get_data(request: schema.Type3Request, metadata_reader: Md
         message=f"Found {len(trials)} trial(s).",
         trials=[schema.Type1Response.TrialInfo(**trial) for trial in trials],
     )
-

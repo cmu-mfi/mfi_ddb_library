@@ -67,7 +67,6 @@ def test_type2_csv_rows_and_headers(client):
     res = _type2(client, "csv")
     assert res.status_code == 200, res.text
     assert res.headers["content-type"].startswith("text/csv")
-    assert res.headers["content-disposition"] == 'attachment; filename="trial_001_57be8ff9.csv"'
     assert res.headers["x-trial-uuid"] == TRIAL["uuid"]
 
     rows = list(csv.reader(io.StringIO(res.text)))

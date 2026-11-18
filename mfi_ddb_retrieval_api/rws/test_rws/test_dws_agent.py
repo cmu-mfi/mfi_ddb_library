@@ -67,20 +67,6 @@ def _make_real_response(*datapoints: Datapoint, next_page_token: str = "") -> Ge
 # Fixtures
 # ---------------------------------------------------------------------------
 
-import grpc
-
-
-class FakeRpcError(grpc.RpcError):
-    def __init__(self, code, details=""):
-        self._code, self._details = code, details
-
-    def code(self):
-        return self._code
-
-    def details(self):
-        return self._details
-
-
 @pytest.fixture()
 def agent():
     """Agent pre-wired with 3 topic families, bypassing YAML loading."""
@@ -120,14 +106,12 @@ def test_out_of_range_time_returns_empty(agent):
         "A topic with no in-range datapoints should not appear in the result."
 
     # Verify the correct time bounds were forwarded in the real request
-    # (times without an offset are UTC)
-    utc = datetime.timezone.utc
     actual_request = mock_call.call_args[0][1]  # (endpoint, request)
     assert actual_request.start_time.seconds == int(
-        datetime.datetime.fromisoformat(TIME_START).replace(tzinfo=utc).timestamp()
+        datetime.datetime.fromisoformat(TIME_START).timestamp()
     )
     assert actual_request.end_time.seconds == int(
-        datetime.datetime.fromisoformat(TIME_END).replace(tzinfo=utc).timestamp()
+        datetime.datetime.fromisoformat(TIME_END).timestamp()
     )
 
 
@@ -147,9 +131,9 @@ def test_single_datapoint_returned_correctly(agent):
     assert len(result["kv/sensor/temp"]) == 1
 
     entry = result["kv/sensor/temp"][0]
+    print(dp)
     assert entry["value"] == pytest.approx(23.5)
-    # ISO 8601 in UTC, with the offset
-    assert entry["timestamp"] == datetime.datetime.fromtimestamp(TS_IN_RANGE, tz=datetime.timezone.utc).isoformat()
+    assert entry["timestamp"] == datetime.datetime.fromtimestamp(TS_IN_RANGE).isoformat()
 
 # ===========================================================================
 # Test 4 – MQTT wildcard "kv/sensor/#" is forwarded as-is to the server.
@@ -218,52 +202,3 @@ def test_pagination_all_pages_fetched_and_merged(agent):
 
     values = [entry["value"] for entry in result["kv/sensor/temp"]]
     assert values == pytest.approx([10.0, 11.0, 12.0, 13.0, 14.0])
-
-
-# ===========================================================================
-# Precision, duplicates, failures and ordering
-# ===========================================================================
-
-def _dp(topic, seconds, nanos=0, value=0.0):
-    dp = _make_real_datapoint(topic, seconds, float_value=value)
-    dp.timestamp.nanos = nanos
-    return dp
-
-
-def test_values_sharing_a_second_are_all_kept(agent):
-    """The old agent kept one value per topic per second; now every datapoint is kept."""
-    page = _make_real_response(*[_dp("historian/a", TS_IN_RANGE, nanos=n * 1_000_000, value=float(n)) for n in range(50)])
-    with patch.object(agent, "_call_dws_server", side_effect=lambda endpoint, request: page):
-        result = agent.get_data("historian/a", TIME_START, TIME_END)
-    assert len(result["historian/a"]) == 50
-    # millisecond precision survives
-    assert result["historian/a"][1]["timestamp"].startswith("2024-01-01T00:00:00.001")
-
-
-def test_exact_duplicates_across_servers_removed(agent):
-    """'historian' has two servers returning the same datapoint: keep it once."""
-    page = _make_real_response(_dp("historian/a", TS_IN_RANGE, value=7.0))
-    with patch.object(agent, "_call_dws_server", side_effect=lambda endpoint, request: page):
-        result = agent.get_data("historian/a", TIME_START, TIME_END)
-    assert len(result["historian/a"]) == 1
-
-
-def test_one_failing_server_does_not_lose_the_others(agent):
-    def call(endpoint, request):
-        if endpoint == "localhost:50052":
-            raise FakeRpcError(grpc.StatusCode.UNAVAILABLE, "down")
-        return _make_real_response(_dp("historian/a", TS_IN_RANGE, value=5.0))
-
-    with patch.object(agent, "_call_dws_server", side_effect=call):
-        result = agent.get_data("historian/a", TIME_START, TIME_END)
-    assert [e["value"] for e in result["historian/a"]] == pytest.approx([5.0])
-
-
-def test_results_ordered_by_time_across_servers(agent):
-    def call(endpoint, request):
-        ts = TS_IN_RANGE + (5 if endpoint == "localhost:50052" else 1)
-        return _make_real_response(_dp("historian/a", ts, value=float(ts - TS_IN_RANGE)))
-
-    with patch.object(agent, "_call_dws_server", side_effect=call):
-        result = agent.get_data("historian/a", TIME_START, TIME_END)
-    assert [e["value"] for e in result["historian/a"]] == pytest.approx([1.0, 5.0])
