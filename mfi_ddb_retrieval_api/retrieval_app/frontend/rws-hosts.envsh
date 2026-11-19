@@ -1,0 +1,19 @@
+# Sourced by the nginx image entrypoint before the templates are rendered.
+#
+# nginx.conf.template resolves the RWS host per request through Docker's DNS
+# (resolver 127.0.0.11), so a recreated RWS container with a new IP keeps
+# working. That DNS server does not know names that exist only in this
+# container's /etc/hosts, such as host.docker.internal added by
+# `extra_hosts: host-gateway` on Linux. For those, put the IP from /etc/hosts
+# into RWS_URL here; an IP needs no lookup. Container names are left alone.
+
+rws_host=$(printf '%s' "${RWS_URL:-}" | sed -E 's#^[a-zA-Z]+://##; s#[:/].*$##')
+if [ -n "$rws_host" ]; then
+    rws_ip=$(awk -v h="$rws_host" '$1 !~ /^#/ { for (i = 2; i <= NF; i++) if ($i == h) { print $1; exit } }' /etc/hosts)
+    if [ -n "$rws_ip" ]; then
+        case "$rws_ip" in *:*) rws_ip="[$rws_ip]" ;; esac
+        export RWS_URL=$(printf '%s' "$RWS_URL" | sed -E "s#^([a-zA-Z]+://)$rws_host#\1$rws_ip#")
+        echo "rws-hosts: $rws_host is in /etc/hosts; using RWS_URL=$RWS_URL"
+    fi
+fi
+unset rws_host rws_ip

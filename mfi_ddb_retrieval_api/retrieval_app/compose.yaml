@@ -1,0 +1,27 @@
+# MFI DDB Retrieval App - standalone
+#
+# Runs ONLY the web UI. It talks to an existing Retrieval API (RWS);
+# nothing else from the pipeline is needed on this machine.
+#
+#   docker compose up -d --build
+#   UI: http://localhost:3003
+#
+# Point it at your RWS with RWS_URL (in .env or the environment), e.g.
+#   RWS_URL=http://rws.example.cmu.edu:8000 docker compose up -d
+name: mfi-ddb-retrieval-app
+
+services:
+  retrieval-app:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: cmumfi/mfi-ddb-retrieval-app:${VERSION:-latest}
+    container_name: mfi-retrieval-app
+    ports:
+      - "${RETRIEVAL_APP_PORT:-3003}:80"
+    environment:
+      # Default reaches an RWS published on this machine (port 8000).
+      RWS_URL: ${RWS_URL:-http://host.docker.internal:8000}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # makes the host reachable on Linux too
+    restart: unless-stopped
